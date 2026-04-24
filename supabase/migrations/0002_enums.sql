@@ -107,6 +107,9 @@ CREATE TYPE notification_type_t AS ENUM (
     'unmatched_company',
     'composition_warning',
     'composition_drift',
+    'bnc_stale_reminder',            -- §16 Q4: admin reminder when no BNC upload in N days
+    'document_archived',             -- §16 Q5: document auto-archive sweep
+    'ownership_transferred',         -- §16 Q8: credit history moved to new owner
     'mention'
 );
 

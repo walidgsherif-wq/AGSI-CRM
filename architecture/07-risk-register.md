@@ -183,25 +183,25 @@ shrinks → they feel deceived.
 
 ---
 
-## R-10 — §16 open questions unresolved
+## R-10 — §16 open questions (7 of 8 resolved)
 
-**What breaks:** Milestone 3 (auth + invite flow) cannot ship without the
-initial admin email. Milestone 8 cannot ship without FY confirmation for
-quarter boundaries. Milestone 13 cannot ship without the email sender domain.
+Seven of eight items are resolved. One still blocks milestone 3. Full
+decisions in `architecture/08-decisions-log.md`.
 
-**Mitigation:**
-- After this pack is approved, convert §16 items into GitHub issues with
-  labels `blocker:milestone-3`, `blocker:milestone-8`, `blocker:milestone-13`.
-- The eight questions, captured here for traceability:
+| # | Question | Status | Answer |
+|---|----------|--------|--------|
+| 1 | Fiscal year | ✅ resolved | Jan–Dec |
+| 2 | UAE working week | ✅ resolved | Mon–Fri (weekend Sat–Sun) |
+| 3 | Email sender domain | ✅ deferred | Email off for v1; in-app notifications only. Sender domain setup moved to v1.1 |
+| 4 | BNC 45+ day reminder | ✅ resolved | Enabled. `bnc-stale-reminder-weekly` cron; threshold 45 days |
+| 5 | Document retention | ✅ resolved | 7-year default, admin-configurable. `document-retention-sweep-monthly` cron flips `is_archived=true` |
+| 6 | L4 MOU workflow | ✅ resolved | Single-admin tick for v1 |
+| 7 | `INITIAL_ADMIN_EMAIL` | 🟡 **still blocking M3** | Actual email address required |
+| 8 | Ownership-transfer credit policy | ✅ resolved | New-owner; scope = all_history. Per-transfer toggle for prior-owner fallback |
 
-  1. Fiscal year: Jan–Dec assumed. Confirm. _[blocks M8]_
-  2. UAE working week: Sun–Thu. Confirm for notification timing. _[blocks M13]_
-  3. Email sender domain (SPF/DKIM setup required). _[blocks M3, M13]_
-  4. "No BNC upload in 45+ days" admin reminder — want it? _[nice-to-have]_
-  5. Document retention: auto-archive after X years? _[pre-launch]_
-  6. L4 MOU: single-admin tick or dual-approver workflow? _[blocks M7]_
-  7. Initial admin email (`INITIAL_ADMIN_EMAIL`). _[blocks M3]_
-  8. Ownership force-reassignment credit-transfer default: prior-owner (rec) or new-owner? _[blocks M7]_
+**What still breaks:** Milestone 3 (auth + invite flow) cannot ship without
+the actual email address for `INITIAL_ADMIN_EMAIL`. Everything else in this
+pack is unblocked.
 
 ## Risks explicitly out of scope
 

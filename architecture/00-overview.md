@@ -15,6 +15,7 @@ before the milestone-1 build (Next.js shell + Supabase provisioning) begins.
 | 17.5 | Mermaid sequence diagram — BNC upload pipeline | `05-bnc-upload-sequence.md` |
 | 17.6 | Mermaid state diagram — company L0→L5 with credit attribution | `06-company-lifecycle-state.md` |
 | 17.7 | Top-10 risk register with mitigations | `07-risk-register.md` |
+| §16  | Open-questions decisions log | `08-decisions-log.md` |
 
 ## Review protocol
 
@@ -41,6 +42,6 @@ en-bloc** — the prompt v2.3 explicitly says approve section by section.
 
 ## Open items blocking milestone 3 (§16)
 
-Prompt §16 lists eight items requiring answers before the BNC pipeline milestone.
-Captured as TODOs in `07-risk-register.md` §R-10; must be converted to GitHub
-issues after this pack is approved.
+Seven of the eight §16 items are resolved — see `08-decisions-log.md`. The
+only remaining blocker for milestone 3 is **D-7**: the actual
+`INITIAL_ADMIN_EMAIL` address. Every other milestone can proceed.

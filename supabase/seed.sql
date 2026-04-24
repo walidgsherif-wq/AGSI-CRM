@@ -22,9 +22,11 @@ END$$;
 -- =====================================================================
 
 INSERT INTO app_settings (key, value_json) VALUES
-    ('fiscal_year_start_month',               '{"month": 1}'::jsonb),
+    ('fiscal_year_start_month',               '{"month": 1}'::jsonb),                                      -- §16 Q1: Jan–Dec confirmed
+    ('working_week',                          '{"days": ["Mon","Tue","Wed","Thu","Fri"], "weekend": ["Sat","Sun"]}'::jsonb),  -- §16 Q2: Mon–Fri
     ('kpi_universe_sizes',                    '{"developers": 110, "consultants": 360, "main_contractors": 300, "enabling_contractors": 19, "total": 789}'::jsonb),
-    ('notification_channels_enabled',         '{"in_app": true, "email": true, "whatsapp": false}'::jsonb),
+    -- §16 Q3: email deferred; in-app is the only active channel for v1
+    ('notification_channels_enabled',         '{"in_app": true, "email": false, "whatsapp": false}'::jsonb),
     ('dormancy_policy',                       '{"consecutive_missed_uploads": 2}'::jsonb),
     ('composition_warning_thresholds',        '{"headline_pct": 80, "composition_pct": 60}'::jsonb),
     ('composition_drift_min_quarter_pct',     '{"pct": 30}'::jsonb),
@@ -35,7 +37,17 @@ INSERT INTO app_settings (key, value_json) VALUES
     ('ecosystem_inactive_company_multiplier', '{"mult": 0.5}'::jsonb),
     ('ecosystem_dedup_window_days',           '{"days": 7}'::jsonb),
     ('bei_weightings',                        '{"A": 45, "B": 20, "C": 20, "D": 15}'::jsonb),
-    ('engagement_freshness_thresholds',       '{"hot_days": 14, "warm_days": 45, "cooling_days": 90}'::jsonb)
+    ('engagement_freshness_thresholds',       '{"hot_days": 14, "warm_days": 45, "cooling_days": 90}'::jsonb),
+    -- §16 Q4: BNC-stale admin reminder enabled; fires when no BNC upload in N days
+    ('bnc_stale_reminder',                    '{"enabled": true, "threshold_days": 45}'::jsonb),
+    -- §16 Q5: document retention / auto-archive.
+    -- Single default for v1. Admin can override per doc_type later; sweep keeps
+    -- rows, flips is_archived=true, hides from default UI, retains storage blob.
+    ('document_retention',                    '{"enabled": true, "archive_after_years": 7, "by_doc_type": {}}'::jsonb),
+    -- §16 Q6: L4 MOU approval workflow — single-admin tick for v1, dual-approver deferred
+    ('l4_mou_workflow',                       '{"mode": "single_admin_tick"}'::jsonb),
+    -- §16 Q8: ownership-transfer credit policy — new owner receives the credit history
+    ('ownership_transfer_credit_policy',      '{"mode": "new_owner", "scope": "all_history"}'::jsonb)
 ON CONFLICT (key) DO UPDATE SET value_json = EXCLUDED.value_json;
 
 -- =====================================================================

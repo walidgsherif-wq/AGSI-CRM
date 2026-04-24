@@ -380,12 +380,30 @@ SELECT cron.schedule(
     );$$
 );
 
--- Email digest: 07:00 Asia/Dubai = 03:00 UTC
+-- Email digest: DISABLED for v1 (§16 Q3 — email deferred; in-app only).
+-- The Edge Function stub stays in supabase/functions/email-digest-daily/ so the
+-- cron entry can be re-enabled with one flip of app_settings.notification_channels_enabled.
+--   SELECT cron.schedule('email-digest-daily', '0 3 * * *', ...);
+
+-- BNC stale reminder: weekly Mon 08:00 Asia/Dubai = 04:00 UTC
+-- Fires if no bnc_uploads row in app_settings.bnc_stale_reminder.threshold_days.
 SELECT cron.schedule(
-    'email-digest-daily',
-    '0 3 * * *',
+    'bnc-stale-reminder-weekly',
+    '0 4 * * 1',
     $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/email-digest-daily',
+        url := current_setting('app.edge_functions_url') || '/bnc-stale-reminder',
+        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+    );$$
+);
+
+-- Document retention sweep: monthly, 1st of month 02:30 Asia/Dubai = 22:30 UTC prior day
+-- Flips is_archived=true on docs whose signed_date is older than the retention
+-- window. Emits 'document_archived' notification to admins with the count.
+SELECT cron.schedule(
+    'document-retention-sweep-monthly',
+    '30 22 1 * *',
+    $$SELECT net.http_post(
+        url := current_setting('app.edge_functions_url') || '/document-retention-sweep',
         headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
     );$$
 );

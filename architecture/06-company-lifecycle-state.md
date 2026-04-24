@@ -86,10 +86,26 @@ stateDiagram-v2
    read from `companies` inside the same transaction as the history row
    insert. This is what makes mid-year ownership transfers and type changes
    non-retroactive.
-3. **Ownership-transfer rule.** When an admin force-reassigns ownership via
-   `/admin/companies/reassign`, the default behaviour is "credit stays with
-   prior owner" — no history row is modified. New forward moves after the
-   transfer credit the new owner.
+3. **Ownership-transfer rule (§16 Q8 resolved: `new_owner`).** When an admin
+   force-reassigns ownership via `/admin/companies/reassign`, the default
+   behaviour is **"credit transfers to new owner"** —
+   `level_history.owner_at_time` is bulk-updated to the new owner for every
+   row of that company, scope `all_history`. Implementation:
+   - A `transfer_company_ownership(company_id, new_owner_id)` SECURITY DEFINER
+     function performs the update in one transaction.
+   - The before/after state is recorded in `audit_events` with
+     `event_type='ownership_transfer'`, `before_json` listing prior
+     `owner_id` and the set of affected `level_history.id`s.
+   - `kpi_actuals_daily` rows for affected metric/period combos are
+     invalidated and rebuilt on the next nightly run (or immediately via an
+     on-demand rebuild trigger from the admin UI).
+   - A `ownership_transferred` notification fires to both prior and new
+     owners so each can see their KPI numbers will shift.
+   - Admins can override the scope to "forward only" on a per-transfer basis
+     via a toggle in the reassign dialog (this is the dual mode — the
+     default is the new-owner global rule above; the toggle falls back to
+     prior-owner preservation for edge cases like genuine mid-year
+     onboarding).
 4. **Per-FY deduplication.** A company that moved L2→L3→L4 in Q1 contributes
    one L3 credit AND one L4 credit. A company that moved L3→L2→L3 in the same
    FY: the second L3 forward move gets `is_credited=false` automatically
