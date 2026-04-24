@@ -13,6 +13,7 @@ import {
   FileText,
   Shield,
   Settings,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@/types/domain';
@@ -149,6 +150,15 @@ export function Sidebar({ role, fullName, email }: { role: Role; fullName: strin
         <p className="mt-2 truncate text-xs text-agsi-darkGray" title={email}>
           {email}
         </p>
+        <form action="/auth/signout" method="post" className="mt-3">
+          <button
+            type="submit"
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-agsi-darkGray hover:bg-agsi-offWhite hover:text-agsi-navy"
+          >
+            <LogOut className="h-3.5 w-3.5" aria-hidden />
+            Sign out
+          </button>
+        </form>
         {process.env.NODE_ENV !== 'production' ? (
           <DevRoleSwitcher currentRole={role} />
         ) : null}

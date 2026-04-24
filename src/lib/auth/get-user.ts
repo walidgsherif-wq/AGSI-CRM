@@ -1,7 +1,10 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { createServerClient } from '@supabase/ssr';
 import type { Role } from '@/types/domain';
 import { ROLES } from '@/types/domain';
 import { DEV_ROLE_COOKIE } from './shared';
+import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 
 export { DEV_ROLE_COOKIE };
 
@@ -10,36 +13,58 @@ export type CurrentUser = {
   email: string;
   fullName: string;
   role: Role;
-  isDev: boolean;
 };
 
 /**
- * M1: auth is not yet wired (Supabase magic-link arrives in M3).
- * Until then, the role is resolved from:
- *   1. A cookie `agsi_dev_role` set by the dev role switcher in the sidebar
- *   2. Fallback to NEXT_PUBLIC_DEV_ROLE_DEFAULT env var
- *   3. Fallback to 'admin'
+ * Returns the currently authenticated user's profile.
+ * Redirects to /login if not authenticated.
  *
- * Once M3 lands, this function swaps to a Supabase session lookup and
- * the dev cookie is no-op in production.
+ * Dev override: if NODE_ENV !== 'production' AND the `agsi_dev_role`
+ * cookie is set, the cookie value overrides the profile's real role
+ * (display only — DB writes still go under the real role via RLS).
  */
 export async function getCurrentUser(): Promise<CurrentUser> {
   const cookieStore = cookies();
-  const cookieRole = cookieStore.get(DEV_ROLE_COOKIE)?.value;
-  const envRole = process.env.NEXT_PUBLIC_DEV_ROLE_DEFAULT;
-  const role = resolveRole(cookieRole ?? envRole);
-  return {
-    id: 'dev-user',
-    email: process.env.INITIAL_ADMIN_EMAIL ?? 'walid.g.sherif@gmail.com',
-    fullName: 'Dev User',
-    role,
-    isDev: true,
-  };
-}
 
-function resolveRole(candidate: string | undefined): Role {
-  if (candidate && (ROLES as readonly string[]).includes(candidate)) {
-    return candidate as Role;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: serverComponentCookies(cookieStore) },
+  );
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) redirect('/login');
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role, is_active')
+    .eq('id', authUser.id)
+    .single();
+
+  if (error || !profile) {
+    redirect('/login?error=profile_missing');
   }
-  return 'admin';
+
+  if (!profile.is_active) {
+    redirect('/login?error=account_deactivated');
+  }
+
+  let role: Role = profile.role as Role;
+
+  if (process.env.NODE_ENV !== 'production') {
+    const devOverride = cookieStore.get(DEV_ROLE_COOKIE)?.value;
+    if (devOverride && (ROLES as readonly string[]).includes(devOverride)) {
+      role = devOverride as Role;
+    }
+  }
+
+  return {
+    id: profile.id,
+    email: profile.email,
+    fullName: profile.full_name,
+    role,
+  };
 }

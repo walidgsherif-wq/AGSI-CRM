@@ -9,8 +9,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 |---|-----------|--------|
 | — | Architecture pack (§17) + §16 decisions | ✅ done |
 | 1 | Foundation shell (Next.js + Tailwind + shadcn-style UI + AGSI theme + role-adaptive sidebar) | ✅ done |
-| 2 | Schema + RLS + seed | ⏳ next |
-| 3 | Auth + invite flow | ⏳ |
+| 2 | Schema + RLS + seed | ✅ done |
+| 3 | Auth + invite flow | ⏳ next |
 | 4 | Companies + projects CRUD | ⏳ |
 | 5 | BNC upload pipeline | ⏳ |
 | 6 | Engagements / tasks / notes / documents | ⏳ |
