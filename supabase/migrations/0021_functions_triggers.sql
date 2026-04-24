@@ -340,80 +340,90 @@ CREATE TRIGGER documents_void_ecosystem
 -- Scheduled Edge Functions. Times in UTC; comments give Asia/Dubai.
 -- Registered via pg_cron. Actual function bodies live in supabase/functions/*.
 
--- Nightly KPI rebuild: 02:00 Asia/Dubai = 22:00 UTC
-SELECT cron.schedule(
-    'kpi-rebuild-nightly',
-    '0 22 * * *',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/kpi-rebuild-nightly',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+-- Cron registration is wrapped in a guard: if the pg_cron extension is not
+-- enabled (Supabase requires explicit enablement via Dashboard → Database →
+-- Extensions), the migration still succeeds and the schedules are skipped.
+-- Re-run this migration, or enable the extension and re-run just this block,
+-- to activate scheduling later.
+DO $cron$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+        RAISE NOTICE 'pg_cron not installed — skipping cron.schedule registration. Enable pg_cron in Supabase Dashboard and re-run.';
+        RETURN;
+    END IF;
 
--- Stagnation daily: 06:00 Asia/Dubai = 02:00 UTC
-SELECT cron.schedule(
-    'stagnation-daily',
-    '0 2 * * *',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/stagnation-daily',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+    -- Nightly KPI rebuild: 02:00 Asia/Dubai = 22:00 UTC
+    PERFORM cron.schedule(
+        'kpi-rebuild-nightly',
+        '0 22 * * *',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/kpi-rebuild-nightly',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
 
--- Composition warning: Mon 06:00 Asia/Dubai = Mon 02:00 UTC
-SELECT cron.schedule(
-    'composition-warning-weekly',
-    '0 2 * * 1',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/composition-warning-weekly',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+    -- Stagnation daily: 06:00 Asia/Dubai = 02:00 UTC
+    PERFORM cron.schedule(
+        'stagnation-daily',
+        '0 2 * * *',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/stagnation-daily',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
 
--- Composition drift: Mon 07:00 Asia/Dubai = Mon 03:00 UTC
-SELECT cron.schedule(
-    'composition-drift-weekly',
-    '0 3 * * 1',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/composition-drift-weekly',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+    -- Composition warning: Mon 06:00 Asia/Dubai = Mon 02:00 UTC
+    PERFORM cron.schedule(
+        'composition-warning-weekly',
+        '0 2 * * 1',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/composition-warning-weekly',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
 
--- Email digest: DISABLED for v1 (§16 Q3 — email deferred; in-app only).
--- The Edge Function stub stays in supabase/functions/email-digest-daily/ so the
--- cron entry can be re-enabled with one flip of app_settings.notification_channels_enabled.
---   SELECT cron.schedule('email-digest-daily', '0 3 * * *', ...);
+    -- Composition drift: Mon 07:00 Asia/Dubai = Mon 03:00 UTC
+    PERFORM cron.schedule(
+        'composition-drift-weekly',
+        '0 3 * * 1',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/composition-drift-weekly',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
 
--- BNC stale reminder: weekly Mon 08:00 Asia/Dubai = 04:00 UTC
--- Fires if no bnc_uploads row in app_settings.bnc_stale_reminder.threshold_days.
-SELECT cron.schedule(
-    'bnc-stale-reminder-weekly',
-    '0 4 * * 1',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/bnc-stale-reminder',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+    -- Email digest: DISABLED for v1 (§16 Q3 — email deferred; in-app only).
+    -- Re-enable by uncommenting below and flipping app_settings.notification_channels_enabled.
+    --   PERFORM cron.schedule('email-digest-daily', '0 3 * * *', ...);
 
--- Document retention sweep: monthly, 1st of month 02:30 Asia/Dubai = 22:30 UTC prior day
--- Flips is_archived=true on docs whose signed_date is older than the retention
--- window. Emits 'document_archived' notification to admins with the count.
-SELECT cron.schedule(
-    'document-retention-sweep-monthly',
-    '30 22 1 * *',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/document-retention-sweep',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+    -- BNC stale reminder: Mon 08:00 Asia/Dubai = 04:00 UTC
+    PERFORM cron.schedule(
+        'bnc-stale-reminder-weekly',
+        '0 4 * * 1',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/bnc-stale-reminder',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
 
--- Ecosystem rebuild: 02:15 Asia/Dubai = 22:15 UTC (safety rebuild after KPI)
-SELECT cron.schedule(
-    'ecosystem-rebuild',
-    '15 22 * * *',
-    $$SELECT net.http_post(
-        url := current_setting('app.edge_functions_url') || '/ecosystem-rebuild',
-        headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
-    );$$
-);
+    -- Document retention sweep: 1st of month 02:30 Asia/Dubai = 22:30 UTC prior day
+    PERFORM cron.schedule(
+        'document-retention-sweep-monthly',
+        '30 22 1 * *',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/document-retention-sweep',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
+
+    -- Ecosystem rebuild: 02:15 Asia/Dubai = 22:15 UTC (safety rebuild after KPI)
+    PERFORM cron.schedule(
+        'ecosystem-rebuild',
+        '15 22 * * *',
+        $body$SELECT net.http_post(
+            url := current_setting('app.edge_functions_url') || '/ecosystem-rebuild',
+            headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.edge_functions_key'))
+        );$body$
+    );
+END
+$cron$;

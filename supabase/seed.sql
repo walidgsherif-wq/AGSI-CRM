@@ -1,14 +1,8 @@
 -- seed.sql
 -- §17.4 — seed script. Idempotent: safe to re-run.
 -- Values sourced from prompt §8 and the playbook references cited there.
---
 -- Apply after all 0001..0023 migrations.
--- Fiscal year of seed data: derived from current year at the time of seed.
--- If a different FY is needed, pass in via psql variable:
---     psql ... -v fy=2026 -f seed.sql
--- (fallback uses EXTRACT(YEAR FROM now()))
-
-\set ON_ERROR_STOP on
+-- FY is derived from current calendar year (Asia/Dubai tz).
 
 DO $$
 DECLARE v_fy int;
