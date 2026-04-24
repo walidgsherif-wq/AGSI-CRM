@@ -1,5 +1,5 @@
 -- AGSI CRM — combined M2 migration bundle
--- Generated 2026-04-24T16:39:20+00:00
+-- Generated 2026-04-24T16:43:14+00:00
 -- From supabase/migrations/0001..0023 + seed.sql
 -- Paste into the Supabase SQL Editor and click Run.
 
@@ -201,9 +201,14 @@ CREATE TABLE companies (
     key_contact_email           text            NULL,
     key_contact_phone           text            NULL,
     notes_internal              text            NULL,
-    -- derived flag, recomputed by trigger + BNC pipeline
+    -- derived flag. Explicit enum casts on the literals so PG15 treats the
+    -- expression as IMMUTABLE (required for GENERATED ALWAYS AS STORED).
     is_in_kpi_universe          boolean         NOT NULL
-        GENERATED ALWAYS AS (company_type IN ('developer','design_consultant','main_contractor')) STORED,
+        GENERATED ALWAYS AS (
+            company_type = 'developer'::company_type_t
+            OR company_type = 'design_consultant'::company_type_t
+            OR company_type = 'main_contractor'::company_type_t
+        ) STORED,
     current_level               level_t         NOT NULL DEFAULT 'L0',
     level_changed_at            timestamptz     NULL,
     has_active_projects         boolean         NOT NULL DEFAULT false,
@@ -346,8 +351,9 @@ CREATE TABLE projects (
 CREATE INDEX projects_stage_idx           ON projects (stage) WHERE is_dormant = false;
 CREATE INDEX projects_city_idx            ON projects (city);
 CREATE INDEX projects_sector_idx          ON projects (sector);
+-- Explicit enum cast on the literal so the predicate is IMMUTABLE.
 CREATE INDEX projects_completion_idx      ON projects (estimated_completion_date)
-    WHERE is_dormant = false AND stage <> 'completed';
+    WHERE is_dormant = false AND stage <> 'completed'::project_stage_t;
 CREATE INDEX projects_bnc_ref_idx         ON projects (bnc_reference_number);
 
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
@@ -429,8 +435,12 @@ CREATE TABLE tasks (
         CHECK ((status = 'done' AND completed_at IS NOT NULL) OR status <> 'done')
 );
 
-CREATE INDEX tasks_owner_status_idx ON tasks (owner_id, status) WHERE status IN ('open','in_progress');
-CREATE INDEX tasks_due_date_idx     ON tasks (due_date) WHERE status IN ('open','in_progress');
+-- Explicit enum casts on the literals so PG15 treats the partial-index
+-- predicate as IMMUTABLE.
+CREATE INDEX tasks_owner_status_idx ON tasks (owner_id, status)
+    WHERE status = 'open'::task_status_t OR status = 'in_progress'::task_status_t;
+CREATE INDEX tasks_due_date_idx     ON tasks (due_date)
+    WHERE status = 'open'::task_status_t OR status = 'in_progress'::task_status_t;
 CREATE INDEX tasks_company_idx     ON tasks (company_id) WHERE company_id IS NOT NULL;
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
@@ -494,8 +504,11 @@ CREATE INDEX documents_project_idx         ON documents (project_id) WHERE proje
 CREATE INDEX documents_uploaded_by_idx     ON documents (uploaded_by);
 
 -- Driver D targeting: partial covering index for the rollup query.
+-- Explicit enum casts so the predicate is IMMUTABLE under PG15.
 CREATE INDEX documents_driver_d_idx ON documents (uploaded_by, doc_type, signed_date)
-    WHERE doc_type IN ('announcement','site_banner_approval','case_study');
+    WHERE doc_type = 'announcement'::document_type_t
+       OR doc_type = 'site_banner_approval'::document_type_t
+       OR doc_type = 'case_study'::document_type_t;
 
 -- Retention sweep: find un-archived docs older than threshold
 CREATE INDEX documents_retention_sweep_idx ON documents (signed_date)
@@ -643,7 +656,9 @@ CREATE TABLE bnc_uploads (
 );
 
 CREATE INDEX bnc_uploads_file_date_idx ON bnc_uploads (file_date);
-CREATE INDEX bnc_uploads_status_idx    ON bnc_uploads (status) WHERE status IN ('pending','processing');
+-- Explicit enum casts so the predicate is IMMUTABLE under PG15.
+CREATE INDEX bnc_uploads_status_idx    ON bnc_uploads (status)
+    WHERE status = 'pending'::bnc_upload_status_t OR status = 'processing'::bnc_upload_status_t;
 
 ALTER TABLE bnc_uploads ENABLE ROW LEVEL SECURITY;
 
@@ -694,7 +709,9 @@ CREATE TABLE company_match_queue (
 );
 
 CREATE INDEX company_match_queue_upload_idx ON company_match_queue (upload_id, status);
-CREATE INDEX company_match_queue_pending_idx ON company_match_queue (status) WHERE status = 'pending';
+-- Explicit enum cast on the literal so the predicate is IMMUTABLE.
+CREATE INDEX company_match_queue_pending_idx ON company_match_queue (status)
+    WHERE status = 'pending'::match_queue_status_t;
 
 ALTER TABLE company_match_queue ENABLE ROW LEVEL SECURITY;
 

@@ -24,7 +24,9 @@ CREATE TABLE bnc_uploads (
 );
 
 CREATE INDEX bnc_uploads_file_date_idx ON bnc_uploads (file_date);
-CREATE INDEX bnc_uploads_status_idx    ON bnc_uploads (status) WHERE status IN ('pending','processing');
+-- Explicit enum casts so the predicate is IMMUTABLE under PG15.
+CREATE INDEX bnc_uploads_status_idx    ON bnc_uploads (status)
+    WHERE status = 'pending'::bnc_upload_status_t OR status = 'processing'::bnc_upload_status_t;
 
 ALTER TABLE bnc_uploads ENABLE ROW LEVEL SECURITY;
 
@@ -75,6 +77,8 @@ CREATE TABLE company_match_queue (
 );
 
 CREATE INDEX company_match_queue_upload_idx ON company_match_queue (upload_id, status);
-CREATE INDEX company_match_queue_pending_idx ON company_match_queue (status) WHERE status = 'pending';
+-- Explicit enum cast on the literal so the predicate is IMMUTABLE.
+CREATE INDEX company_match_queue_pending_idx ON company_match_queue (status)
+    WHERE status = 'pending'::match_queue_status_t;
 
 ALTER TABLE company_match_queue ENABLE ROW LEVEL SECURITY;

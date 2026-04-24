@@ -42,8 +42,12 @@ CREATE TABLE tasks (
         CHECK ((status = 'done' AND completed_at IS NOT NULL) OR status <> 'done')
 );
 
-CREATE INDEX tasks_owner_status_idx ON tasks (owner_id, status) WHERE status IN ('open','in_progress');
-CREATE INDEX tasks_due_date_idx     ON tasks (due_date) WHERE status IN ('open','in_progress');
+-- Explicit enum casts on the literals so PG15 treats the partial-index
+-- predicate as IMMUTABLE.
+CREATE INDEX tasks_owner_status_idx ON tasks (owner_id, status)
+    WHERE status = 'open'::task_status_t OR status = 'in_progress'::task_status_t;
+CREATE INDEX tasks_due_date_idx     ON tasks (due_date)
+    WHERE status = 'open'::task_status_t OR status = 'in_progress'::task_status_t;
 CREATE INDEX tasks_company_idx     ON tasks (company_id) WHERE company_id IS NOT NULL;
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;

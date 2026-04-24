@@ -34,8 +34,11 @@ CREATE INDEX documents_project_idx         ON documents (project_id) WHERE proje
 CREATE INDEX documents_uploaded_by_idx     ON documents (uploaded_by);
 
 -- Driver D targeting: partial covering index for the rollup query.
+-- Explicit enum casts so the predicate is IMMUTABLE under PG15.
 CREATE INDEX documents_driver_d_idx ON documents (uploaded_by, doc_type, signed_date)
-    WHERE doc_type IN ('announcement','site_banner_approval','case_study');
+    WHERE doc_type = 'announcement'::document_type_t
+       OR doc_type = 'site_banner_approval'::document_type_t
+       OR doc_type = 'case_study'::document_type_t;
 
 -- Retention sweep: find un-archived docs older than threshold
 CREATE INDEX documents_retention_sweep_idx ON documents (signed_date)

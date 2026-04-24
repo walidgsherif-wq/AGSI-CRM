@@ -34,8 +34,9 @@ CREATE TABLE projects (
 CREATE INDEX projects_stage_idx           ON projects (stage) WHERE is_dormant = false;
 CREATE INDEX projects_city_idx            ON projects (city);
 CREATE INDEX projects_sector_idx          ON projects (sector);
+-- Explicit enum cast on the literal so the predicate is IMMUTABLE.
 CREATE INDEX projects_completion_idx      ON projects (estimated_completion_date)
-    WHERE is_dormant = false AND stage <> 'completed';
+    WHERE is_dormant = false AND stage <> 'completed'::project_stage_t;
 CREATE INDEX projects_bnc_ref_idx         ON projects (bnc_reference_number);
 
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;

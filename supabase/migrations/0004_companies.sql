@@ -21,9 +21,14 @@ CREATE TABLE companies (
     key_contact_email           text            NULL,
     key_contact_phone           text            NULL,
     notes_internal              text            NULL,
-    -- derived flag, recomputed by trigger + BNC pipeline
+    -- derived flag. Explicit enum casts on the literals so PG15 treats the
+    -- expression as IMMUTABLE (required for GENERATED ALWAYS AS STORED).
     is_in_kpi_universe          boolean         NOT NULL
-        GENERATED ALWAYS AS (company_type IN ('developer','design_consultant','main_contractor')) STORED,
+        GENERATED ALWAYS AS (
+            company_type = 'developer'::company_type_t
+            OR company_type = 'design_consultant'::company_type_t
+            OR company_type = 'main_contractor'::company_type_t
+        ) STORED,
     current_level               level_t         NOT NULL DEFAULT 'L0',
     level_changed_at            timestamptz     NULL,
     has_active_projects         boolean         NOT NULL DEFAULT false,
