@@ -1,5 +1,5 @@
 -- AGSI CRM — combined M2 migration bundle
--- Generated 2026-04-24T16:25:00+00:00
+-- Generated 2026-04-24T16:35:40+00:00
 -- From supabase/migrations/0001..0023 + seed.sql
 -- Paste into the Supabase SQL Editor and click Run.
 
@@ -2010,9 +2010,12 @@ CREATE INDEX notifications_recipient_type_idx
 CREATE INDEX market_snapshots_by_metric_date_idx
     ON market_snapshots (metric_code, snapshot_date DESC);
 
--- Ecosystem quarterly trend: fast aggregate per quarter
+-- Ecosystem quarterly trend: fast aggregate per quarter.
+-- Cast to timestamp-without-tz via AT TIME ZONE so date_trunc is IMMUTABLE
+-- (required for use in an index expression). Storage is UTC so 'UTC' is
+-- the correct pin — quarters align with calendar quarters in app-display tz.
 CREATE INDEX ecosystem_events_quarter_idx
-    ON ecosystem_events (date_trunc('quarter', occurred_at), company_type_at_time)
+    ON ecosystem_events (date_trunc('quarter', occurred_at AT TIME ZONE 'UTC'), company_type_at_time)
     WHERE is_void = false;
 
 -- ============================================================
