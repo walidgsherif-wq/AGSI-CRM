@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    @apply bg-white text-agsi-navy;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  body {
+    @apply min-h-screen font-sans antialiased;
+  }
+
+  /* Tabular figures for numbers everywhere */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus ring — subtle but visible on white */
+  :focus-visible {
+    @apply outline-none ring-2 ring-agsi-accent ring-offset-2 ring-offset-white;
+  }
+}

@@ -42,6 +42,5 @@ en-bloc** — the prompt v2.3 explicitly says approve section by section.
 
 ## Open items blocking milestone 3 (§16)
 
-Seven of the eight §16 items are resolved — see `08-decisions-log.md`. The
-only remaining blocker for milestone 3 is **D-7**: the actual
-`INITIAL_ADMIN_EMAIL` address. Every other milestone can proceed.
+All eight §16 items resolved — see `08-decisions-log.md`. Milestone 1
+build is in progress; see the repo root `README.md` for what's built.

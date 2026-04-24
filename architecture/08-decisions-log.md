@@ -151,11 +151,12 @@ and that single action is authoritative.
 
 ---
 
-## D-7 — `INITIAL_ADMIN_EMAIL`: **🟡 still outstanding**
+## D-7 — `INITIAL_ADMIN_EMAIL`: **`walid.g.sherif@gmail.com`**
 
-User answered "yes" — which reads as "yes I acknowledge I'll supply one" but
-no actual email address was provided. This is the only remaining blocker for
-milestone 3 (auth + invite flow).
+**Note:** this is a personal Gmail address rather than an `@agsi.ae`
+corporate address. Acceptable for v1 bootstrapping, but strongly recommend
+switching to a corporate address before production rollout so admin
+access is tied to the organisation's identity provider and SSO policies.
 
 **Impact:**
 - `.env.example` ships with `INITIAL_ADMIN_EMAIL=` blank.

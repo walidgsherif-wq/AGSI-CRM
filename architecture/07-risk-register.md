@@ -196,12 +196,10 @@ decisions in `architecture/08-decisions-log.md`.
 | 4 | BNC 45+ day reminder | ✅ resolved | Enabled. `bnc-stale-reminder-weekly` cron; threshold 45 days |
 | 5 | Document retention | ✅ resolved | 7-year default, admin-configurable. `document-retention-sweep-monthly` cron flips `is_archived=true` |
 | 6 | L4 MOU workflow | ✅ resolved | Single-admin tick for v1 |
-| 7 | `INITIAL_ADMIN_EMAIL` | 🟡 **still blocking M3** | Actual email address required |
+| 7 | `INITIAL_ADMIN_EMAIL` | ✅ resolved | `walid.g.sherif@gmail.com` — flag: personal gmail; recommend swap to @agsi.ae before prod rollout |
 | 8 | Ownership-transfer credit policy | ✅ resolved | New-owner; scope = all_history. Per-transfer toggle for prior-owner fallback |
 
-**What still breaks:** Milestone 3 (auth + invite flow) cannot ship without
-the actual email address for `INITIAL_ADMIN_EMAIL`. Everything else in this
-pack is unblocked.
+All eight §16 items resolved. Milestone 1 unblocked.
 
 ## Risks explicitly out of scope
 
