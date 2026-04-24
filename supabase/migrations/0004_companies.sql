@@ -57,8 +57,22 @@ CREATE UNIQUE INDEX companies_canonical_name_ci_uq
 CREATE INDEX companies_canonical_name_trgm
     ON companies USING gin (canonical_name gin_trgm_ops);
 
+-- The polymorphic array_to_string(anyarray, text) is marked STABLE by
+-- Postgres 15 on the Supabase platform, which disqualifies it from use in
+-- an index expression. Wrap it in a concretely-typed IMMUTABLE function
+-- so the GIN trgm index on aliases can be built. text[] → text conversion
+-- has no hidden time-zone / locale dependency so this is truthfully
+-- IMMUTABLE.
+CREATE OR REPLACE FUNCTION agsi_aliases_to_text(a text[])
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+STRICT
+PARALLEL SAFE
+AS $$ SELECT coalesce(array_to_string(a, ' '), '') $$;
+
 CREATE INDEX companies_aliases_trgm
-    ON companies USING gin (array_to_string(aliases, ' ') gin_trgm_ops);
+    ON companies USING gin (agsi_aliases_to_text(aliases) gin_trgm_ops);
 
 CREATE INDEX companies_owner_id_idx    ON companies (owner_id) WHERE is_active = true;
 CREATE INDEX companies_current_level_idx ON companies (current_level) WHERE is_active = true;
