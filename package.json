@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\"",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "verify:m2": "node --env-file=.env.local scripts/verify-m2.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",
