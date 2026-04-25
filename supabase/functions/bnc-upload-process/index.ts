@@ -342,6 +342,12 @@ async function processBncRows(
     `phase1 prefetch ${projectsByRef.size}+${projectsByName.size}p / ${allCompanies.size}c in ${((Date.now() - phase1Started) / 1000).toFixed(1)}s`,
   );
 
+  // Yield helper — resets the per-burst CPU counter on Supabase Edge.
+  // Each await new Promise(setTimeout) gives the runtime a chance to swap
+  // out, which prevents the synchronous work in Phase 2 + Phase 4 from
+  // exhausting the 200ms CPU budget in one go.
+  const yieldNow = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
   // Phase 2: collect resolver contexts + unique tokens needing fuzzy lookup
   const phase2Started = Date.now();
   type ResolveContext = {
@@ -353,6 +359,7 @@ async function processBncRows(
   const fuzzyKeys = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
+    if (i % 200 === 0 && i > 0) await yieldNow();
     const row = rows[i];
     for (const def of ROLE_COLUMNS) {
       const cell = pickColumn(row, def.nameAliases);
@@ -436,6 +443,7 @@ async function processBncRows(
   const phase4Started = Date.now();
 
   for (let i = 0; i < rows.length; i++) {
+    if (i % 200 === 0 && i > 0) await yieldNow();
     const row = rows[i];
     const ref = pickColumn(row, ['Reference Number', 'Reference No', 'PRJ Reference']);
     const name = pickColumn(row, ['Project Name', 'Name']);
@@ -487,7 +495,10 @@ async function processBncRows(
     }
   }
 
+  let resolverIdx = 0;
   for (const ctx of resolvers) {
+    if (resolverIdx % 500 === 0 && resolverIdx > 0) await yieldNow();
+    resolverIdx++;
     const projectId = projectIdByRowIndex.get(ctx.rowIndex);
     if (!projectId) continue;
     const lower = ctx.token.name.toLowerCase();
