@@ -20,15 +20,22 @@ export type CurrentUser = {
  * Redirects to /login if not authenticated.
  *
  * Dev override: if NODE_ENV !== 'production' AND the `agsi_dev_role`
- * cookie is set, the cookie value overrides the profile's real role
- * (display only — DB writes still go under the real role via RLS).
+ * cookie is set:
+ *   - With a real session, the cookie overrides the profile's real role
+ *     (display only — DB writes still go under the real role via RLS).
+ *   - Without a real session, a synthetic CurrentUser is returned so the
+ *     M1 shell remains previewable locally without Supabase env vars.
  */
 export async function getCurrentUser(): Promise<CurrentUser> {
   const cookieStore = cookies();
+  const devOverride = cookieStore.get(DEV_ROLE_COOKIE)?.value;
+  const isDev = process.env.NODE_ENV !== 'production';
+  const isValidDevRole =
+    !!devOverride && (ROLES as readonly string[]).includes(devOverride);
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
     { cookies: serverComponentCookies(cookieStore) },
   );
 
@@ -36,7 +43,17 @@ export async function getCurrentUser(): Promise<CurrentUser> {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  if (!authUser) redirect('/login');
+  if (!authUser) {
+    if (isDev && isValidDevRole) {
+      return {
+        id: `dev-${devOverride}`,
+        email: `dev-${devOverride}@local`,
+        fullName: `Dev ${devOverride}`,
+        role: devOverride as Role,
+      };
+    }
+    redirect('/login');
+  }
 
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -52,14 +69,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
     redirect('/login?error=account_deactivated');
   }
 
-  let role: Role = profile.role as Role;
-
-  if (process.env.NODE_ENV !== 'production') {
-    const devOverride = cookieStore.get(DEV_ROLE_COOKIE)?.value;
-    if (devOverride && (ROLES as readonly string[]).includes(devOverride)) {
-      role = devOverride as Role;
-    }
-  }
+  const role: Role = isDev && isValidDevRole ? (devOverride as Role) : (profile.role as Role);
 
   return {
     id: profile.id,
