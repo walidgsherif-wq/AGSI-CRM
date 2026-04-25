@@ -2,14 +2,81 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+
+type RawRow = Record<string, string | null>;
+
+const HEADER_HINTS = ['reference number', 'project name', 'reference no', 'project ref'];
+
+function looksLikeHeader(row: unknown[]): boolean {
+  const lc = row
+    .map((v) => (typeof v === 'string' ? v.toLowerCase().trim() : ''))
+    .filter(Boolean);
+  return HEADER_HINTS.some((hint) => lc.some((cell) => cell.includes(hint)));
+}
+
+function cellToString(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'number') return String(v);
+  return String(v).trim();
+}
+
+/** Browser-side XLSX parser with auto-detected header row. */
+function parseWorkbook(buffer: ArrayBuffer): { rows: RawRow[]; headerRowIndex: number } {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const firstSheetName = wb.SheetNames[0];
+  if (!firstSheetName) throw new Error('Workbook has no sheets.');
+  const sheet = wb.Sheets[firstSheetName];
+  const sheetRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: true,
+    blankrows: false,
+    defval: null,
+  });
+
+  let headerRowIndex = -1;
+  for (let i = 0; i < Math.min(10, sheetRows.length); i++) {
+    if (looksLikeHeader(sheetRows[i] ?? [])) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+  if (headerRowIndex < 0) {
+    throw new Error(
+      'Could not locate header row. Expected "Reference Number" or "Project Name" within first 10 rows.',
+    );
+  }
+
+  const headerRaw = sheetRows[headerRowIndex] ?? [];
+  const headers = headerRaw.map((h) =>
+    typeof h === 'string' ? h.trim() : String(h ?? '').trim(),
+  );
+
+  const dataRows: RawRow[] = [];
+  for (let r = headerRowIndex + 1; r < sheetRows.length; r++) {
+    const row = sheetRows[r] ?? [];
+    if (row.every((v) => v === null || v === '')) continue;
+    const obj: RawRow = {};
+    for (let c = 0; c < headers.length; c++) {
+      const key = headers[c];
+      if (!key) continue;
+      obj[key] = cellToString(row[c]);
+    }
+    dataRows.push(obj);
+  }
+
+  return { rows: dataRows, headerRowIndex };
+}
 
 export function UploadForm() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [reprocess, setReprocess] = useState(false);
 
@@ -18,27 +85,75 @@ export function UploadForm() {
     setError(null);
     setInfo(null);
     setDuplicateOf(null);
+    setProgress(null);
+
     const form = new FormData(e.currentTarget);
-    if (reprocess) form.set('reprocess', 'on');
+    const file = form.get('file') as File | null;
+    const fileDate = String(form.get('file_date') ?? '');
+    if (!file) {
+      setError('Choose a file first.');
+      return;
+    }
+    if (!fileDate) {
+      setError('Pick a file date.');
+      return;
+    }
 
     startTransition(async () => {
       try {
-        // Invoke the Supabase Edge Function directly. This bypasses Vercel's
-        // 60s function ceiling — Edge Functions run in Supabase's network
-        // with sub-millisecond DB round-trips and a 150s timeout.
+        // 1) Browser parses XLSX (unlimited CPU)
+        setProgress('Parsing workbook…');
+        const buffer = await file.arrayBuffer();
+        let rows: RawRow[];
+        try {
+          ({ rows } = parseWorkbook(buffer));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+          return;
+        }
+        if (rows.length === 0) {
+          setError('Workbook contained no data rows.');
+          return;
+        }
+
+        // 2) Browser uploads file to Storage (RLS gates to admin via session JWT)
+        setProgress(`Uploading file (${rows.length} rows parsed)…`);
         const supabase = createSupabaseBrowserClient();
+        const stamp = Date.now();
+        const storagePath = `${fileDate}/${stamp}-${file.name}`;
+        const { error: storeErr } = await supabase.storage
+          .from('bnc-uploads')
+          .upload(storagePath, buffer, {
+            contentType:
+              file.type ||
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            upsert: false,
+          });
+        if (storeErr) {
+          setError(`Storage upload failed: ${storeErr.message}`);
+          return;
+        }
+
+        // 3) Browser POSTs JSON to Edge Function (no XLSX dep there)
+        setProgress(`Resolving ${rows.length} rows on the server…`);
         const { data, error: invokeErr } = await supabase.functions.invoke(
           'bnc-upload-process',
-          { body: form },
+          {
+            body: {
+              file_date: fileDate,
+              filename: file.name,
+              storage_path: storagePath,
+              rows,
+              reprocess,
+            },
+          },
         );
         if (invokeErr) {
-          // Edge Function returned non-2xx. The body may still be JSON.
           const ctx = invokeErr.context as Response | undefined;
           let payload: Record<string, unknown> | null = null;
           if (ctx) {
             try {
-              const text = await ctx.text();
-              payload = JSON.parse(text);
+              payload = JSON.parse(await ctx.text()) as Record<string, unknown>;
             } catch {
               // not JSON
             }
@@ -75,6 +190,7 @@ export function UploadForm() {
           `Processed ${summary.rowsProcessed}/${summary.rowsTotal} rows. ` +
             `${summary.newProjects} new projects, ${summary.unmatchedCompanies} unmatched companies.`,
         );
+        setProgress(null);
         router.push(`/admin/uploads/${uploadId}`);
         router.refresh();
       } catch (err) {
@@ -129,7 +245,7 @@ export function UploadForm() {
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Processing… (up to 2 min)' : 'Upload + process'}
+          {pending ? progress ?? 'Working…' : 'Upload + process'}
         </Button>
         {error && <p className="text-xs text-rag-red">{error}</p>}
         {info && <p className="text-xs text-agsi-green">{info}</p>}

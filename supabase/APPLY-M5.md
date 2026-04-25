@@ -27,16 +27,21 @@ Skip if you already ran it. Adds the fuzzy-match RPC the resolver calls.
 3. Supabase dashboard → **SQL Editor** → **New query** → paste → **Run**
 4. Expect: `Success. No rows returned.`
 
-## Step 3 — Deploy the Edge Function
+## Step 3 — Deploy / re-deploy the Edge Function
 
-This is the new piece — replaces the inline Vercel processing.
+Architecture note: the function only handles **resolving + DB writes**. The
+browser parses the .xlsx and uploads it to Storage. This split is required
+because Edge Functions on Supabase Free tier have a strict CPU-time budget
+that XLSX parsing of large files exhausts.
 
 1. Supabase dashboard → **Edge Functions** (left sidebar)
-2. Click **Create a new function**
+2. Click **Create a new function** (first time) OR click the existing
+   `bnc-upload-process` function (re-deploy)
 3. Function name: `bnc-upload-process` (exact, case-sensitive)
 4. Open https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/functions/bnc-upload-process/index.ts
 5. Click **Raw** → select all → copy
-6. Back in Supabase Dashboard, paste into the **index.ts** editor (replace any default content)
+6. Back in Supabase Dashboard, paste into the **index.ts** editor —
+   **completely replace** any existing content
 7. Click **Deploy**
 8. Wait ~30 seconds for the deployment indicator to go green
 

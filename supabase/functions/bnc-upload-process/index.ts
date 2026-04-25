@@ -1,27 +1,26 @@
 // Edge Function: bnc-upload-process
 // =====================================================================
-// Single-file Deno port of the BNC upload pipeline. Runs inside Supabase's
-// network so DB round-trips drop from ~150ms (Vercel→Supabase) to <5ms,
-// killing the 60s function timeout problem we hit on Vercel for ~3500-row
-// files.
+// Resolver-only pipeline. The browser handles XLSX parsing + Storage
+// upload because Supabase Edge Functions have a strict CPU-time budget
+// (~200ms on Free tier) that loading xlsx + parsing 3500 rows blows
+// through long before wall-clock timeout matters.
 //
-// Deploy via Supabase Dashboard → Edge Functions → Create new function
-// → name "bnc-upload-process" → paste this entire file → Deploy.
-// No CLI required.
+// Deploy via Supabase Dashboard → Edge Functions → Create/Update
+// "bnc-upload-process" → paste this entire file → Deploy.
 //
-// The function expects a multipart POST with:
-//   file:        the .xlsx (max 50MB)
-//   file_date:   YYYY-MM-DD
-//   reprocess:   "on" to bypass the duplicate-file_date guard
+// The function expects a JSON POST with:
+//   file_date:    YYYY-MM-DD
+//   filename:     original name of the .xlsx
+//   storage_path: where the browser uploaded the file in bnc-uploads
+//   rows:         array of parsed row objects (see RawRow below)
+//   reprocess:    optional bool — bypass duplicate-file_date guard
 //
-// Auth: caller's session JWT in the Authorization header. The function
+// Auth: caller's session JWT in the Authorization header. Function
 // verifies the caller is an active admin profile before doing any work.
 // =====================================================================
 
 // @ts-expect-error — Deno-style URL imports are resolved at runtime.
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-// @ts-expect-error — npm: prefix is Supabase Edge Runtime sugar.
-import * as XLSX from 'npm:xlsx@0.18.5';
 
 declare const Deno: {
   env: { get(k: string): string | undefined };
@@ -178,70 +177,11 @@ function mapStage(raw: string | null | undefined): {
 }
 
 // ---------------------------------------------------------------------
-// XLSX parser (auto-detects header row)
+// Row helpers (parsing happens in the browser; here we just operate on
+// the pre-parsed RawRow shape)
 // ---------------------------------------------------------------------
 
 type RawRow = Record<string, string | null>;
-type ParseResult = { headers: string[]; rows: RawRow[]; headerRowIndex: number };
-
-const HEADER_HINTS = ['reference number', 'project name', 'reference no', 'project ref'];
-
-function looksLikeHeader(row: unknown[]): boolean {
-  const lc = row
-    .map((v) => (typeof v === 'string' ? v.toLowerCase().trim() : ''))
-    .filter(Boolean);
-  return HEADER_HINTS.some((hint) => lc.some((cell) => cell.includes(hint)));
-}
-
-function cellToString(v: unknown): string | null {
-  if (v === null || v === undefined || v === '') return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  if (typeof v === 'number') return String(v);
-  return String(v).trim();
-}
-
-function parseBncWorkbook(buffer: ArrayBuffer): ParseResult {
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
-  const firstSheetName = wb.SheetNames[0];
-  if (!firstSheetName) throw new Error('Workbook has no sheets.');
-  const sheet = wb.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-    header: 1, raw: true, blankrows: false, defval: null,
-  });
-
-  let headerRowIndex = -1;
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    if (looksLikeHeader(rows[i] ?? [])) {
-      headerRowIndex = i;
-      break;
-    }
-  }
-  if (headerRowIndex < 0) {
-    throw new Error(
-      'Could not locate header row. Expected "Reference Number" or "Project Name" within first 10 rows.',
-    );
-  }
-
-  const headerRaw = rows[headerRowIndex] ?? [];
-  const headers = headerRaw.map((h: unknown) =>
-    typeof h === 'string' ? h.trim() : String(h ?? '').trim(),
-  );
-
-  const dataRows: RawRow[] = [];
-  for (let r = headerRowIndex + 1; r < rows.length; r++) {
-    const row = rows[r] ?? [];
-    if (row.every((v: unknown) => v === null || v === '')) continue;
-    const obj: RawRow = {};
-    for (let c = 0; c < headers.length; c++) {
-      const key = headers[c];
-      if (!key) continue;
-      obj[key] = cellToString(row[c]);
-    }
-    dataRows.push(obj);
-  }
-
-  return { headers, rows: dataRows, headerRowIndex };
-}
 
 function pickColumn(row: RawRow, aliases: string[]): string | null {
   for (const a of aliases) {
@@ -732,30 +672,36 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'forbidden' }, 403);
   }
 
-  // Parse multipart
-  let form: FormData;
+  // Parse JSON body
+  type RequestPayload = {
+    file_date?: string;
+    filename?: string;
+    storage_path?: string;
+    rows?: RawRow[];
+    reprocess?: boolean;
+  };
+  let payload: RequestPayload;
   try {
-    form = await req.formData();
+    payload = (await req.json()) as RequestPayload;
   } catch (err) {
-    return jsonResponse({ error: `Could not parse form data: ${(err as Error).message}` }, 400);
-  }
-  const file = form.get('file');
-  const fileDateRaw = String(form.get('file_date') ?? '');
-  const reprocess = form.get('reprocess') === 'on';
-
-  if (!(file instanceof File)) return jsonResponse({ error: 'No file provided.' }, 400);
-  if (!file.name.toLowerCase().endsWith('.xlsx')) {
-    return jsonResponse({ error: 'File must be .xlsx' }, 400);
-  }
-  if (file.size > 50 * 1024 * 1024) {
-    return jsonResponse({ error: 'File exceeds 50MB.' }, 400);
-  }
-  const fileDate = parseDate(fileDateRaw);
-  if (!fileDate) {
     return jsonResponse(
-      { error: 'file_date is required (YYYY-MM-DD or DD/MM/YYYY).' }, 400,
+      { error: `Could not parse JSON body: ${(err as Error).message}` }, 400,
     );
   }
+
+  const fileDate = parseDate(payload.file_date ?? null);
+  if (!fileDate) {
+    return jsonResponse({ error: 'file_date is required (YYYY-MM-DD).' }, 400);
+  }
+  const filename = (payload.filename ?? '').trim();
+  if (!filename) return jsonResponse({ error: 'filename is required.' }, 400);
+  const storagePath = (payload.storage_path ?? '').trim();
+  if (!storagePath) return jsonResponse({ error: 'storage_path is required.' }, 400);
+  const rows = Array.isArray(payload.rows) ? payload.rows : null;
+  if (!rows || rows.length === 0) {
+    return jsonResponse({ error: 'rows is required and must be a non-empty array.' }, 400);
+  }
+  const reprocess = !!payload.reprocess;
 
   const admin: SupabaseClient = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
@@ -776,25 +722,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
   }
 
-  // Persist to Storage
-  const stamp = Date.now();
-  const storagePath = `${fileDate}/${stamp}-${file.name}`;
-  const arrayBuffer = await file.arrayBuffer();
-  const { error: storeErr } = await admin.storage
-    .from('bnc-uploads').upload(storagePath, arrayBuffer, {
-      contentType: file.type ||
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      upsert: false,
-    });
-  if (storeErr) {
-    return jsonResponse({ error: `Storage upload failed: ${storeErr.message}` }, 500);
-  }
-
-  // Insert bnc_uploads row
+  // Insert bnc_uploads row (file is already in storage; the browser uploaded it)
   const { data: uploadRow, error: insertErr } = await admin.from('bnc_uploads')
     .insert({
-      filename: file.name, storage_path: storagePath,
+      filename, storage_path: storagePath,
       uploaded_by: user.id, file_date: fileDate, status: 'processing',
+      row_count: rows.length,
     })
     .select('id').single();
   if (insertErr || !uploadRow) {
@@ -804,9 +737,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
   const uploadId = (uploadRow as { id: string }).id;
 
-  // Parse + process
+  // Process
   try {
-    const { rows } = parseBncWorkbook(arrayBuffer);
     const summary = await processBncRows(admin, uploadId, fileDate, rows);
 
     await admin.from('bnc_uploads').update({
@@ -830,7 +762,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         (admins as Array<{ id: string }>).map((a) => ({
           recipient_id: a.id,
           notification_type: 'upload_complete',
-          subject: `BNC upload completed (${file.name})`,
+          subject: `BNC upload completed (${filename})`,
           body: `${summary.newProjects} new / ${summary.updatedProjects} updated projects, ${summary.unmatchedCompanies} unmatched companies pending review.`,
           link_url: `/admin/uploads/${uploadId}`,
         })),
