@@ -11,8 +11,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 1 | Foundation shell (Next.js + Tailwind + shadcn-style UI + AGSI theme + role-adaptive sidebar) | ✅ done |
 | 2 | Schema + RLS + seed | ✅ done |
 | 3 | Auth + invite flow | ✅ done |
-| 4 | Companies + projects CRUD | ⏳ next |
-| 5 | BNC upload pipeline | ⏳ |
+| 4 | Companies + projects CRUD | ✅ done |
+| 5 | BNC upload pipeline | ⏳ next |
 | 6 | Engagements / tasks / notes / documents | ⏳ |
 | 7 | Level movement + Kanban | ⏳ |
 | 8 | KPI engine + composition + BEI | ⏳ |
