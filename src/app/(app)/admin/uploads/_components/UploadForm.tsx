@@ -23,19 +23,41 @@ export function UploadForm() {
     startTransition(async () => {
       try {
         const res = await fetch('/api/bnc/upload', { method: 'POST', body: form });
-        const json = await res.json();
+        const text = await res.text();
+        let json: Record<string, unknown> | null = null;
+        try {
+          json = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          setError(
+            `HTTP ${res.status}. Server returned non-JSON response (likely Vercel timeout or function crash). Body: ${text.slice(0, 300)}`,
+          );
+          return;
+        }
         if (!res.ok) {
-          if (res.status === 409 && json.duplicate_of) {
+          if (res.status === 409 && typeof json?.duplicate_of === 'string') {
             setDuplicateOf(json.duplicate_of);
           }
-          setError(json.error ?? `HTTP ${res.status}`);
+          setError((json?.error as string) ?? `HTTP ${res.status}`);
+          return;
+        }
+        const summary = json?.summary as
+          | {
+              rowsProcessed: number;
+              rowsTotal: number;
+              newProjects: number;
+              unmatchedCompanies: number;
+            }
+          | undefined;
+        const uploadId = json?.upload_id as string | undefined;
+        if (!summary || !uploadId) {
+          setError('Server returned no summary.');
           return;
         }
         setInfo(
-          `Processed ${json.summary.rowsProcessed}/${json.summary.rowsTotal} rows. ` +
-            `${json.summary.newProjects} new projects, ${json.summary.unmatchedCompanies} unmatched companies.`,
+          `Processed ${summary.rowsProcessed}/${summary.rowsTotal} rows. ` +
+            `${summary.newProjects} new projects, ${summary.unmatchedCompanies} unmatched companies.`,
         );
-        router.push(`/admin/uploads/${json.upload_id}`);
+        router.push(`/admin/uploads/${uploadId}`);
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
