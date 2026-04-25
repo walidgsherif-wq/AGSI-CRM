@@ -5,10 +5,7 @@ import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { LevelBadge } from '@/components/domain/LevelBadge';
 import { CompanyForm, type ProfileOption, type CompanyInitial } from '../_components/CompanyForm';
-import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
 export const dynamic = 'force-dynamic';
@@ -70,23 +67,6 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <Link href="/companies" className="text-xs text-agsi-darkGray hover:underline">
-            ← Companies
-          </Link>
-          <div className="mt-1 flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-agsi-navy">{company.canonical_name}</h1>
-            <LevelBadge level={company.current_level} />
-            {company.is_key_stakeholder && <Badge variant="gold">Key</Badge>}
-            {company.has_active_projects && <Badge variant="green">Active projects</Badge>}
-          </div>
-          <p className="mt-1 text-sm text-agsi-darkGray">
-            {COMPANY_TYPE_LABEL[company.company_type]} · {company.city ?? 'No city'} · Source: {company.source}
-          </p>
-        </div>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
@@ -110,8 +90,8 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
         <CardHeader>
           <CardTitle>Linked projects</CardTitle>
           <CardDescription>
-            {(linked?.length ?? 0)} current project links. Engagements, tasks, notes, documents, level
-            history and ownership timeline land in M6/M7/M9.
+            {(linked?.length ?? 0)} current project links. Use the Engagements / Tasks / Notes /
+            Documents tabs to log activity per company.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
