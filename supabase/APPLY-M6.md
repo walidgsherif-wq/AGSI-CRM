@@ -17,15 +17,34 @@ Same flow as the `bnc-uploads` bucket from M5.
 5. Allowed MIME types: leave blank (any file type)
 6. Save
 
-## Step 2 — Apply migration `0026_documents_bucket_rls.sql`
+## Step 2 — Apply migrations `0026` + `0027`
 
-Adds storage RLS policies so ops roles (admin / bd_head / bd_manager)
-can upload + read documents, and leadership can read but not write.
+**`0026_documents_bucket_rls.sql`** adds storage RLS policies so ops roles
+(admin / bd_head / bd_manager) can upload + read documents, and leadership
+can read but not write.
 
-1. Open https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0026_documents_bucket_rls.sql
-2. Click **Raw** → select all → copy
-3. Supabase SQL Editor → **New query** → paste → **Run**
-4. Expect: `Success. No rows returned.`
+**`0027_task_reminders.sql`** adds the per-task reminder feature: a
+`task_reminders` table, a `process_task_reminders()` dispatcher function,
+and a pg_cron schedule that fires every 15 minutes to insert `task_due`
+notifications for any reminder whose `reminder_at <= now()`.
+
+For each migration:
+
+1. Open the Raw GitHub link
+2. Copy
+3. Supabase SQL Editor → New query → paste → Run
+
+Migration links:
+
+- https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0026_documents_bucket_rls.sql
+- https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0027_task_reminders.sql
+
+Expect: `Success. No rows returned.`
+
+**Reminder cron requirements**: 0027 will print a NOTICE if pg_cron is not
+enabled. If you didn't enable pg_cron during M2 setup, do so now in
+**Supabase Dashboard → Database → Extensions** and re-run 0027 to register
+the schedule. Without pg_cron, reminders are stored but never fire.
 
 ## Step 3 — Smoke test
 
