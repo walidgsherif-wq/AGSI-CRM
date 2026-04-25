@@ -364,6 +364,7 @@ async function processBncRows(
   const lastSeenAt = fileDate ? new Date(fileDate).toISOString() : nowIso;
 
   // Phase 1: pre-fetch existing projects + companies into hashmaps
+  const phase1Started = Date.now();
   const projectsByRef = new Map<string, { id: string; ref: string | null }>();
   const projectsByName = new Map<string, { id: string; ref: string | null }>();
   for (let from = 0; ; from += 1000) {
@@ -397,8 +398,12 @@ async function processBncRows(
     }
     if (data.length < 1000) break;
   }
+  summary.warnings.push(
+    `phase1 prefetch ${projectsByRef.size}+${projectsByName.size}p / ${allCompanies.size}c in ${((Date.now() - phase1Started) / 1000).toFixed(1)}s`,
+  );
 
   // Phase 2: collect resolver contexts + unique tokens needing fuzzy lookup
+  const phase2Started = Date.now();
   type ResolveContext = {
     rowIndex: number; role: CompanyRoleColumn; inferredType: CompanyType;
     contact: { phone: string | null; contact: string | null; email: string | null };
@@ -433,23 +438,39 @@ async function processBncRows(
       }
     }
   }
+  summary.warnings.push(
+    `phase2 collect ${resolvers.length} tokens (${fuzzyKeys.size} need fuzzy) in ${((Date.now() - phase2Started) / 1000).toFixed(1)}s`,
+  );
 
-  // Phase 3: fuzzy lookups in parallel batches of 50
+  // Phase 3: fuzzy lookups in parallel batches.
+  // Short-circuit when the existing-companies index is small: every fuzzy
+  // result would be null anyway, so wasting tens of seconds on RPCs that
+  // can't match against anything is the #1 reason first uploads time out.
   const fuzzyResults = new Map<string, { company_id: string; similarity_score: number } | null>();
-  const fuzzyTokens = Array.from(fuzzyKeys);
-  for (let i = 0; i < fuzzyTokens.length; i += 50) {
-    const slice = fuzzyTokens.slice(i, i + 50);
-    await Promise.all(slice.map(async (raw) => {
-      const norm = normaliseCompanyName(raw);
-      if (!norm) { fuzzyResults.set(raw, null); return; }
-      const { data } = await supabase.rpc('find_company_by_fuzzy_name', {
-        p_token: norm, p_threshold: 0.75,
-      });
-      const best = Array.isArray(data) && data.length > 0
-        ? (data[0] as { company_id: string; similarity_score: number })
-        : null;
-      fuzzyResults.set(raw, best);
-    }));
+  const phase3Started = Date.now();
+  if (allCompanies.size < 100) {
+    summary.warnings.push(
+      `phase3 skipped fuzzy (existing companies=${allCompanies.size}, fuzzyKeys=${fuzzyKeys.size})`,
+    );
+  } else {
+    const fuzzyTokens = Array.from(fuzzyKeys);
+    for (let i = 0; i < fuzzyTokens.length; i += 200) {
+      const slice = fuzzyTokens.slice(i, i + 200);
+      await Promise.all(slice.map(async (raw) => {
+        const norm = normaliseCompanyName(raw);
+        if (!norm) { fuzzyResults.set(raw, null); return; }
+        const { data } = await supabase.rpc('find_company_by_fuzzy_name', {
+          p_token: norm, p_threshold: 0.75,
+        });
+        const best = Array.isArray(data) && data.length > 0
+          ? (data[0] as { company_id: string; similarity_score: number })
+          : null;
+        fuzzyResults.set(raw, best);
+      }));
+    }
+    summary.warnings.push(
+      `phase3 fuzzy ${fuzzyKeys.size} tokens in ${((Date.now() - phase3Started) / 1000).toFixed(1)}s`,
+    );
   }
 
   // Phase 4: in-memory accumulation
@@ -472,6 +493,7 @@ async function processBncRows(
   }> = [];
   const newCompaniesByLowerName = new Map<string, string>();
   const projectIdByRowIndex = new Map<number, string>();
+  const phase4Started = Date.now();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -603,26 +625,30 @@ async function processBncRows(
     }
   }
   summary.rowsProcessed = projectIdByRowIndex.size;
+  summary.warnings.push(
+    `phase4 accumulate (P:${projectsToInsert.length}new+${projectsToUpdate.length}upd, C:${companiesToInsert.length}new, L:${projectCompanyLinks.size}, Q:${matchQueueEntries.length}) in ${((Date.now() - phase4Started) / 1000).toFixed(1)}s`,
+  );
 
   // Phase 5: bulk flush
+  const phase5Started = Date.now();
   // Skip bnc_upload_rows insert (large jsonb writes) — keep file in storage as audit trail
   if (projectsToInsert.length > 0) {
-    for (let i = 0; i < projectsToInsert.length; i += 200) {
-      const slice = projectsToInsert.slice(i, i + 200);
+    for (let i = 0; i < projectsToInsert.length; i += 1000) {
+      const slice = projectsToInsert.slice(i, i + 1000);
       const { error } = await supabase.from('projects').insert(slice);
       if (error) summary.warnings.push(`insert projects: ${error.message}`);
     }
   }
   if (projectsToUpdate.length > 0) {
-    for (let i = 0; i < projectsToUpdate.length; i += 200) {
-      const slice = projectsToUpdate.slice(i, i + 200);
+    for (let i = 0; i < projectsToUpdate.length; i += 1000) {
+      const slice = projectsToUpdate.slice(i, i + 1000);
       const { error } = await supabase.from('projects').upsert(slice, { onConflict: 'id' });
       if (error) summary.warnings.push(`update projects: ${error.message}`);
     }
   }
   if (companiesToInsert.length > 0) {
-    for (let i = 0; i < companiesToInsert.length; i += 200) {
-      const slice = companiesToInsert.slice(i, i + 200);
+    for (let i = 0; i < companiesToInsert.length; i += 1000) {
+      const slice = companiesToInsert.slice(i, i + 1000);
       const { error } = await supabase.from('companies').insert(slice);
       if (error) summary.warnings.push(`insert companies: ${error.message}`);
     }
@@ -636,16 +662,16 @@ async function processBncRows(
   }
   if (projectCompanyLinks.size > 0) {
     const links = Array.from(projectCompanyLinks.values());
-    for (let i = 0; i < links.length; i += 500) {
-      const slice = links.slice(i, i + 500);
+    for (let i = 0; i < links.length; i += 1000) {
+      const slice = links.slice(i, i + 1000);
       const { error } = await supabase.from('project_companies')
         .upsert(slice, { onConflict: 'project_id,company_id,role' });
       if (error) summary.warnings.push(`upsert project_companies: ${error.message}`);
     }
   }
   if (matchQueueEntries.length > 0) {
-    for (let i = 0; i < matchQueueEntries.length; i += 500) {
-      const slice = matchQueueEntries.slice(i, i + 500);
+    for (let i = 0; i < matchQueueEntries.length; i += 1000) {
+      const slice = matchQueueEntries.slice(i, i + 1000);
       const { error } = await supabase.from('company_match_queue').insert(slice);
       if (error) summary.warnings.push(`insert match queue: ${error.message}`);
     }
@@ -655,13 +681,14 @@ async function processBncRows(
   for (const link of projectCompanyLinks.values()) seenCompanyIds.add(link.company_id);
   if (seenCompanyIds.size > 0) {
     const ids = Array.from(seenCompanyIds);
-    for (let i = 0; i < ids.length; i += 500) {
-      const slice = ids.slice(i, i + 500);
+    for (let i = 0; i < ids.length; i += 1000) {
+      const slice = ids.slice(i, i + 1000);
       const { error } = await supabase.from('companies')
         .update({ has_active_projects: true }).in('id', slice);
       if (error) summary.warnings.push(`update has_active_projects: ${error.message}`);
     }
   }
+  summary.warnings.push(`phase5 flush in ${((Date.now() - phase5Started) / 1000).toFixed(1)}s`);
 
   summary.warnings.unshift(`processed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
   return summary;
