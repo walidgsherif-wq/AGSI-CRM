@@ -1,91 +1,118 @@
 # M5 — BNC upload pipeline
 
-The M5 code is in: admin upload form, server-side XLSX parsing, project +
-company resolver, match queue UI. Three short user-side steps to enable it
-on your live Supabase + Vercel deploy.
+The pipeline is a Supabase Edge Function (not a Vercel API route) so it
+isn't bound by Vercel's 60s function timeout. It runs inside Supabase's
+network with sub-millisecond DB round-trips — handles 3,500+ row files
+in <30s.
 
-## Step 1 — Create the storage bucket
+Three short user-side steps to enable it. All web-only — no terminal,
+no CLI install required.
 
-The pipeline writes the original .xlsx to a private bucket so admins can
-re-download / re-process later.
+## Step 1 — Storage bucket
+
+Skip if you already created `bnc-uploads` (it persists across deploys).
 
 1. Supabase dashboard → **Storage** → **New bucket**
-2. Name: `bnc-uploads`
-3. Public: **off** (uncheck the public toggle)
-4. File size limit: **50 MB**
-5. Allowed MIME types: leave blank (or paste `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel`)
-6. **Save**
+2. Bucket name: `bnc-uploads` (exact, case-sensitive)
+3. Public bucket: **OFF**
+4. File size limit: `50` MB
+5. Save
 
 ## Step 2 — Apply migration `0025_bnc_match_rpc.sql`
 
-Adds the fuzzy-match RPC the Stage C resolver calls, plus admin-only RLS
-policies on the `bnc-uploads` bucket.
+Skip if you already ran it. Adds the fuzzy-match RPC the resolver calls.
 
 1. Open https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0025_bnc_match_rpc.sql
 2. Click **Raw** → select all → copy
 3. Supabase dashboard → **SQL Editor** → **New query** → paste → **Run**
 4. Expect: `Success. No rows returned.`
 
-## Step 3 — Smoke-test the upload
+## Step 3 — Deploy the Edge Function
 
-Vercel auto-deploys when this branch pushes; give it ~1 minute.
+This is the new piece — replaces the inline Vercel processing.
+
+1. Supabase dashboard → **Edge Functions** (left sidebar)
+2. Click **Create a new function**
+3. Function name: `bnc-upload-process` (exact, case-sensitive)
+4. Open https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/functions/bnc-upload-process/index.ts
+5. Click **Raw** → select all → copy
+6. Back in Supabase Dashboard, paste into the **index.ts** editor (replace any default content)
+7. Click **Deploy**
+8. Wait ~30 seconds for the deployment indicator to go green
+
+Verification: at the top of the function detail page you should see
+**Status: ACTIVE** (or similar) and the function URL
+`https://<project>.supabase.co/functions/v1/bnc-upload-process`.
+
+## Step 4 — Clean up the stuck row from earlier attempts
+
+Before retrying, remove the orphaned `processing` row from the failed
+Vercel attempts. Paste in the Supabase SQL Editor:
+
+```sql
+DELETE FROM bnc_uploads WHERE status='processing'
+  AND uploaded_at < now() - interval '2 minutes';
+```
+
+Should report `DELETE 1` (or `DELETE N` if you have multiple stuck).
+
+## Step 5 — Smoke-test the upload
+
+Vercel auto-deploys when this branch pushes; give it ~1 min.
 
 1. Open https://agsi-crm.vercel.app/admin/uploads
-2. Click **Choose file** → select your real BDM-Market-Database export
-3. Pick a **File date** (the week the export represents — e.g. today)
+2. Click **Choose file** → select your `BDM Market Database (1).xlsx`
+3. Pick a **File date** (e.g. today)
 4. Click **Upload + process**
-5. Wait. The button shows "Processing… (up to 60s)". For ~500 rows this
-   takes 20–40s; larger files may exceed the 60s Vercel limit and fail. If
-   yours is larger, split the spreadsheet first or wait for the v1.1
-   Edge Function migration.
-6. On success, you land on the upload's detail page:
+5. Wait. Button shows "Processing… (up to 2 min)". For 3,500 rows
+   the Edge Function typically finishes in 15–30s.
+6. On success you land on the upload's detail page with non-zero stats:
    - Status badge = **completed**
-   - Stat tiles populate: rows / new projects / unmatched companies / etc.
-   - If unmatched > 0, a "Match queue" card appears with a button to review.
-7. Open `/companies` — you should see the BNC-imported companies appearing
-   in the list (they'll have `source = 'bnc_upload'`, no owner, level L0).
-8. Open `/projects` — same: imported projects with their stage, value, and
-   linked-companies on the detail page.
+   - Rows / new projects / matched companies / unmatched companies
+     populated
+   - "Warnings / errors" panel includes a `processed in X.Xs` line at
+     the top
+7. Open `/companies` — should now show thousands of companies imported
+   from the BNC.
+8. Open `/projects` — same: thousands of projects with their stages,
+   values, and linked companies.
 
-## Step 4 — Resolve any unmatched companies
+## Step 6 — Resolve any unmatched companies
 
-Click "Open match queue →" or visit `/admin/companies/merge`.
+Click "Open match queue →" on the upload detail page or visit
+`/admin/companies/merge`. For each pending row:
 
-For each pending row:
-- **Approve match** — accepts the suggested existing company. Adds the raw
-  BNC name as an alias so the next upload auto-matches. (The current
-  upload's project link is created on the next upload — for v1 simplicity.)
-- **Create as new** — creates a new company with the type you select from
-  the dropdown.
-- **Reject** — discards the row. No DB-side mutation.
-
-## What if the file is larger than ~500 rows?
-
-Vercel's 60s API timeout is the bottleneck. Two options:
-- **Split the file** — open in Excel, save the first 500 rows as
-  `BDM-Market-Part1.xlsx`, the next 500 as `Part2.xlsx`, etc. Upload each
-  separately. Each part gets its own `bnc_uploads` row in history.
-- **Migrate to Edge Function** (v1.1 polish) — Supabase Edge Functions get
-  150s on free tier and unlimited on paid. Same code, same logic, just
-  longer ceiling. Defer to a polish milestone unless this becomes a daily
-  blocker.
+- **Approve match** — accepts the suggested existing company. Adds the
+  raw BNC name as an alias so the next upload auto-matches.
+- **Create as new** — creates a new company with the type you select.
+- **Reject** — discards the row.
 
 ## Troubleshooting
 
-- **"Storage upload failed: Bucket not found"** — Step 1 wasn't completed.
-  Create the bucket and retry.
-- **"new row violates row-level security policy"** on storage — Step 2 wasn't
-  applied (or pg_cron blocked the storage policy block). Re-run migration
-  0025; it's idempotent.
-- **"Could not locate header row"** — the parser scanned the first 10 rows
-  for a header containing "Reference Number" or "Project Name" and didn't
-  find it. Make sure your headers are in row 1–10 of the first sheet.
-- **Function timed out** — file too large. Split it.
-- **Unknown stage strings** — non-fatal. They map to `concept` and appear in
-  the upload's "Warnings / errors" panel as `unknown:<original>`.
+- **"Storage upload failed: Bucket not found"** — Step 1 wasn't done.
+- **`function find_company_by_fuzzy_name does not exist`** — Step 2 wasn't done.
+- **`Edge Function returned 401: missing authorization header`** — your
+  session expired; reload the page and try again.
+- **`Edge Function returned 403: forbidden`** — your profile is not
+  marked `role='admin'`. Confirm via `/admin/users`.
+- **`An error occurred...` (non-JSON 504)** — should not happen with the
+  Edge Function. If it does, paste the error from the Supabase Dashboard
+  → Edge Functions → bnc-upload-process → **Logs** tab.
+- **"Could not locate header row"** — the parser scanned rows 1–10 of
+  the first sheet for a header containing "Reference Number" or "Project
+  Name" and didn't find one. Make sure the file's first sheet has
+  proper headers.
+- **Unknown stage strings** — non-fatal. They map to `concept` and appear
+  in the upload's "Warnings / errors" panel as `unknown:<original>`.
+
+## When you upgrade or modify the function
+
+Each time we push code changes to the Edge Function, you re-paste the
+new content from GitHub Raw and click Deploy again. The function URL
+stays the same; only the implementation behind it changes.
 
 ## Reply to me
 
-- **"M5 verified"** — I close it out (flip README, mark M6 next).
-- A specific bug — paste the error from the upload's detail page (the
-  "Warnings / errors" panel) and I'll fix.
+- **"M5 verified"** + a brief note on the upload summary numbers — I close
+  out (flip README, mark M6 next).
+- A specific error — paste the Edge Function log line and I'll fix.

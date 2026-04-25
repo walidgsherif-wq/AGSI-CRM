@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export function UploadForm() {
   const router = useRouter();
@@ -22,22 +23,39 @@ export function UploadForm() {
 
     startTransition(async () => {
       try {
-        const res = await fetch('/api/bnc/upload', { method: 'POST', body: form });
-        const text = await res.text();
-        let json: Record<string, unknown> | null = null;
-        try {
-          json = JSON.parse(text) as Record<string, unknown>;
-        } catch {
-          setError(
-            `HTTP ${res.status}. Server returned non-JSON response (likely Vercel timeout or function crash). Body: ${text.slice(0, 300)}`,
-          );
+        // Invoke the Supabase Edge Function directly. This bypasses Vercel's
+        // 60s function ceiling — Edge Functions run in Supabase's network
+        // with sub-millisecond DB round-trips and a 150s timeout.
+        const supabase = createSupabaseBrowserClient();
+        const { data, error: invokeErr } = await supabase.functions.invoke(
+          'bnc-upload-process',
+          { body: form },
+        );
+        if (invokeErr) {
+          // Edge Function returned non-2xx. The body may still be JSON.
+          const ctx = invokeErr.context as Response | undefined;
+          let payload: Record<string, unknown> | null = null;
+          if (ctx) {
+            try {
+              const text = await ctx.text();
+              payload = JSON.parse(text);
+            } catch {
+              // not JSON
+            }
+          }
+          if (payload) {
+            if (typeof payload.duplicate_of === 'string') {
+              setDuplicateOf(payload.duplicate_of);
+            }
+            setError((payload.error as string) ?? invokeErr.message);
+          } else {
+            setError(invokeErr.message);
+          }
           return;
         }
-        if (!res.ok) {
-          if (res.status === 409 && typeof json?.duplicate_of === 'string') {
-            setDuplicateOf(json.duplicate_of);
-          }
-          setError((json?.error as string) ?? `HTTP ${res.status}`);
+        const json = (data as Record<string, unknown> | null) ?? null;
+        if (!json) {
+          setError('Empty response from Edge Function.');
           return;
         }
         const summary = json?.summary as
@@ -111,7 +129,7 @@ export function UploadForm() {
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Processing… (up to 60s)' : 'Upload + process'}
+          {pending ? 'Processing… (up to 2 min)' : 'Upload + process'}
         </Button>
         {error && <p className="text-xs text-rag-red">{error}</p>}
         {info && <p className="text-xs text-agsi-green">{info}</p>}
