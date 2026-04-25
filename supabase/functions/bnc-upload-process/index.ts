@@ -591,8 +591,14 @@ async function processBncRows(
     }
   }
   if (projectsToUpdate.length > 0) {
-    for (let i = 0; i < projectsToUpdate.length; i += 1000) {
-      const slice = projectsToUpdate.slice(i, i + 1000);
+    // Dedup by id — same project can appear via both ref-match and name-match
+    // for different rows; ON CONFLICT can't update the same row twice in one
+    // statement.
+    const dedup = new Map<string, ProjectFields>();
+    for (const p of projectsToUpdate) dedup.set(p.id, p);
+    const deduped = Array.from(dedup.values());
+    for (let i = 0; i < deduped.length; i += 1000) {
+      const slice = deduped.slice(i, i + 1000);
       const { error } = await supabase.from('projects').upsert(slice, { onConflict: 'id' });
       if (error) summary.warnings.push(`update projects: ${error.message}`);
     }
@@ -632,8 +638,10 @@ async function processBncRows(
   for (const link of projectCompanyLinks.values()) seenCompanyIds.add(link.company_id);
   if (seenCompanyIds.size > 0) {
     const ids = Array.from(seenCompanyIds);
-    for (let i = 0; i < ids.length; i += 1000) {
-      const slice = ids.slice(i, i + 1000);
+    // Smaller batch (PostgREST URL length cap on .in() filter; 1000 ids
+    // serialised into a query string overflow on some configs).
+    for (let i = 0; i < ids.length; i += 200) {
+      const slice = ids.slice(i, i + 200);
       const { error } = await supabase.from('companies')
         .update({ has_active_projects: true }).in('id', slice);
       if (error) summary.warnings.push(`update has_active_projects: ${error.message}`);

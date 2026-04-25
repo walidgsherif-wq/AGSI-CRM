@@ -12,8 +12,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 2 | Schema + RLS + seed | ✅ done |
 | 3 | Auth + invite flow | ✅ done |
 | 4 | Companies + projects CRUD | ✅ done |
-| 5 | BNC upload pipeline | ⏳ next |
-| 6 | Engagements / tasks / notes / documents | ⏳ |
+| 5 | BNC upload pipeline | ✅ done |
+| 6 | Engagements / tasks / notes / documents | ⏳ next |
 | 7 | Level movement + Kanban | ⏳ |
 | 8 | KPI engine + composition + BEI | ⏳ |
 | 9 | Performance review | ⏳ |

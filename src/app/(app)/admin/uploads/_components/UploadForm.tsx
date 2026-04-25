@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
@@ -77,8 +77,20 @@ export function UploadForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [reprocess, setReprocess] = useState(false);
+
+  // Tick a 1-second elapsed counter while the request is in flight so the
+  // user sees the page is working. Resets on completion.
+  useEffect(() => {
+    if (!pending) {
+      setElapsed(0);
+      return;
+    }
+    const id = window.setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [pending]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -243,12 +255,33 @@ export function UploadForm() {
         </label>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? progress ?? 'Working…' : 'Upload + process'}
-        </Button>
-        {error && <p className="text-xs text-rag-red">{error}</p>}
-        {info && <p className="text-xs text-agsi-green">{info}</p>}
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={pending}>
+            {pending ? progress ?? 'Working…' : 'Upload + process'}
+          </Button>
+          {pending && (
+            <p className="text-xs tabular text-agsi-darkGray">
+              {elapsed}s elapsed
+              {elapsed > 30 && ' — large files take ~60-90s, please wait…'}
+            </p>
+          )}
+          {error && <p className="text-xs text-rag-red">{error}</p>}
+          {info && <p className="text-xs text-agsi-green">{info}</p>}
+        </div>
+        {pending && (
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-agsi-lightGray">
+            <div
+              className="h-full bg-agsi-accent transition-all duration-700 ease-out"
+              style={{
+                // Indeterminate-feeling progress: asymptotically approaches 95%
+                // over ~90s so it never falsely hits 100% before the server
+                // responds. Final 100% comes from completion redirect.
+                width: `${Math.min(95, 100 * (1 - Math.exp(-elapsed / 30)))}%`,
+              }}
+            />
+          </div>
+        )}
       </div>
     </form>
   );
