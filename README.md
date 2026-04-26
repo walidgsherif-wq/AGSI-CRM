@@ -13,8 +13,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 3 | Auth + invite flow | ✅ done |
 | 4 | Companies + projects CRUD | ✅ done |
 | 5 | BNC upload pipeline | ✅ done |
-| 6 | Engagements / tasks / notes / documents | ⏳ next |
-| 7 | Level movement + Kanban | ⏳ |
+| 6 | Engagements / tasks / notes / documents | ✅ done |
+| 7 | Level movement + Kanban | ⏳ next |
 | 8 | KPI engine + composition + BEI | ⏳ |
 | 9 | Performance review | ⏳ |
 | 10 | Ecosystem Awareness engine | ⏳ |
