@@ -10,6 +10,8 @@ const TABS = [
   { label: 'Tasks', segment: 'tasks' },
   { label: 'Notes', segment: 'notes' },
   { label: 'Documents', segment: 'documents' },
+  { label: 'Level history', segment: 'level-history' },
+  { label: 'Ownership', segment: 'ownership-timeline' },
 ];
 
 export function CompanyTabs({ companyId }: { companyId: string }) {
