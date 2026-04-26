@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { LEVELS, type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
-import { LevelChangeButton } from './_components/LevelChangeDialog';
+import { LevelChangeButton } from '@/components/domain/LevelChangeDialog';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +20,8 @@ type CardRow = {
   city: string | null;
   is_key_stakeholder: boolean;
   has_active_projects: boolean;
+  owner_id: string | null;
   owner: { full_name: string } | null;
-  pending_requests: { count: number }[] | null;
 };
 
 const LEVEL_DESCRIPTION: Record<Level, string> = {
@@ -32,6 +32,14 @@ const LEVEL_DESCRIPTION: Record<Level, string> = {
   L4: 'MOU signed',
   L5: 'Strategic partnership',
 };
+
+/** Stakeholder-type filter buckets. Each maps to one company_type enum. */
+const STAKEHOLDER_FILTERS = [
+  { key: 'developer', label: 'Owner' },
+  { key: 'design_consultant', label: 'Design Consultant' },
+  { key: 'main_contractor', label: 'Contractor' },
+  { key: 'authority', label: 'Authority' },
+] as const;
 
 export default async function PipelinePage({
   searchParams,
@@ -49,7 +57,7 @@ export default async function PipelinePage({
   let query = supabase
     .from('companies')
     .select(
-      'id, canonical_name, company_type, current_level, city, is_key_stakeholder, has_active_projects, owner:profiles!companies_owner_id_fkey(full_name)',
+      'id, canonical_name, company_type, current_level, city, is_key_stakeholder, has_active_projects, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
     )
     .eq('is_active', true)
     .order('canonical_name', { ascending: true })
@@ -81,9 +89,40 @@ export default async function PipelinePage({
       <div>
         <h1 className="text-2xl font-semibold text-agsi-navy">Pipeline</h1>
         <p className="mt-1 text-sm text-agsi-darkGray">
-          Stakeholder progression L0 → L5. Click &quot;Change level →&quot; on any card to move
-          it; the ledger records who, when, evidence note, and credits the current owner.
+          Stakeholder progression L0 → L5.{' '}
+          {user.role === 'admin'
+            ? 'Click "Change level →" on any card; the ledger records who, when, evidence note.'
+            : 'You can request progression on stakeholders you own. An admin reviews each request.'}
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-wider text-agsi-darkGray">
+          Stakeholder type
+        </span>
+        <Link
+          href="/pipeline"
+          className={
+            !searchParams.type
+              ? 'rounded border border-agsi-navy bg-agsi-navy px-3 py-1 text-xs font-medium text-white'
+              : 'rounded border border-agsi-midGray px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
+          }
+        >
+          All
+        </Link>
+        {STAKEHOLDER_FILTERS.map((f) => (
+          <Link
+            key={f.key}
+            href={`/pipeline?type=${f.key}`}
+            className={
+              searchParams.type === f.key
+                ? 'rounded border border-agsi-navy bg-agsi-navy px-3 py-1 text-xs font-medium text-white'
+                : 'rounded border border-agsi-midGray px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
+            }
+          >
+            {f.label}
+          </Link>
+        ))}
       </div>
 
       {error && (
@@ -150,6 +189,7 @@ export default async function PipelinePage({
                             companyName={c.canonical_name}
                             currentLevel={c.current_level}
                             userRole={user.role}
+                            isOwner={c.owner_id === user.id}
                           />
                         </div>
                       </div>

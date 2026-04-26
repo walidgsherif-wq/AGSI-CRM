@@ -54,6 +54,9 @@ export async function changeCompanyLevel(formData: FormData) {
  * Submit a level change for admin approval. Used by bd_manager and
  * bd_head. Files must be uploaded to the evidence bucket BEFORE calling
  * this — pass the resulting storage paths in the form.
+ *
+ * Ownership rule: only admin or the company's current owner may request.
+ * Members can't progress stakeholders they're not assigned to.
  */
 export async function requestLevelChange(formData: FormData) {
   const user = await getCurrentUser();
@@ -75,7 +78,24 @@ export async function requestLevelChange(formData: FormData) {
   if (fromLevel === toLevel) return { error: 'From and to levels must differ.' };
   if (!evidenceNote) return { error: 'Evidence note is required.' };
 
-  const { error } = await supabase().from('level_change_requests').insert({
+  const sb = supabase();
+
+  // Ownership check
+  if (user.role !== 'admin') {
+    const { data: company } = await sb
+      .from('companies')
+      .select('owner_id')
+      .eq('id', companyId)
+      .single();
+    if (!company) return { error: 'Company not found.' };
+    if (company.owner_id !== user.id) {
+      return {
+        error: 'You can only progress stakeholders you own. Ask the owner or an admin.',
+      };
+    }
+  }
+
+  const { error } = await sb.from('level_change_requests').insert({
     company_id: companyId,
     from_level: fromLevel,
     to_level: toLevel,

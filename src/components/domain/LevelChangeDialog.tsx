@@ -5,18 +5,24 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LEVELS, type Level, type Role } from '@/types/domain';
 import { changeCompanyLevel, requestLevelChange } from '@/server/actions/level';
-import { EvidenceUploader, type UploadedEvidence } from './EvidenceUploader';
+import { EvidenceUploader, type UploadedEvidence } from '@/components/domain/EvidenceUploader';
 
 export function LevelChangeButton({
   companyId,
   companyName,
   currentLevel,
   userRole,
+  isOwner,
+  variant = 'inline',
 }: {
   companyId: string;
   companyName: string;
   currentLevel: Level;
   userRole: Role;
+  /** True when the current user is the company's owner. Admin always allowed. */
+  isOwner: boolean;
+  /** 'inline' renders a small text link (Pipeline cards). 'button' renders a primary button (company header / level history top). */
+  variant?: 'inline' | 'button';
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -25,12 +31,10 @@ export function LevelChangeButton({
   const [evidenceFiles, setEvidenceFiles] = useState<UploadedEvidence[]>([]);
 
   const isAdmin = userRole === 'admin';
-  const canRequest = userRole !== 'leadership';
+  const canChange = isAdmin || isOwner;
 
   async function onSubmit(formData: FormData) {
     setError(null);
-    // The EvidenceUploader emits hidden inputs `evidence_file_paths`, but we
-    // re-set them defensively in case form serialisation ordered around state.
     formData.delete('evidence_file_paths');
     for (const f of evidenceFiles) formData.append('evidence_file_paths', f.path);
 
@@ -46,16 +50,24 @@ export function LevelChangeButton({
     });
   }
 
-  if (!canRequest) return null;
+  if (!canChange) return null;
 
   if (!open) {
+    const label = isAdmin ? 'Change level →' : 'Request level change →';
+    if (variant === 'button') {
+      return (
+        <Button onClick={() => setOpen(true)} size="sm">
+          {label}
+        </Button>
+      );
+    }
     return (
       <button
         type="button"
         onClick={() => setOpen(true)}
         className="text-xs text-agsi-accent hover:underline"
       >
-        {isAdmin ? 'Change level →' : 'Request level change →'}
+        {label}
       </button>
     );
   }
