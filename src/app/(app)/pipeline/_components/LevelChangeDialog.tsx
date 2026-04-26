@@ -3,34 +3,50 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { LEVELS, type Level } from '@/types/domain';
-import { changeCompanyLevel } from '@/server/actions/level';
+import { LEVELS, type Level, type Role } from '@/types/domain';
+import { changeCompanyLevel, requestLevelChange } from '@/server/actions/level';
+import { EvidenceUploader, type UploadedEvidence } from './EvidenceUploader';
 
 export function LevelChangeButton({
   companyId,
   companyName,
   currentLevel,
+  userRole,
 }: {
   companyId: string;
   companyName: string;
   currentLevel: Level;
+  userRole: Role;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [evidenceFiles, setEvidenceFiles] = useState<UploadedEvidence[]>([]);
+
+  const isAdmin = userRole === 'admin';
+  const canRequest = userRole !== 'leadership';
 
   async function onSubmit(formData: FormData) {
     setError(null);
+    // The EvidenceUploader emits hidden inputs `evidence_file_paths`, but we
+    // re-set them defensively in case form serialisation ordered around state.
+    formData.delete('evidence_file_paths');
+    for (const f of evidenceFiles) formData.append('evidence_file_paths', f.path);
+
     startTransition(async () => {
-      const r = await changeCompanyLevel(formData);
-      if (r.error) setError(r.error);
-      else {
+      const r = isAdmin ? await changeCompanyLevel(formData) : await requestLevelChange(formData);
+      if (r.error) {
+        setError(r.error);
+      } else {
         setOpen(false);
+        setEvidenceFiles([]);
         router.refresh();
       }
     });
   }
+
+  if (!canRequest) return null;
 
   if (!open) {
     return (
@@ -39,7 +55,7 @@ export function LevelChangeButton({
         onClick={() => setOpen(true)}
         className="text-xs text-agsi-accent hover:underline"
       >
-        Change level →
+        {isAdmin ? 'Change level →' : 'Request level change →'}
       </button>
     );
   }
@@ -50,13 +66,18 @@ export function LevelChangeButton({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-agsi-navy/50 p-4">
       <form
         action={onSubmit}
-        className="w-full max-w-md space-y-4 rounded-xl border border-agsi-lightGray bg-white p-5 shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl border border-agsi-lightGray bg-white p-5 shadow-xl"
       >
         <input type="hidden" name="company_id" value={companyId} />
+        <input type="hidden" name="from_level" value={currentLevel} />
+
         <div>
-          <h3 className="text-lg font-semibold text-agsi-navy">Change level</h3>
+          <h3 className="text-lg font-semibold text-agsi-navy">
+            {isAdmin ? 'Change level' : 'Request level change'}
+          </h3>
           <p className="mt-1 text-sm text-agsi-darkGray">
             <strong>{companyName}</strong> is currently at <strong>{currentLevel}</strong>.
+            {!isAdmin && ' An admin will review your request before the level moves.'}
           </p>
         </div>
 
@@ -75,40 +96,52 @@ export function LevelChangeButton({
             ))}
           </select>
           <p className="mt-1 text-xs text-agsi-darkGray">
-            Forward moves credit the current owner; backward moves are recorded but uncredited.
+            Forward moves credit the current owner; backward moves are recorded but
+            uncredited.
           </p>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-agsi-darkGray">Evidence note</label>
-          <textarea
-            name="evidence_note"
-            rows={3}
-            placeholder="What progressed this stakeholder? (Required for audit.)"
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">
-            Evidence link (optional)
+            Evidence note <span className="text-rag-red">*</span>
           </label>
-          <input
-            name="evidence_file_url"
-            type="url"
-            placeholder="https://… (drive link, signed PDF URL, etc.)"
+          <textarea
+            name="evidence_note"
+            required
+            rows={3}
+            placeholder="What progressed this stakeholder? (e.g. 'Signed MOU on 25 Mar; copy attached.')"
             className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
           />
-          <p className="mt-1 text-xs text-agsi-darkGray">
-            For L4 transitions a signed MOU document on this company is recommended (§16 D-6).
-          </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-agsi-darkGray">
+            Evidence files {isAdmin ? '(optional)' : '— add at least one screenshot/PDF'}
+          </label>
+          <EvidenceUploader
+            companyId={companyId}
+            onChange={setEvidenceFiles}
+            disabled={pending}
+          />
         </div>
 
         <div className="flex items-center gap-3">
           <Button type="submit" size="sm" disabled={pending}>
-            {pending ? 'Saving…' : 'Confirm change'}
+            {pending
+              ? 'Saving…'
+              : isAdmin
+                ? 'Confirm change'
+                : 'Submit for approval'}
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              setEvidenceFiles([]);
+            }}
+          >
             Cancel
           </Button>
           {error && <p className="text-xs text-rag-red">{error}</p>}

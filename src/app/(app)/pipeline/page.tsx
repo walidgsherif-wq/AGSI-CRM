@@ -21,6 +21,7 @@ type CardRow = {
   is_key_stakeholder: boolean;
   has_active_projects: boolean;
   owner: { full_name: string } | null;
+  pending_requests: { count: number }[] | null;
 };
 
 const LEVEL_DESCRIPTION: Record<Level, string> = {
@@ -37,7 +38,7 @@ export default async function PipelinePage({
 }: {
   searchParams: { type?: string; owner?: string };
 }) {
-  await requireRole(['admin', 'bd_head', 'bd_manager']);
+  const user = await requireRole(['admin', 'bd_head', 'bd_manager']);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
@@ -59,6 +60,16 @@ export default async function PipelinePage({
 
   const { data, error } = await query.returns<CardRow[]>();
   const all = data ?? [];
+
+  // Pending request counts so cards show a "Pending" badge
+  const { data: pendingRows } = await supabase
+    .from('level_change_requests')
+    .select('company_id')
+    .eq('status', 'pending');
+  const pendingByCompany = new Map<string, number>();
+  for (const r of (pendingRows ?? []) as Array<{ company_id: string }>) {
+    pendingByCompany.set(r.company_id, (pendingByCompany.get(r.company_id) ?? 0) + 1);
+  }
 
   const grouped: Record<Level, CardRow[]> = {
     L0: [], L1: [], L2: [], L3: [], L4: [], L5: [],
@@ -101,40 +112,49 @@ export default async function PipelinePage({
                     No companies at this level.
                   </p>
                 ) : (
-                  cards.map((c) => (
-                    <div
-                      key={c.id}
-                      className="rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <Link
-                          href={`/companies/${c.id}`}
-                          className="text-sm font-medium text-agsi-navy hover:underline"
-                        >
-                          {c.canonical_name}
-                        </Link>
-                        {c.is_key_stakeholder && (
-                          <Badge variant="gold" className="shrink-0">
-                            Key
+                  cards.map((c) => {
+                    const pending = pendingByCompany.get(c.id) ?? 0;
+                    return (
+                      <div
+                        key={c.id}
+                        className="rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <Link
+                            href={`/companies/${c.id}`}
+                            className="text-sm font-medium text-agsi-navy hover:underline"
+                          >
+                            {c.canonical_name}
+                          </Link>
+                          {c.is_key_stakeholder && (
+                            <Badge variant="gold" className="shrink-0">
+                              Key
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-agsi-darkGray">
+                          {COMPANY_TYPE_LABEL[c.company_type]}
+                          {c.city && ` · ${c.city}`}
+                        </p>
+                        <p className="mt-1 text-xs text-agsi-darkGray">
+                          Owner: {c.owner?.full_name ?? 'Unassigned'}
+                        </p>
+                        {pending > 0 && (
+                          <Badge variant="amber" className="mt-2">
+                            {pending} pending review
                           </Badge>
                         )}
+                        <div className="mt-2">
+                          <LevelChangeButton
+                            companyId={c.id}
+                            companyName={c.canonical_name}
+                            currentLevel={c.current_level}
+                            userRole={user.role}
+                          />
+                        </div>
                       </div>
-                      <p className="mt-1 text-xs text-agsi-darkGray">
-                        {COMPANY_TYPE_LABEL[c.company_type]}
-                        {c.city && ` · ${c.city}`}
-                      </p>
-                      <p className="mt-1 text-xs text-agsi-darkGray">
-                        Owner: {c.owner?.full_name ?? 'Unassigned'}
-                      </p>
-                      <div className="mt-2">
-                        <LevelChangeButton
-                          companyId={c.id}
-                          companyName={c.canonical_name}
-                          currentLevel={c.current_level}
-                        />
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

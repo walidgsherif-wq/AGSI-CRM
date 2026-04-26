@@ -1,50 +1,83 @@
-# M7 — Level movement + Kanban
+# M7 — Level movement + Kanban + approval workflow
 
-The M7 code adds the `/pipeline` Kanban (six L0–L5 columns), a level
-change dialog, the Level History tab on each company, and an Ownership
+The M7 code adds the `/pipeline` Kanban, an approval-gated level-change
+flow with file evidence, the Level History tab, and an Ownership
 Timeline tab with the §16 D-8 transfer-with-credit-history flow.
 
-## Step 1 — Apply migration `0028_transfer_ownership.sql`
+## Step 1 — Create the `evidence` Storage bucket
 
-Adds the `transfer_company_ownership(company_id, new_owner_id, transfer_credit)`
-RPC. Admin-only. Updates `companies.owner_id`, optionally rewrites
-`level_history.owner_at_time` for retroactive credit reattribution, and
-inserts an audit + notifications.
+Used by the level-change request form to store screenshots / PDF
+evidence. Same flow as the `bnc-uploads` and `documents` buckets.
 
-1. Open https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0028_transfer_ownership.sql
-2. Click **Raw** → select all → copy
-3. Supabase SQL Editor → **New query** → paste → **Run**
-4. Expect: `Success. No rows returned.`
+1. Supabase dashboard → **Storage** → **New bucket**
+2. Bucket name: `evidence` (exact, case-sensitive)
+3. Public bucket: **OFF**
+4. File size limit: `25` MB
+5. Allowed MIME types: leave blank (we accept images, PDFs, .eml, .msg)
+6. Save
 
-(`change_company_level()` was already created in 0021_functions_triggers.sql
-during M2 — no new migration needed for level changes themselves.)
+## Step 2 — Apply migrations `0028` + `0029`
 
-## Step 2 — Smoke test
+- **0028_transfer_ownership.sql** — `transfer_company_ownership()` RPC
+  for the §16 D-8 ownership transfer with optional credit-history
+  reattribution.
+- **0029_level_change_requests.sql** — approval workflow. New
+  `level_change_requests` table, `approve_level_change_request()` and
+  `reject_level_change_request()` RPCs, RLS for the `evidence` bucket,
+  and a trigger that auto-notifies all admins when a new pending request
+  is created.
+
+For each migration:
+
+1. Open the Raw GitHub link → copy
+2. Supabase SQL Editor → New query → paste → **Run**
+3. Expect: `Success. No rows returned.`
+
+Migration links:
+- https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0028_transfer_ownership.sql
+- https://github.com/walidgsherif-wq/agsi-crm/blob/claude/resume-agsi-crm-build-TQ28J/supabase/migrations/0029_level_change_requests.sql
+
+## Step 3 — Smoke test
 
 Vercel auto-deploys from the push (~1 min). Then:
 
-1. **Pipeline view** — open https://agsi-crm.vercel.app/pipeline. You
-   should see six columns L0–L5 with your seeded companies distributed
-   across them (Khansaheb at L0, Naboodah at L1, Aldar at L2, Emaar at L3,
-   Dewan at L4, etc).
-2. **Change level** — click "Change level →" on any card. Pick a target
-   level, write an evidence note, optionally an evidence URL, Confirm.
-   The card moves to the new column on refresh.
-3. **Verify the ledger** — open the company → **Level history** tab. The
-   move you just made appears at the top with from→to badges, your name,
-   the FY/Q stamp, evidence note, and a "Credited" badge (forward moves
-   default to credited; backward moves default to uncredited).
-4. **Backward move** — try moving Emaar L3 → L2. The level history row
-   appears with a "Backward" badge and uncredited status.
-5. **Admin credit toggle** — as admin, on the Level history tab, click
-   the "Credited" checkbox to toggle whether a row counts toward KPI.
-6. **Ownership transfer** (admin only) — open any company → **Ownership**
-   tab → "Transfer ownership". Pick a new owner from the dropdown. Decide
-   whether to tick "Transfer credit history" (default on per §16 D-8).
-   Confirm. The company's owner updates and (if credit was transferred)
-   every row of level_history.owner_at_time gets rewritten.
-7. **Audit trail** — same Ownership tab now shows a transfer-history table
-   with the rows-reattributed count.
+1. **Pipeline view** — open https://agsi-crm.vercel.app/pipeline. Six
+   columns L0–L5 with your seeded companies bucketed by current level.
+2. **As BD manager / BD head — request a level change.** Click
+   "Request level change →" on any card. Pick a target level, write an
+   evidence note (required), and add at least one file (drag & drop, file
+   picker, or **paste a screenshot** with Ctrl/Cmd+V — handy for pasting
+   email screenshots). Click "Submit for approval".
+   - The card now shows an amber "1 pending review" badge.
+   - All admins receive an in-app notification.
+   - The card stays at its current level until an admin approves.
+3. **As admin — review the queue.** Open `/admin/level-requests`
+   (Admin → Level requests in the admin top-nav). You see the request
+   with from→to badges, the requester, evidence note, and download
+   buttons for each attached file. Optionally write a review note.
+   Click **Approve** (or **Reject** with a required reason).
+   - On approve: the level_history row is inserted with the **original
+     requester** as `changed_by` so credit attribution stays correct,
+     `companies.current_level` updates, the requester gets a
+     notification.
+   - On reject: status flips to rejected, requester gets a notification
+     with your reason.
+4. **As admin — direct change.** When admin clicks "Change level →"
+   from Pipeline, the dialog says "Change level" (not "Request") and
+   submits straight to `change_company_level()` (no approval queue).
+   Useful for corrections.
+5. **Verify the ledger** — open the company → **Level history** tab. The
+   move appears with from→to badges, the requester's name, the FY/Q
+   stamp, evidence note, and download buttons for each evidence file.
+6. **Backward move** — admin can move L3 → L2 directly. The history row
+   gets a "Backward" badge and is uncredited.
+7. **Admin credit toggle** — on the Level history tab, click the
+   "Credited" checkbox to flip whether a row counts toward KPI.
+8. **Ownership transfer** — open any company → **Ownership** tab →
+   "Transfer ownership". Pick a new owner. Decide whether to tick
+   "Transfer credit history" (default on per §16 D-8). Confirm.
+9. **Audit trail** — same Ownership tab now shows a transfer-history
+   table with the rows-reattributed count.
 
 ## What's deferred (intentionally)
 
