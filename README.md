@@ -14,8 +14,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 4 | Companies + projects CRUD | ✅ done |
 | 5 | BNC upload pipeline | ✅ done |
 | 6 | Engagements / tasks / notes / documents | ✅ done |
-| 7 | Level movement + Kanban | ⏳ next |
-| 8 | KPI engine + composition + BEI | ⏳ |
+| 7 | Level movement + Kanban | ✅ done |
+| 8 | KPI engine + composition + BEI | ⏳ next |
 | 9 | Performance review | ⏳ |
 | 10 | Ecosystem Awareness engine | ⏳ |
 | 11 | Heat maps | ⏳ |
