@@ -7,48 +7,39 @@ import { LEVELS, type Level, type Role } from '@/types/domain';
 import { changeCompanyLevel, requestLevelChange } from '@/server/actions/level';
 import { EvidenceUploader, type UploadedEvidence } from '@/components/domain/EvidenceUploader';
 
-export function LevelChangeButton({
-  companyId,
-  companyName,
-  currentLevel,
-  userRole,
-  isOwner,
-  variant = 'inline',
-}: {
+const LEVEL_INDEX: Record<Level, number> = {
+  L0: 0,
+  L1: 1,
+  L2: 2,
+  L3: 3,
+  L4: 4,
+  L5: 5,
+};
+
+/** Adjacent-level only: L1 ↔ L0 / L2; L0 only forward to L1; L5 only back to L4. */
+export function adjacentTargets(currentLevel: Level): Level[] {
+  return LEVELS.filter((l) => Math.abs(LEVEL_INDEX[l] - LEVEL_INDEX[currentLevel]) === 1);
+}
+
+type CommonProps = {
   companyId: string;
   companyName: string;
   currentLevel: Level;
   userRole: Role;
   /** True when the current user is the company's owner. Admin always allowed. */
   isOwner: boolean;
-  /** 'inline' renders a small text link (Pipeline cards). 'button' renders a primary button (company header / level history top). */
+};
+
+export function LevelChangeButton({
+  variant = 'inline',
+  ...common
+}: CommonProps & {
+  /** 'inline' = small text link (Pipeline cards). 'button' = primary button (company header / level history top). */
   variant?: 'inline' | 'button';
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [evidenceFiles, setEvidenceFiles] = useState<UploadedEvidence[]>([]);
-
-  const isAdmin = userRole === 'admin';
-  const canChange = isAdmin || isOwner;
-
-  async function onSubmit(formData: FormData) {
-    setError(null);
-    formData.delete('evidence_file_paths');
-    for (const f of evidenceFiles) formData.append('evidence_file_paths', f.path);
-
-    startTransition(async () => {
-      const r = isAdmin ? await changeCompanyLevel(formData) : await requestLevelChange(formData);
-      if (r.error) {
-        setError(r.error);
-      } else {
-        setOpen(false);
-        setEvidenceFiles([]);
-        router.refresh();
-      }
-    });
-  }
+  const isAdmin = common.userRole === 'admin';
+  const canChange = isAdmin || common.isOwner;
 
   if (!canChange) return null;
 
@@ -72,7 +63,57 @@ export function LevelChangeButton({
     );
   }
 
-  const targetOptions = LEVELS.filter((l) => l !== currentLevel);
+  return <LevelChangeDialog {...common} onClose={() => setOpen(false)} />;
+}
+
+/**
+ * Standalone dialog. Used by the drag-and-drop flow (drag a card to an
+ * adjacent column → opens this dialog with `forcedToLevel` pre-set).
+ */
+export function LevelChangeDialog({
+  companyId,
+  companyName,
+  currentLevel,
+  userRole,
+  isOwner,
+  forcedToLevel,
+  onClose,
+}: CommonProps & {
+  forcedToLevel?: Level;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [evidenceFiles, setEvidenceFiles] = useState<UploadedEvidence[]>([]);
+
+  const isAdmin = userRole === 'admin';
+  const canChange = isAdmin || isOwner;
+  if (!canChange) {
+    onClose();
+    return null;
+  }
+
+  const targetOptions = adjacentTargets(currentLevel);
+  // If forcedToLevel was supplied (drag-drop), validate adjacency and lock.
+  const lockedTarget = forcedToLevel && targetOptions.includes(forcedToLevel) ? forcedToLevel : null;
+
+  async function onSubmit(formData: FormData) {
+    setError(null);
+    formData.delete('evidence_file_paths');
+    for (const f of evidenceFiles) formData.append('evidence_file_paths', f.path);
+
+    startTransition(async () => {
+      const r = isAdmin ? await changeCompanyLevel(formData) : await requestLevelChange(formData);
+      if (r.error) {
+        setError(r.error);
+      } else {
+        setEvidenceFiles([]);
+        onClose();
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-agsi-navy/50 p-4">
@@ -82,6 +123,7 @@ export function LevelChangeButton({
       >
         <input type="hidden" name="company_id" value={companyId} />
         <input type="hidden" name="from_level" value={currentLevel} />
+        {lockedTarget && <input type="hidden" name="to_level" value={lockedTarget} />}
 
         <div>
           <h3 className="text-lg font-semibold text-agsi-navy">
@@ -89,29 +131,37 @@ export function LevelChangeButton({
           </h3>
           <p className="mt-1 text-sm text-agsi-darkGray">
             <strong>{companyName}</strong> is currently at <strong>{currentLevel}</strong>.
+            {lockedTarget && (
+              <>
+                {' '}
+                Move to <strong>{lockedTarget}</strong>.
+              </>
+            )}
             {!isAdmin && ' An admin will review your request before the level moves.'}
           </p>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-agsi-darkGray">Move to</label>
-          <select
-            name="to_level"
-            required
-            defaultValue={targetOptions[0]}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          >
-            {targetOptions.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-agsi-darkGray">
-            Forward moves credit the current owner; backward moves are recorded but
-            uncredited.
-          </p>
-        </div>
+        {!lockedTarget && (
+          <div>
+            <label className="block text-xs font-medium text-agsi-darkGray">Move to</label>
+            <select
+              name="to_level"
+              required
+              defaultValue={targetOptions[0]}
+              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            >
+              {targetOptions.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-agsi-darkGray">
+              Single-step only. To move multiple levels, make each step its own change with its
+              own evidence.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">
@@ -130,28 +180,20 @@ export function LevelChangeButton({
           <label className="mb-1 block text-xs font-medium text-agsi-darkGray">
             Evidence files {isAdmin ? '(optional)' : '— add at least one screenshot/PDF'}
           </label>
-          <EvidenceUploader
-            companyId={companyId}
-            onChange={setEvidenceFiles}
-            disabled={pending}
-          />
+          <EvidenceUploader companyId={companyId} onChange={setEvidenceFiles} disabled={pending} />
         </div>
 
         <div className="flex items-center gap-3">
           <Button type="submit" size="sm" disabled={pending}>
-            {pending
-              ? 'Saving…'
-              : isAdmin
-                ? 'Confirm change'
-                : 'Submit for approval'}
+            {pending ? 'Saving…' : isAdmin ? 'Confirm change' : 'Submit for approval'}
           </Button>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => {
-              setOpen(false);
               setEvidenceFiles([]);
+              onClose();
             }}
           >
             Cancel

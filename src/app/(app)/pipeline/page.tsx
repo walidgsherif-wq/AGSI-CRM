@@ -4,11 +4,9 @@ import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireRole } from '@/lib/auth/require-role';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { LevelBadge } from '@/components/domain/LevelBadge';
-import { LEVELS, type Level } from '@/types/domain';
+import { type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
-import { LevelChangeButton } from '@/components/domain/LevelChangeDialog';
+import { PipelineKanban, type CardData } from './_components/PipelineKanban';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,15 +20,6 @@ type CardRow = {
   has_active_projects: boolean;
   owner_id: string | null;
   owner: { full_name: string } | null;
-};
-
-const LEVEL_DESCRIPTION: Record<Level, string> = {
-  L0: 'Not yet engaged',
-  L1: 'Identified',
-  L2: 'In conversation',
-  L3: 'Active relationship',
-  L4: 'MOU signed',
-  L5: 'Strategic partnership',
 };
 
 /** Stakeholder-type filter buckets. Each maps to one company_type enum. */
@@ -69,7 +58,6 @@ export default async function PipelinePage({
   const { data, error } = await query.returns<CardRow[]>();
   const all = data ?? [];
 
-  // Pending request counts so cards show a "Pending" badge
   const { data: pendingRows } = await supabase
     .from('level_change_requests')
     .select('company_id')
@@ -79,20 +67,27 @@ export default async function PipelinePage({
     pendingByCompany.set(r.company_id, (pendingByCompany.get(r.company_id) ?? 0) + 1);
   }
 
-  const grouped: Record<Level, CardRow[]> = {
-    L0: [], L1: [], L2: [], L3: [], L4: [], L5: [],
-  };
-  for (const c of all) grouped[c.current_level].push(c);
+  const cards: CardData[] = all.map((c) => ({
+    id: c.id,
+    canonical_name: c.canonical_name,
+    company_type: c.company_type,
+    current_level: c.current_level,
+    city: c.city,
+    is_key_stakeholder: c.is_key_stakeholder,
+    has_active_projects: c.has_active_projects,
+    owner_id: c.owner_id,
+    owner_full_name: c.owner?.full_name ?? null,
+    pending_count: pendingByCompany.get(c.id) ?? 0,
+  }));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-agsi-navy">Pipeline</h1>
         <p className="mt-1 text-sm text-agsi-darkGray">
-          Stakeholder progression L0 → L5.{' '}
-          {user.role === 'admin'
-            ? 'Click "Change level →" on any card; the ledger records who, when, evidence note.'
-            : 'You can request progression on stakeholders you own. An admin reviews each request.'}
+          Stakeholder progression L0 → L5. Drag a card to an adjacent column to{' '}
+          {user.role === 'admin' ? 'change' : 'request'} a level change, or use the link on
+          each card. Single-step only — to move multiple levels, do each step separately.
         </p>
       </div>
 
@@ -133,83 +128,17 @@ export default async function PipelinePage({
         </Card>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {LEVELS.map((level) => {
-          const cards = grouped[level];
-          return (
-            <div key={level} className="flex min-h-0 flex-col">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <LevelBadge level={level} />
-                  <span className="text-xs text-agsi-darkGray">{cards.length}</span>
-                </div>
-              </div>
-              <p className="mb-2 text-xs text-agsi-darkGray">{LEVEL_DESCRIPTION[level]}</p>
-              <div className="space-y-2">
-                {cards.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-agsi-lightGray p-3 text-xs text-agsi-darkGray">
-                    No companies at this level.
-                  </p>
-                ) : (
-                  cards.map((c) => {
-                    const pending = pendingByCompany.get(c.id) ?? 0;
-                    return (
-                      <div
-                        key={c.id}
-                        className="rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <Link
-                            href={`/companies/${c.id}`}
-                            className="text-sm font-medium text-agsi-navy hover:underline"
-                          >
-                            {c.canonical_name}
-                          </Link>
-                          {c.is_key_stakeholder && (
-                            <Badge variant="gold" className="shrink-0">
-                              Key
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-agsi-darkGray">
-                          {COMPANY_TYPE_LABEL[c.company_type]}
-                          {c.city && ` · ${c.city}`}
-                        </p>
-                        <p className="mt-1 text-xs text-agsi-darkGray">
-                          Owner: {c.owner?.full_name ?? 'Unassigned'}
-                        </p>
-                        {pending > 0 && (
-                          <Badge variant="amber" className="mt-2">
-                            {pending} pending review
-                          </Badge>
-                        )}
-                        <div className="mt-2">
-                          <LevelChangeButton
-                            companyId={c.id}
-                            companyName={c.canonical_name}
-                            currentLevel={c.current_level}
-                            userRole={user.role}
-                            isOwner={c.owner_id === user.id}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <PipelineKanban cards={cards} userRole={user.role} userId={user.id} />
 
       <Card>
         <CardHeader>
           <CardTitle>How the ledger works</CardTitle>
           <CardDescription>
             change_company_level() writes a level_history row with snapshots of owner +
-            company type at the time, plus the fiscal year/quarter. Forward moves count
-            toward Driver A/B/C scoring; backward moves are stored uncredited so the audit
-            trail stays complete.
+            company type at the time, plus the fiscal year/quarter. Forward moves count toward
+            Driver A/B/C scoring; backward moves are stored uncredited so the audit trail
+            stays complete. Single-step rule: each move requires its own evidence — no
+            skipping levels.
           </CardDescription>
         </CardHeader>
       </Card>
