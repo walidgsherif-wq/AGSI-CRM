@@ -15,7 +15,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\"",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "verify:m2": "node --env-file=.env.local scripts/verify-m2.mjs"
+    "verify:m2": "node --env-file=.env.local scripts/verify-m2.mjs",
+    "import:bnc": "tsx --env-file=.env.local scripts/import-bnc.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",
@@ -26,7 +27,9 @@
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.5.2"
+    "tailwind-merge": "^2.5.2",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
@@ -40,6 +43,7 @@
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.8",
     "tailwindcss": "^3.4.13",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.3"
   }
 }

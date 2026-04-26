@@ -11,6 +11,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           { href: '/admin/users', label: 'Users' },
           { href: '/admin/uploads', label: 'BNC Uploads' },
           { href: '/admin/companies/merge', label: 'Match queue' },
+          { href: '/admin/level-requests', label: 'Level requests' },
+          { href: '/admin/inbound-email', label: 'Inbound email' },
           { href: '/admin/targets', label: 'Targets' },
           { href: '/admin/reports', label: 'Reports' },
           { href: '/admin/settings', label: 'Settings' },

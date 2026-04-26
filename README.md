@@ -10,13 +10,13 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | — | Architecture pack (§17) + §16 decisions | ✅ done |
 | 1 | Foundation shell (Next.js + Tailwind + shadcn-style UI + AGSI theme + role-adaptive sidebar) | ✅ done |
 | 2 | Schema + RLS + seed | ✅ done |
-| 3 | Auth + invite flow | ⏳ next |
-| 4 | Companies + projects CRUD | ⏳ |
-| 5 | BNC upload pipeline | ⏳ |
-| 6 | Engagements / tasks / notes / documents | ⏳ |
-| 7 | Level movement + Kanban | ⏳ |
-| 8 | KPI engine + composition + BEI | ⏳ |
-| 9 | Performance review | ⏳ |
+| 3 | Auth + invite flow | ✅ done |
+| 4 | Companies + projects CRUD | ✅ done |
+| 5 | BNC upload pipeline | ✅ done |
+| 6 | Engagements / tasks / notes / documents | ✅ done |
+| 7 | Level movement + Kanban | ✅ done |
+| 8 | KPI engine + composition + BEI | ✅ done |
+| 9 | Performance review | ⏳ next |
 | 10 | Ecosystem Awareness engine | ⏳ |
 | 11 | Heat maps | ⏳ |
 | 12 | Leadership reports | ⏳ |
@@ -55,8 +55,7 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 
 ## What's explicitly deferred
 
-- **Real auth** — M3 (Supabase magic-link, admin-invite gated).
-- **Real data** — M2 schema + M4 CRUD.
+- **Real data** — M4 CRUD.
 - **Email notifications** — deferred to v1.1 per §16 D-3. In-app only for v1.
 - **WhatsApp channel** — v1.1 per prompt §1.
 - **AI features, mobile native, third-party CRM sync** — out of scope per §11.
