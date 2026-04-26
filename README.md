@@ -15,8 +15,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 5 | BNC upload pipeline | ✅ done |
 | 6 | Engagements / tasks / notes / documents | ✅ done |
 | 7 | Level movement + Kanban | ✅ done |
-| 8 | KPI engine + composition + BEI | ⏳ next |
-| 9 | Performance review | ⏳ |
+| 8 | KPI engine + composition + BEI | ✅ done |
+| 9 | Performance review | ⏳ next |
 | 10 | Ecosystem Awareness engine | ⏳ |
 | 11 | Heat maps | ⏳ |
 | 12 | Leadership reports | ⏳ |
