@@ -16,8 +16,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 6 | Engagements / tasks / notes / documents | ✅ done |
 | 7 | Level movement + Kanban | ✅ done |
 | 8 | KPI engine + composition + BEI | ✅ done |
-| 9 | Performance review | ⏳ next |
-| 10 | Ecosystem Awareness engine | ⏳ |
+| 9 | Performance review + single-step level rule + inbound email + engagement drawer | ✅ done |
+| 10 | Ecosystem Awareness engine | ⏳ next |
 | 11 | Heat maps | ⏳ |
 | 12 | Leadership reports | ⏳ |
 | 13 | Stagnation engine + notifications | ⏳ |
@@ -53,11 +53,41 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
 
+## What's in milestone 9
+
+- **Performance review** (`/reports`, `/reports/performance-review/[userId]`) —
+  per-BDM annual scorecard. Five sections per fiscal year:
+  - BEI by quarter (tier badge + driver A/B/C/D pcts pulled from
+    `bei_for_caller`).
+  - Per-driver Q1-Q4 actuals vs target tables with RAG colouring.
+  - Stakeholder composition by `company_type_at_time` per quarter.
+  - Engagement freshness — engagements logged per quarter.
+  - Level transitions ledger — full FY list of `level_history` rows where
+    `owner_at_time = subject`.
+- **Single-step level rule** (migration `0031_level_step_rule.sql`) — every
+  level change is `±1` only. Enforced at three layers: a `CHECK` constraint
+  on `level_change_requests`, the `change_company_level()` function, and
+  the `approve_level_change_request()` function.
+- **Kanban drag-and-drop** (`PipelineKanban.tsx`) — adjacent columns
+  highlight on drag-over, dialog opens with target locked to the drop
+  column. Native HTML5 dragstart/dragover/drop, no library.
+- **Inbound email tracking** (migration `0032_email_tracking.sql`,
+  `/api/inbound-email`, `/admin/inbound-email`) — Postmark Inbound webhook
+  → matcher → `engagements` (type=email) + `engagement_emails`. Unmatched
+  emails land in `inbound_email_unmatched` for admin review. AuthN via
+  `INBOUND_EMAIL_SECRET` query-string token.
+- **Engagement details drawer** (`src/components/domain/EngagementDetailsSheet.tsx`)
+  — click any engagement row in `/companies/[id]/engagements` to slide a
+  details sheet in from the right. Postmark-captured emails are read-only
+  with a sanitized HTML body / plain-text toggle and an admin-only "Raw
+  email data" section. Manual engagements are editable via the same drawer.
+  Built on `@radix-ui/react-dialog`; HTML sanitised with `isomorphic-dompurify`.
+
 ## What's explicitly deferred
 
-- **Real data** — M4 CRUD.
 - **Email notifications** — deferred to v1.1 per §16 D-3. In-app only for v1.
 - **WhatsApp channel** — v1.1 per prompt §1.
+- **Email attachments** — captured-flag stored, file bytes deferred to v1.1.
 - **AI features, mobile native, third-party CRM sync** — out of scope per §11.
 
 ## Running locally

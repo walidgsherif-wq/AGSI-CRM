@@ -154,11 +154,11 @@ AGSI-CRM/
 │   │   │   │       ├── level-distribution/page.tsx
 │   │   │   │       └── engagement-freshness/page.tsx
 │   │   │   │
-│   │   │   ├── reports/                         # [M15]
-│   │   │   │   ├── page.tsx                     # hub
-│   │   │   │   ├── quarterly-scorecard/page.tsx # bd_head + admin
+│   │   │   ├── reports/                         # [M9 + M12 + M15]
+│   │   │   │   ├── page.tsx                     # [M9] hub — perf review by member
+│   │   │   │   ├── quarterly-scorecard/page.tsx # [M15] bd_head + admin
 │   │   │   │   ├── performance-review/
-│   │   │   │   │   └── [userId]/page.tsx
+│   │   │   │   │   └── [userId]/page.tsx        # [M9] BEI / actuals-vs-target / composition / freshness / level ledger
 │   │   │   │   └── leadership/                  # [M12]
 │   │   │   │       ├── page.tsx                 # archive
 │   │   │   │       └── [id]/page.tsx            # viewer + feedback field
@@ -176,6 +176,8 @@ AGSI-CRM/
 │   │   │       │   ├── merge/page.tsx           # [M5] match queue
 │   │   │       │   └── reassign/page.tsx        # force-reassign ownership
 │   │   │       ├── targets/page.tsx             # [M8]
+│   │   │       ├── inbound-email/page.tsx       # [M9] postmark unmatched-queue + resolve
+│   │   │       ├── level-requests/page.tsx      # [M7+] level-change approval queue
 │   │   │       ├── reports/                     # [M12]
 │   │   │       │   ├── page.tsx
 │   │   │       │   ├── new/page.tsx
@@ -185,15 +187,19 @@ AGSI-CRM/
 │   │   │
 │   │   └── api/                                 # server actions preferred; API used for webhooks/exports
 │   │       ├── bnc/upload/route.ts              # POST → storage + trigger function
+│   │       ├── inbound-email/route.ts           # [M9] POST — Postmark/SES/SendGrid inbound webhook
 │   │       ├── reports/leadership/[id]/pdf/route.ts
 │   │       └── export/
 │   │           ├── company/[id]/route.ts
 │   │           └── user/[id]/route.ts
 │   │
 │   ├── components/
-│   │   ├── ui/                                  # shadcn-generated (button, dialog, card, badge, ...)
+│   │   ├── ui/                                  # shadcn-generated (button, dialog, card, badge, sheet, ...)
 │   │   └── domain/                              # §7.7 shared components
 │   │       ├── LevelBadge.tsx
+│   │       ├── LevelChangeDialog.tsx            # [M7+] adjacent-target picker + evidence upload
+│   │       ├── EngagementDetailsSheet.tsx       # [M9] right-anchored drawer; read-only emails / editable manual
+│   │       ├── EvidenceUploader.tsx             # [M7+] file upload for level-change evidence
 │   │       ├── OwnerAvatar.tsx
 │   │       ├── StagnationIndicator.tsx
 │   │       ├── KPITile.tsx

@@ -1,13 +1,10 @@
-import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ENGAGEMENT_TYPE_LABEL, type EngagementType } from '@/lib/zod/engagement';
+import { type EngagementType } from '@/lib/zod/engagement';
 import { EngagementForm } from './_components/EngagementForm';
-import { DeleteEngagementButton } from './_components/DeleteEngagementButton';
+import { EngagementsList, type EngagementRowData } from './_components/EngagementsList';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +16,14 @@ type EngagementRow = {
   created_at: string;
   created_by: string;
   project_id: string | null;
-  author: { full_name: string } | null;
-  project: { id: string; name: string } | null;
+  author: { full_name: string } | { full_name: string }[] | null;
+  project: { id: string; name: string } | { id: string; name: string }[] | null;
 };
+
+function pickOne<T>(v: T | T[] | null | undefined): T | null {
+  if (Array.isArray(v)) return v[0] ?? null;
+  return v ?? null;
+}
 
 export default async function CompanyEngagementsTab({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -49,12 +51,21 @@ export default async function CompanyEngagementsTab({ params }: { params: { id: 
       .eq('is_current', true),
   ]);
 
-  const engagements = engagementsRes.data ?? [];
+  const engagements: EngagementRowData[] = (engagementsRes.data ?? []).map((e) => ({
+    id: e.id,
+    engagement_type: e.engagement_type,
+    summary: e.summary,
+    engagement_date: e.engagement_date,
+    created_by: e.created_by,
+    project: pickOne(e.project),
+    author_name: pickOne(e.author)?.full_name ?? null,
+  }));
+
   const projects: Array<{ id: string; name: string }> = [];
   for (const r of (projectsRes.data ?? []) as Array<{
     project: { id: string; name: string } | { id: string; name: string }[] | null;
   }>) {
-    const p = Array.isArray(r.project) ? r.project[0] : r.project;
+    const p = pickOne(r.project);
     if (p) projects.push(p);
   }
 
@@ -63,57 +74,14 @@ export default async function CompanyEngagementsTab({ params }: { params: { id: 
   return (
     <div className="space-y-4">
       {canCreate && <EngagementForm companyId={params.id} projects={projects} />}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Engagement log</CardTitle>
-          <CardDescription>
-            {engagements.length} most recent. Each entry feeds Driver C credit + the stagnation
-            timer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {engagements.length === 0 ? (
-            <p className="p-6 text-sm text-agsi-darkGray">
-              No engagements logged yet.{' '}
-              {canCreate && 'Click "Log engagement" above to record the first one.'}
-            </p>
-          ) : (
-            <ul className="divide-y divide-agsi-lightGray">
-              {engagements.map((e) => (
-                <li key={e.id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="blue">{ENGAGEMENT_TYPE_LABEL[e.engagement_type]}</Badge>
-                        <span className="text-xs text-agsi-darkGray">{e.engagement_date}</span>
-                        {e.project && (
-                          <Link
-                            href={`/projects/${e.project.id}`}
-                            className="text-xs text-agsi-accent hover:underline"
-                          >
-                            ↳ {e.project.name}
-                          </Link>
-                        )}
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-agsi-navy">
-                        {e.summary}
-                      </p>
-                      <p className="mt-1 text-xs text-agsi-darkGray">
-                        by {e.author?.full_name ?? 'Unknown'}
-                      </p>
-                    </div>
-                    {(user.role === 'admin' ||
-                      (user.role !== 'leadership' && e.created_by === user.id)) && (
-                      <DeleteEngagementButton id={e.id} companyId={params.id} />
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <EngagementsList
+        companyId={params.id}
+        engagements={engagements}
+        projects={projects}
+        role={user.role}
+        currentUserId={user.id}
+        canCreate={canCreate}
+      />
     </div>
   );
 }

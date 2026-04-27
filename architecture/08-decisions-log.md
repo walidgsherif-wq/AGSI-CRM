@@ -245,3 +245,17 @@ need an "effective as of" freshness badge on KPI tiles.
 
 All milestones 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16 can start
 immediately. Milestone 3 (auth flow) starts once D-7 lands.
+
+---
+
+## Post-pack additions (M9 expansion)
+
+These two items were not in the pack as scoped at §17 review time. Both
+were brought into M9 mid-build by an explicit user decision; recorded
+here so future pack reviewers can see why M9 differs from the original
+"performance review only" framing.
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| D-9 | Inbound email tracking is part of M9, not v1.1 | Auto-BCC pattern is cheap to add now (one webhook + one matcher) and BD-side adoption is just a Gmail/Outlook filter rule. Better than waiting for v1.1 because every week without it is engagements not getting captured. Migration `0032_email_tracking.sql`, route `src/app/api/inbound-email/route.ts`, sequence diagram `09-inbound-email-sequence.md`. |
+| D-10 | Engagement details drawer is part of M9 | Captured emails store `body_text`, `body_html`, full recipient list and raw provider payload, but the original engagements list only showed a one-line summary — the rich content was effectively write-only. The drawer turns that into read access. Same component is reused for editing manual engagements (the existing list had no edit affordance, only delete). New deps `@radix-ui/react-dialog` + `isomorphic-dompurify`. |
