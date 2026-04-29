@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ROLE_LABEL } from '@/types/domain';
+import { EcosystemPanel } from '@/components/domain/EcosystemPanel';
 import { RebuildButton } from './_components/RebuildButton';
 
 export const dynamic = 'force-dynamic';
@@ -228,6 +229,8 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {user.role !== 'bd_manager' && <EcosystemPanel />}
 
       {bei && (
         <Card>

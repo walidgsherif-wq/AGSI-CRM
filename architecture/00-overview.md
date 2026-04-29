@@ -65,4 +65,12 @@ are documented after the fact:
   render read-only with a sanitized HTML body view; manual engagements
   are editable in-place. See
   `src/components/domain/EngagementDetailsSheet.tsx`. Required new deps:
-  `@radix-ui/react-dialog`, `isomorphic-dompurify`.
+  `@radix-ui/react-dialog`, `sanitize-html`.
+- **Ecosystem awareness engine** (M10). Real-time event firing via
+  AFTER INSERT triggers on `level_history` / `engagements` / `documents`,
+  plus `rebuild_ecosystem_awareness()` and `backfill_ecosystem_events()`
+  RPCs. Leadership UI at `/insights/ecosystem` with hero scores, trend
+  chart, segmentation, top contributors, cooling accounts. Compact
+  `EcosystemPanel` on `/dashboard` for admin/leadership/bd_head.
+  Migrations `0034_ecosystem_event_triggers.sql` +
+  `0035_ecosystem_summary_helpers.sql`. New dep: `recharts`.

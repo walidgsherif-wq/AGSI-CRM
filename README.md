@@ -17,8 +17,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 7 | Level movement + Kanban | ✅ done |
 | 8 | KPI engine + composition + BEI | ✅ done |
 | 9 | Performance review + single-step level rule + inbound email + engagement drawer | ✅ done |
-| 10 | Ecosystem Awareness engine | ⏳ next |
-| 11 | Heat maps | ⏳ |
+| 10 | Ecosystem Awareness engine | ✅ done |
+| 11 | Heat maps | ⏳ next |
 | 12 | Leadership reports | ⏳ |
 | 13 | Stagnation engine + notifications | ⏳ |
 | 14 | Insights module | ⏳ |
@@ -52,6 +52,55 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager cannot see Admin / Reports / Maps
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
+
+## What's in milestone 10
+
+- **Real-time event firing** (migration `0034_ecosystem_event_triggers.sql`) —
+  AFTER INSERT triggers on `level_history`, `engagements`, `documents`
+  automatically score qualifying rows by calling the existing
+  `insert_ecosystem_event()` (from migration 0021). Per §3.16:
+  - `level_history`: forward + credited transitions only (L0→L1=1pt,
+    L1→L2=3, L2→L3=8, L3→L4=20, L4→L5=50).
+  - `engagements`: call / meeting / email / site_visit / workshop = 1pt;
+    document_sent = 2pt; spec_inclusion = 15pt.
+  - `documents`: announcement = 10pt, site_banner_approval = 15pt,
+    case_study = 10pt (non-archived only).
+  - 7-day dedup, 0.5× multiplier on inactive companies (existing rules
+    in `insert_ecosystem_event`).
+  - Soft-delete cascade (existing): when source row is deleted,
+    `is_void = true` flips on the matching ecosystem event.
+- **`rebuild_ecosystem_awareness()`** — recomputes
+  `ecosystem_awareness_current` for `current_date`. `theoretical_max =
+  kpi_universe_sizes.total × 100` (= 78,900 per §3.16). Builds
+  `by_company_type` / `by_level` / `by_city` jsonb breakdowns. Hooks into
+  the existing `ecosystem-rebuild` pg_cron schedule (22:15 UTC nightly).
+- **`backfill_ecosystem_events()`** — one-time replay of historical
+  rows. Idempotent via `dedup_key UNIQUE`.
+- **`ecosystem_top_contributors()` / `ecosystem_cooling_accounts()`**
+  (migration `0035_ecosystem_summary_helpers.sql`) — read-side helper
+  RPCs feeding the leadership panel. Both `SECURITY DEFINER` with
+  explicit `bd_manager` block.
+- **`/admin/ecosystem-rebuild`** — admin-only page with **Rebuild now**
+  and **Run backfill** buttons + the latest snapshot stats.
+- **`/insights/ecosystem`** — leadership / admin / bd_head page (§7.5
+  visibility rules). `bd_manager` → 404. Renders:
+  - Hero: lifetime + active scores against theoretical max with
+    intellectually-honest *"5.3% of theoretical max"* framing per §3.16.
+  - Trend chart (recharts area) — daily snapshot over 120 days, lifetime
+    + active overlay.
+  - Segmentation (recharts bar) with tabs for company type / L-level /
+    city.
+  - Top contributors (this 90-day window) and cooling accounts
+    (lifetime > 0, active = 0) tables.
+- **`EcosystemPanel.tsx`** — compact dashboard tile (admin / leadership /
+  bd_head) with active vs lifetime stats and a 30-day spark line.
+- **E2E tests** (`m10-ecosystem.spec.ts`) — `bd_manager` blocked from
+  `/insights/ecosystem` and `/admin/ecosystem-rebuild`; other roles see
+  the heading. Per the §17 risk register R-3 RLS-defence requirement.
+
+Deferred to v1.1: per §3.16 "Top contributors / cooling" filters (by
+quarter, by company type), PNG export of the trend chart for inclusion in
+leadership reports (lands with M12 reports).
 
 ## What's in milestone 9
 

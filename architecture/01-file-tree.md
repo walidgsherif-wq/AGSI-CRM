@@ -148,6 +148,7 @@ AGSI-CRM/
 │   │   │   │
 │   │   │   ├── insights/                        # [M14]
 │   │   │   │   ├── page.tsx                     # reads market_snapshots
+│   │   │   │   ├── ecosystem/page.tsx           # [M10] §3.16 — leadership/admin/bd_head only; bd_manager 404
 │   │   │   │   └── maps/                        # [M11] §7.5
 │   │   │   │       ├── layout.tsx               # tab nav; blocked for bd_manager
 │   │   │   │       ├── geographic/page.tsx
@@ -178,6 +179,7 @@ AGSI-CRM/
 │   │   │       ├── targets/page.tsx             # [M8]
 │   │   │       ├── inbound-email/page.tsx       # [M9] postmark unmatched-queue + resolve
 │   │   │       ├── level-requests/page.tsx      # [M7+] level-change approval queue
+│   │   │       ├── ecosystem-rebuild/page.tsx   # [M10] manual rebuild + backfill
 │   │   │       ├── reports/                     # [M12]
 │   │   │       │   ├── page.tsx
 │   │   │       │   ├── new/page.tsx
@@ -200,6 +202,8 @@ AGSI-CRM/
 │   │       ├── LevelChangeDialog.tsx            # [M7+] adjacent-target picker + evidence upload
 │   │       ├── EngagementDetailsSheet.tsx       # [M9] right-anchored drawer; read-only emails / editable manual
 │   │       ├── EvidenceUploader.tsx             # [M7+] file upload for level-change evidence
+│   │       ├── EcosystemPanel.tsx               # [M10] §3.16 leadership-only dashboard tile
+│   │       ├── EcosystemTrendSpark.tsx          # [M10] recharts spark line for the panel
 │   │       ├── OwnerAvatar.tsx
 │   │       ├── StagnationIndicator.tsx
 │   │       ├── KPITile.tsx
