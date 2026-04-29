@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import DOMPurify from 'isomorphic-dompurify';
+import sanitizeHtml from 'sanitize-html';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import {
@@ -171,7 +171,26 @@ export async function getEngagement(
         subject: rawEmail.subject,
         body_text: rawEmail.body_text,
         body_html_safe: rawEmail.body_html
-          ? DOMPurify.sanitize(rawEmail.body_html, { USE_PROFILES: { html: true } })
+          ? sanitizeHtml(rawEmail.body_html, {
+              allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+                'img',
+                'h1',
+                'h2',
+              ]),
+              allowedAttributes: {
+                ...sanitizeHtml.defaults.allowedAttributes,
+                a: ['href', 'name', 'target', 'rel'],
+                img: ['src', 'alt', 'title', 'width', 'height'],
+                '*': ['style'],
+              },
+              allowedSchemes: ['http', 'https', 'mailto', 'cid'],
+              transformTags: {
+                a: sanitizeHtml.simpleTransform('a', {
+                  target: '_blank',
+                  rel: 'noopener noreferrer',
+                }),
+              },
+            })
           : null,
         has_attachments: rawEmail.has_attachments,
         received_at: rawEmail.received_at,
