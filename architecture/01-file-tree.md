@@ -149,11 +149,11 @@ AGSI-CRM/
 │   │   │   ├── insights/                        # [M14]
 │   │   │   │   ├── page.tsx                     # reads market_snapshots
 │   │   │   │   ├── ecosystem/page.tsx           # [M10] §3.16 — leadership/admin/bd_head only; bd_manager 404
-│   │   │   │   └── maps/                        # [M11] §7.5
-│   │   │   │       ├── layout.tsx               # tab nav; blocked for bd_manager
-│   │   │   │       ├── geographic/page.tsx
-│   │   │   │       ├── level-distribution/page.tsx
-│   │   │   │       └── engagement-freshness/page.tsx
+│   │   │   │   └── maps/                        # [M11] §7.5 — admin/leadership/bd_head only; bd_manager 404
+│   │   │   │       ├── layout.tsx               # tab nav + requireRole
+│   │   │   │       ├── geographic/page.tsx      # [M11] stylised UAE SVG with city dots
+│   │   │   │       ├── level-distribution/page.tsx  # [M11] universe grid coloured by L-level
+│   │   │   │       └── engagement-freshness/page.tsx # [M11] stakeholder × week heat matrix
 │   │   │   │
 │   │   │   ├── reports/                         # [M9 + M12 + M15]
 │   │   │   │   ├── page.tsx                     # [M9] hub — perf review by member
@@ -204,6 +204,7 @@ AGSI-CRM/
 │   │       ├── EvidenceUploader.tsx             # [M7+] file upload for level-change evidence
 │   │       ├── EcosystemPanel.tsx               # [M10] §3.16 leadership-only dashboard tile
 │   │       ├── EcosystemTrendSpark.tsx          # [M10] recharts spark line for the panel
+│   │       ├── HeatMapExportButton.tsx          # [M11] §7.5 PNG export via html-to-image
 │   │       ├── OwnerAvatar.tsx
 │   │       ├── StagnationIndicator.tsx
 │   │       ├── KPITile.tsx
