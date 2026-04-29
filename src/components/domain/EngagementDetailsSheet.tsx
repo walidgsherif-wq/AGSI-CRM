@@ -19,6 +19,7 @@ import {
   ENGAGEMENT_TYPE_LABEL,
 } from '@/lib/zod/engagement';
 import {
+  deleteEngagement,
   getEngagement,
   updateEngagement,
   type EngagementDetails,
@@ -51,6 +52,8 @@ export function EngagementDetailsSheet({
   const [pending, startTransition] = useTransition();
   const [bodyMode, setBodyMode] = useState<'rich' | 'plain'>('rich');
   const [showRaw, setShowRaw] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePending, startDeleteTransition] = useTransition();
 
   useEffect(() => {
     if (!isOpen || !engagementId) return;
@@ -58,6 +61,7 @@ export function EngagementDetailsSheet({
     setError(null);
     setBodyMode('rich');
     setShowRaw(false);
+    setConfirmDelete(false);
     setLoading(true);
     getEngagement(engagementId)
       .then((r) => {
@@ -72,6 +76,21 @@ export function EngagementDetailsSheet({
     !isEmail &&
     !!data &&
     (role === 'admin' || (role !== 'leadership' && data.created_by === currentUserId));
+  const canDelete =
+    !!data &&
+    (role === 'admin' || (role !== 'leadership' && data.created_by === currentUserId));
+
+  function handleDelete() {
+    if (!data) return;
+    startDeleteTransition(async () => {
+      const r = await deleteEngagement(data.id, data.company_id);
+      if (r.error) setError(r.error);
+      else {
+        router.refresh();
+        onOpenChange(false);
+      }
+    });
+  }
 
   const headerTitle = !data
     ? 'Loading…'
@@ -125,6 +144,15 @@ export function EngagementDetailsSheet({
                 />
               ) : (
                 <ReadOnlyView data={data} />
+              )}
+
+              {canDelete && (
+                <DangerZone
+                  open={confirmDelete}
+                  onOpenChange={setConfirmDelete}
+                  onConfirm={handleDelete}
+                  pending={deletePending}
+                />
               )}
             </>
           )}
@@ -363,6 +391,69 @@ function EmailView({
       <p className="text-xs text-agsi-darkGray">
         This engagement was captured from an inbound email and is read-only.
       </p>
+    </div>
+  );
+}
+
+function DangerZone({
+  open,
+  onOpenChange,
+  onConfirm,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConfirm: () => void;
+  pending: boolean;
+}) {
+  return (
+    <div className="mt-6 rounded-lg border border-rag-red/30 bg-rag-red/5 p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-rag-red">
+        Danger zone
+      </h3>
+      {!open ? (
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-xs text-agsi-darkGray">
+            Deleting an engagement is permanent and logged for admin review.
+          </p>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            onClick={() => onOpenChange(true)}
+          >
+            Delete engagement
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-3">
+          <p className="text-sm text-agsi-navy">
+            Delete this engagement? This action cannot be undone. A copy of
+            the engagement (and any captured email) is written to the audit
+            log before removal.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              onClick={onConfirm}
+              disabled={pending}
+            >
+              {pending ? 'Deleting…' : 'Confirm delete'}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
