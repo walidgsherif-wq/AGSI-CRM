@@ -18,8 +18,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 8 | KPI engine + composition + BEI | ✅ done |
 | 9 | Performance review + single-step level rule + inbound email + engagement drawer | ✅ done |
 | 10 | Ecosystem Awareness engine | ✅ done |
-| 11 | Heat maps | ⏳ next |
-| 12 | Leadership reports | ⏳ |
+| 11 | Heat maps | ✅ done |
+| 12 | Leadership reports | ⏳ next |
 | 13 | Stagnation engine + notifications | ⏳ |
 | 14 | Insights module | ⏳ |
 | 15 | Reports archive + audit log | ⏳ |
@@ -52,6 +52,41 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager cannot see Admin / Reports / Maps
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
+
+## What's in milestone 11
+
+Three heat maps under `/insights/maps/*`, all gated to admin /
+leadership / bd_head (bd_manager → 404 per §17 risk register R-3,
+preventing reverse-engineering of ecosystem data they shouldn&apos;t see):
+
+- **Geographic** (`/insights/maps/geographic`) — stylised UAE SVG with
+  city dots positioned via lat/lon. Dot size scales with stakeholder
+  count; colour = dominant company type at that city. Filters: type,
+  L-level (incl. L3+), active-projects status. Side panel ranks
+  cities with per-type micro-breakdown and syncs hover with the map.
+- **Level distribution** (`/insights/maps/level-distribution`) — one
+  tile per stakeholder in the AGSI universe. Tile colour = current
+  L-level (§15 palette). Click a tile → `/companies/[id]`. Highlight
+  modes: all / L3+ / key stakeholders. Summary bar shows §3.16 Block A
+  counts at each level vs the type-narrowed denominator.
+- **Engagement freshness** (`/insights/maps/engagement-freshness`) —
+  stakeholder × week matrix, last 26 weeks. Cells coloured per the
+  §7.5.3 buckets: hot (≤14d), warm (15–45d), cooling (46–90d), cold
+  (>90d / never). Cell colour reflects the freshness of the
+  engagement that fell in that week relative to today. Filters: type,
+  L-level, sort (by L-level / most-neglected), &ldquo;my accounts only.&rdquo;
+  Side panel: Cooling &amp; Cold L3+ accounts ranked by days-since-touch.
+
+All three support **PNG export** via the shared
+`HeatMapExportButton` (html-to-image; pixelRatio 2; date-stamped
+filename) so admins can drop snapshots into leadership reports.
+
+E2E (`tests/e2e/m11-heat-maps.spec.ts`): admin / leadership / bd_head
+see the Export button on each map; bd_manager hitting any of the three
+URLs returns 404.
+
+Deferred to M12 / v1.1: triangulation map (§7.5 footnote — defer until
+ecosystem data warrants it).
 
 ## What's in milestone 10
 
