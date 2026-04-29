@@ -95,7 +95,9 @@ export async function updateEngagement(formData: FormData) {
 export async function deleteEngagement(id: string, companyId: string) {
   const user = await getCurrentUser();
   if (user.role === 'leadership') return { error: 'forbidden' };
-  const { error } = await supabase().from('engagements').delete().eq('id', id);
+  const { error } = await supabase().rpc('delete_engagement_with_audit', {
+    p_engagement_id: id,
+  });
   if (error) return { error: error.message };
   revalidatePath(`/companies/${companyId}/engagements`);
   return { ok: true };
