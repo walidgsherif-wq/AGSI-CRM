@@ -14,6 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           { href: '/admin/level-requests', label: 'Level requests' },
           { href: '/admin/inbound-email', label: 'Inbound email' },
           { href: '/admin/targets', label: 'Targets' },
+          { href: '/admin/ecosystem-rebuild', label: 'Ecosystem' },
           { href: '/admin/reports', label: 'Reports' },
           { href: '/admin/settings', label: 'Settings' },
           { href: '/admin/audit', label: 'Audit log' },
