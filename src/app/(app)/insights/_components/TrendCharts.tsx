@@ -244,7 +244,7 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 /**
- * Auto-scaled Y-axis domain that pads ±30% around the data so small
+ * Auto-scaled Y-axis domain that pads ±10% around the data so small
  * fluctuations are still visible. Falls back to [0, 1] for empty data.
  * Zero / negative values are filtered when computing min so an axis
  * with mostly populated data + a few zeros doesn't collapse to 0.
@@ -255,10 +255,10 @@ function paddedDomain(values: number[]): [number, number] {
   const min = Math.min(...positives);
   const max = Math.max(...positives);
   if (min === max) {
-    // Single distinct value — pad by 30% around it.
-    return [min * 0.7, max * 1.3];
+    // Single distinct value — pad by 10% around it.
+    return [min * 0.9, max * 1.1];
   }
-  return [min * 0.7, max * 1.3];
+  return [min * 0.9, max * 1.1];
 }
 
 function fmtAedAxis(v: number): string {
