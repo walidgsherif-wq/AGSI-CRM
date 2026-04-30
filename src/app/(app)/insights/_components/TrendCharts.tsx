@@ -74,6 +74,11 @@ export function TrendCharts({
 }
 
 function PipelineChart({ points }: { points: TrendPoint[] }) {
+  const aedDomain = paddedDomain(
+    points.flatMap((p) => [p.pre_construction_aed, p.under_construction_aed]),
+  );
+  const tonnesDomain = paddedDomain(points.map((p) => p.rebar_tonnes));
+
   return (
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -87,6 +92,8 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
           <YAxis
             yAxisId="aed"
             orientation="left"
+            domain={aedDomain}
+            allowDecimals={false}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
             tickFormatter={fmtAedAxis}
@@ -100,6 +107,8 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
           <YAxis
             yAxisId="tonnes"
             orientation="right"
+            domain={tonnesDomain}
+            allowDecimals={false}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
             tickFormatter={fmtTonnesAxis}
@@ -171,6 +180,8 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
 }
 
 function PriceChart({ points }: { points: PricePoint[] }) {
+  const priceDomain = paddedDomain(points.map((p) => p.price_aed_per_tonne));
+
   return (
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -182,6 +193,8 @@ function PriceChart({ points }: { points: PricePoint[] }) {
             stroke="#C5CDD8"
           />
           <YAxis
+            domain={priceDomain}
+            allowDecimals={false}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
             tickFormatter={(v: number) => new Intl.NumberFormat().format(v)}
@@ -228,6 +241,24 @@ function Legend({ color, label }: { color: string; label: string }) {
       {label}
     </span>
   );
+}
+
+/**
+ * Auto-scaled Y-axis domain that pads ±30% around the data so small
+ * fluctuations are still visible. Falls back to [0, 1] for empty data.
+ * Zero / negative values are filtered when computing min so an axis
+ * with mostly populated data + a few zeros doesn't collapse to 0.
+ */
+function paddedDomain(values: number[]): [number, number] {
+  const positives = values.filter((v) => Number.isFinite(v) && v > 0);
+  if (positives.length === 0) return [0, 1];
+  const min = Math.min(...positives);
+  const max = Math.max(...positives);
+  if (min === max) {
+    // Single distinct value — pad by 30% around it.
+    return [min * 0.7, max * 1.3];
+  }
+  return [min * 0.7, max * 1.3];
 }
 
 function fmtAedAxis(v: number): string {
