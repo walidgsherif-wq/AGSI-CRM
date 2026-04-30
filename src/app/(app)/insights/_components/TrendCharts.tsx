@@ -86,6 +86,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
           <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="snapshot_date"
+            tickFormatter={fmtMonthYear}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
           />
@@ -139,7 +140,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
               if (series === 'under_construction_aed') return [aed, 'Under construction'];
               return [aed, series];
             }}
-            labelFormatter={(label) => `Snapshot: ${String(label ?? '')}`}
+            labelFormatter={(label) => `Snapshot: ${fmtMonthYear(String(label ?? ''))}`}
           />
           <Line
             yAxisId="aed"
@@ -189,6 +190,7 @@ function PriceChart({ points }: { points: PricePoint[] }) {
           <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="effective_month"
+            tickFormatter={fmtMonthYear}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
           />
@@ -215,7 +217,7 @@ function PriceChart({ points }: { points: PricePoint[] }) {
               `${new Intl.NumberFormat().format(Number(value))} AED/t`,
               'Price',
             ]}
-            labelFormatter={(label) => `Month: ${String(label ?? '')}`}
+            labelFormatter={(label) => `Month: ${fmtMonthYear(String(label ?? ''))}`}
           />
           <Line
             type="monotone"
@@ -244,21 +246,36 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 /**
- * Auto-scaled Y-axis domain that pads ±30% around the data so small
- * fluctuations are still visible. Falls back to [0, 1] for empty data.
- * Zero / negative values are filtered when computing min so an axis
- * with mostly populated data + a few zeros doesn't collapse to 0.
+ * X-axis tick formatter. Accepts YYYY-MM or YYYY-MM-DD and returns
+ * "Jan'26" (mixed-case 3-letter month + apostrophe + 2-digit year).
+ * Falls through to the original string when the input doesn't parse.
+ */
+function fmtMonthYear(s: string): string {
+  const m = s.match(/^(\d{4})-(\d{2})/);
+  if (!m) return s;
+  const yyyy = m[1];
+  const mm = m[2];
+  const date = new Date(`${yyyy}-${mm}-01T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return s;
+  const month = date.toLocaleString('en-US', {
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  return `${month}'${yyyy.slice(2)}`;
+}
+
+/**
+ * Auto-scaled Y-axis domain that pads ±10% around the data so small
+ * fluctuations are visible without losing context. Falls back to
+ * [0, 1] for empty data. Zero / negative values are filtered when
+ * computing min so a sparsely populated series doesn't collapse to 0.
  */
 function paddedDomain(values: number[]): [number, number] {
   const positives = values.filter((v) => Number.isFinite(v) && v > 0);
   if (positives.length === 0) return [0, 1];
   const min = Math.min(...positives);
   const max = Math.max(...positives);
-  if (min === max) {
-    // Single distinct value — pad by 30% around it.
-    return [min * 0.7, max * 1.3];
-  }
-  return [min * 0.7, max * 1.3];
+  return [min * 0.9, max * 1.1];
 }
 
 function fmtAedAxis(v: number): string {
