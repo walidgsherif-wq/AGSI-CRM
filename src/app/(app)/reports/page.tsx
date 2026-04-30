@@ -79,7 +79,7 @@ export default async function ReportsHubPage() {
       <Card>
         <CardHeader>
           <CardTitle>Quarterly scorecard</CardTitle>
-          <CardDescription>Cross-team summary. Lands in M12.</CardDescription>
+          <CardDescription>Cross-team summary. Lands in M15.</CardDescription>
         </CardHeader>
       </Card>
 
@@ -87,9 +87,18 @@ export default async function ReportsHubPage() {
         <CardHeader>
           <CardTitle>Leadership reports archive</CardTitle>
           <CardDescription>
-            Monthly + quarterly strategic reports, with feedback flow. Lands in M12.
+            Monthly + quarterly strategic reports — frozen snapshots with the
+            leadership feedback loop.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <Link
+            href={'/reports/leadership' as never}
+            className="inline-flex items-center text-sm font-medium text-agsi-accent hover:underline"
+          >
+            Open archive →
+          </Link>
+        </CardContent>
       </Card>
     </div>
   );
