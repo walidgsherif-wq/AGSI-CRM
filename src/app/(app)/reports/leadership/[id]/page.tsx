@@ -154,25 +154,40 @@ export default async function LeadershipReportViewer({
 }
 
 function Hero({ report }: { report: Report }) {
+  const showPdf = report.status === 'finalised' || report.status === 'archived';
   return (
     <div className="rounded-lg border border-agsi-lightGray bg-agsi-offWhite p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-semibold text-agsi-navy">{report.period_label}</h1>
-        <Badge variant={report.status === 'finalised' ? 'green' : 'neutral'}>
-          {REPORT_STATUS_LABEL[report.status]}
-        </Badge>
-        <Badge variant="blue">{REPORT_TYPE_LABEL[report.report_type]}</Badge>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold text-agsi-navy">
+              {report.period_label}
+            </h1>
+            <Badge variant={report.status === 'finalised' ? 'green' : 'neutral'}>
+              {REPORT_STATUS_LABEL[report.status]}
+            </Badge>
+            <Badge variant="blue">{REPORT_TYPE_LABEL[report.report_type]}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-agsi-darkGray">
+            FY{report.fiscal_year}
+            {report.fiscal_quarter ? ` Q${report.fiscal_quarter}` : ''} · period{' '}
+            {report.period_start} → {report.period_end}
+            {report.finalised_at &&
+              ` · finalised ${new Date(report.finalised_at).toISOString().slice(0, 10)}`}
+          </p>
+          <p className="mt-2 text-xs italic text-agsi-darkGray">
+            Frozen snapshot — data as at {report.period_end}. Current live values may differ.
+          </p>
+        </div>
+        {showPdf && (
+          <a
+            href={`/api/reports/leadership/${report.id}/pdf`}
+            className="rounded-lg bg-agsi-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-agsi-blue"
+          >
+            Download PDF
+          </a>
+        )}
       </div>
-      <p className="mt-1 text-sm text-agsi-darkGray">
-        FY{report.fiscal_year}
-        {report.fiscal_quarter ? ` Q${report.fiscal_quarter}` : ''} · period{' '}
-        {report.period_start} → {report.period_end}
-        {report.finalised_at &&
-          ` · finalised ${new Date(report.finalised_at).toISOString().slice(0, 10)}`}
-      </p>
-      <p className="mt-2 text-xs italic text-agsi-darkGray">
-        Frozen snapshot — data as at {report.period_end}. Current live values may differ.
-      </p>
     </div>
   );
 }

@@ -74,3 +74,12 @@ are documented after the fact:
   `EcosystemPanel` on `/dashboard` for admin/leadership/bd_head.
   Migrations `0034_ecosystem_event_triggers.sql` +
   `0035_ecosystem_summary_helpers.sql`. New dep: `recharts`.
+- **Leadership reports** (M12). Frozen monthly / quarterly snapshots
+  with feedback loop. Migration `0036_generate_leadership_report.sql`
+  builds payload_json + denormalised stakeholder rows in one pass;
+  `0037_finalise_leadership_report.sql` adds finalise + archive RPCs
+  and the `leadership_report_finalised` notification value. Admin
+  draft flow at `/admin/reports/*`, leadership viewer + archive at
+  `/reports/leadership/*`, server-side PDF at
+  `/api/reports/leadership/[id]/pdf` via `@react-pdf/renderer`.
+  bd_manager fully blocked at every layer.
