@@ -5,6 +5,8 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SnapshotPicker } from './_components/SnapshotPicker';
 import { TrendCharts, type TrendPoint, type PricePoint } from './_components/TrendCharts';
 
@@ -77,7 +79,7 @@ export default async function InsightsPage({
   );
 
   if (allDates.length === 0) {
-    return <EmptyState />;
+    return <InsightsEmpty />;
   }
 
   const primary = searchParams.snapshot && allDates.includes(searchParams.snapshot)
@@ -190,6 +192,12 @@ export default async function InsightsPage({
             Pre-computed market snapshots from BNC uploads. Pick a snapshot date to view,
             and optionally a second to diff against.
           </p>
+          <div className="mt-2">
+            <DataFreshnessBadge
+              asOf={primary}
+              refreshedAt={primaryRef?.uploaded_at}
+            />
+          </div>
         </div>
         <SnapshotPicker
           dates={allDates}
@@ -279,7 +287,7 @@ function group(rows: Row[]): Record<string, Row[]> {
 // ---------------------------------------------------------------------------
 // Cards
 
-function EmptyState() {
+function InsightsEmpty() {
   return (
     <div className="space-y-4">
       <div>
@@ -288,18 +296,12 @@ function EmptyState() {
           No market snapshot has been generated yet.
         </p>
       </div>
-      <Card>
-        <CardContent className="p-6 text-sm text-agsi-darkGray">
-          Generate a snapshot from the most recent completed BNC upload via{' '}
-          <Link
-            href={'/admin/uploads' as never}
-            className="text-agsi-accent hover:underline"
-          >
-            Admin → BNC Uploads
-          </Link>{' '}
-          → open the upload → <strong>Generate market snapshot</strong>.
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon="MS"
+        title="No market snapshot yet"
+        description="Generate a snapshot from the most recent completed BNC upload via Admin → BNC Uploads → open the upload → Generate market snapshot."
+        action={{ label: 'Open BNC Uploads', href: '/admin/uploads' }}
+      />
     </div>
   );
 }

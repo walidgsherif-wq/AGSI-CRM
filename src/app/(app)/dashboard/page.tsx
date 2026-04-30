@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ROLE_LABEL } from '@/types/domain';
 import { EcosystemPanel } from '@/components/domain/EcosystemPanel';
+import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
 import { RebuildButton } from './_components/RebuildButton';
 
 export const dynamic = 'force-dynamic';
@@ -208,13 +209,10 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-semibold text-agsi-navy">Dashboard</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
             {user.fullName} · {ROLE_LABEL[user.role]} · FY{fy} Q{fq}
-            {snapshotDate && (
-              <>
-                {' · KPI snapshot '}
-                <span className="text-agsi-navy">{snapshotDate}</span>
-              </>
-            )}
           </p>
+          <div className="mt-2">
+            <DataFreshnessBadge asOf={snapshotDate} compact />
+          </div>
         </div>
         {user.role === 'admin' && <RebuildButton />}
       </div>
