@@ -20,8 +20,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 10 | Ecosystem Awareness engine | ✅ done |
 | 11 | Heat maps | ✅ done |
 | 12 | Leadership reports | ✅ done |
-| 13 | Stagnation engine + notifications | ⏳ next |
-| 14 | Insights module | ⏳ |
+| 13 | Stagnation engine + notifications | ✅ done |
+| 14 | Insights module | ⏳ next |
 | 15 | Reports archive + audit log | ⏳ |
 | 16 | Polish pass | ⏳ |
 
@@ -52,6 +52,47 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager cannot see Admin / Reports / Maps
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
+
+## What's in milestone 13
+
+The notification bell finally lights up. Notifications written by M5
+BNC uploads, M9 inbound email unmatched-queue, M12 leadership-report
+finalise, plus three new eval jobs from M13 itself, all surface in a
+sidebar bell with unread count + dropdown + a full `/notifications`
+inbox.
+
+- **Three eval functions** (migrations `0038_stagnation_notification_engine.sql`
+  + `0039_fix_eval_stagnation.sql`):
+  - `eval_stagnation()` — fires `stagnation_warning` at warn-pct% and
+    `stagnation_breach` at 100% per `stagnation_rules`. Owner +
+    escalation role.
+  - `eval_composition_warning()` — per BDM, fires when on-track for
+    Driver A headline but missing Driver B/C composition sub-target.
+  - `eval_composition_drift()` — mid-quarter early warning when
+    developer-/consultant-ratio drifts off target (§3.12b). Audit
+    log in `composition_drift_log` regardless of fire.
+  All three are SECURITY DEFINER, dedup-aware, and admin-only.
+- **`/admin/notifications-eval`** — admin trigger page with three
+  Run-now cards + last-24h fan-out by type + active stagnation
+  thresholds. v1 has no cron wrappers; thin Edge Function adapters
+  can be added later if leadership wants the eval to run without admin
+  intervention.
+- **`NotificationBell.tsx`** — sidebar dropdown component. Polls every
+  60 seconds for the latest unread count + recent 10 notifications.
+  Click an item to open its `link_url` (auto-marks read); "Mark all
+  read" + "View all" link to the inbox.
+- **`/notifications`** — full inbox with filter (all / unread only)
+  and type filter; mark-all-read; per-row mark-read.
+- **`/settings/notifications`** — channel status (in-app enabled,
+  email + WhatsApp deferred to v1.1) + a catalogue of every
+  notification type the CRM emits with recipient and trigger.
+- **E2E tests** (`m13-notifications.spec.ts`): admin sees eval page;
+  bd_manager 404 on eval; all roles can reach /notifications and
+  /settings/notifications.
+
+Deferred to v1.1: email digest at 07:00 Asia/Dubai (Resend); WhatsApp
+channel; Realtime push (currently 60-second polling); per-user opt-out
+toggles per type.
 
 ## What's in milestone 12
 
