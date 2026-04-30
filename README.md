@@ -21,8 +21,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 11 | Heat maps | ✅ done |
 | 12 | Leadership reports | ✅ done |
 | 13 | Stagnation engine + notifications | ✅ done |
-| 14 | Insights module | ⏳ next |
-| 15 | Reports archive + audit log | ⏳ |
+| 14 | Insights module | ✅ done |
+| 15 | Reports archive + audit log | ⏳ next |
 | 16 | Polish pass | ⏳ |
 
 ## What's in milestone 1
@@ -52,6 +52,39 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager cannot see Admin / Reports / Maps
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
+
+## What's in milestone 14
+
+Pre-computed market insights from BNC uploads:
+
+- **Migration `0040_generate_market_snapshot.sql`** —
+  `generate_market_snapshot(p_upload_id uuid)` SECURITY DEFINER fn
+  aggregates the §4.4 metric set into `market_snapshots`:
+  projects-by-stage / -by-city / -by-sector, top-20 developers /
+  contractors / consultants, awarded vs not, completion pipeline
+  (12/24/36 mo), under-construction value averages, and the canonical
+  stage funnel. Idempotent — re-runs delete the prior `snapshot_date`
+  rows and rewrite. Admin-only.
+- **Admin trigger** on `/admin/uploads/[id]` — new "Generate market
+  snapshot" card visible on completed uploads. The BNC pipeline
+  itself doesn&apos;t auto-run this in v1; admin clicks once after each
+  upload.
+- **`/insights` page** — admin / leadership / bd_head / bd_manager all
+  visible (no role gate; the data is BNC-derived, not BD-confidential).
+  - **Snapshot picker** defaults to most recent date; second
+    "Compare to" picker enables snapshot-vs-snapshot diffs (each
+    metric tile shows a +N / -N badge).
+  - Cards: stage funnel, projects-by-stage with value, projects-by-
+    city + by-sector, three top-20 leaderboards, awarded vs
+    not-awarded, completion pipeline, under-construction value
+    averages.
+
+Empty-state when no snapshot has been generated yet links to the
+admin trigger.
+
+Deferred to v1.1 / M16 polish: auto-run snapshot from the BNC Edge
+Function on upload completion (so admin doesn&apos;t need to click);
+charts (currently table-only, no recharts on `/insights`).
 
 ## What's in milestone 13
 

@@ -6,6 +6,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireRole } from '@/lib/auth/require-role';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { GenerateSnapshotButton } from './_components/GenerateSnapshotButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,6 +123,25 @@ export default async function AdminUploadDetailPage({ params }: { params: { id: 
             <pre className="max-h-96 overflow-auto rounded-lg bg-agsi-lightGray/40 p-4 text-xs text-agsi-darkGray">
               {upload.error_log}
             </pre>
+          </CardContent>
+        </Card>
+      )}
+
+      {upload.status === 'completed' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Market snapshot</CardTitle>
+            <CardDescription>
+              Computes the §4.4 metric set (projects-by-stage / by-city / by-sector,
+              top-20 developers / contractors / consultants, awarded breakdown,
+              completion pipeline 12/24/36mo) and writes them to{' '}
+              <code>market_snapshots</code> for the file date{' '}
+              <span className="font-mono">{upload.file_date}</span>. Idempotent — re-run
+              any time to refresh.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GenerateSnapshotButton uploadId={upload.id} />
           </CardContent>
         </Card>
       )}
