@@ -190,7 +190,7 @@ AGSI-CRM/
 │   │   └── api/                                 # server actions preferred; API used for webhooks/exports
 │   │       ├── bnc/upload/route.ts              # POST → storage + trigger function
 │   │       ├── inbound-email/route.ts           # [M9] POST — Postmark/SES/SendGrid inbound webhook
-│   │       ├── reports/leadership/[id]/pdf/route.ts
+│   │       ├── reports/leadership/[id]/pdf/route.tsx  # [M12] @react-pdf/renderer download
 │   │       └── export/
 │   │           ├── company/[id]/route.ts
 │   │           └── user/[id]/route.ts

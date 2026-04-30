@@ -19,8 +19,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 9 | Performance review + single-step level rule + inbound email + engagement drawer | ✅ done |
 | 10 | Ecosystem Awareness engine | ✅ done |
 | 11 | Heat maps | ✅ done |
-| 12 | Leadership reports | ⏳ next |
-| 13 | Stagnation engine + notifications | ⏳ |
+| 12 | Leadership reports | ✅ done |
+| 13 | Stagnation engine + notifications | ⏳ next |
 | 14 | Insights module | ⏳ |
 | 15 | Reports archive + audit log | ⏳ |
 | 16 | Polish pass | ⏳ |
@@ -52,6 +52,52 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager cannot see Admin / Reports / Maps
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
+
+## What's in milestone 12
+
+Frozen monthly + quarterly leadership reports, end-to-end:
+
+- **Generator** (migration `0036_generate_leadership_report.sql`) —
+  `generate_leadership_report(uuid)` SECURITY DEFINER fn aggregates
+  executive headlines, KPI scorecard (team rollup + per-BDM with BEI),
+  ecosystem awareness (snapshot + monthly trend), heat-map frozen
+  counts, pipeline movements, key-stakeholder progress, and the latest
+  market snapshot reference into `leadership_reports.payload_json`.
+  Idempotent on draft rows; refuses on finalised / archived.
+- **Finalise + archive** (migration `0037_finalise_leadership_report.sql`) —
+  admin-only RPCs that flip status (draft → finalised → archived). On
+  finalise, fans out a `notifications` row to every active
+  leadership-role user. No DELETE path (audit-of-record per §3.17).
+- **Admin draft flow** — `/admin/reports`, `/admin/reports/new`,
+  `/admin/reports/[id]/edit` with executive summary + per-stakeholder
+  narrative editors and a Regenerate button.
+- **Leadership viewer** (`/reports/leadership/[id]`) — visible to
+  admin / leadership / bd_head; bd_manager 404. Renders every payload
+  section. Drafts are admin-only (rest of the app sees them as 404).
+  Leadership-only feedback editor on finalised reports; the existing
+  `enforce_leadership_feedback_only` trigger from migration 0021
+  blocks any other role from writing into the feedback column.
+- **Archive list** (`/reports/leadership`) — finalised + archived rows
+  with role-aware sort. Leadership sees an inbox-style "awaiting
+  feedback first" order.
+- **PDF export** — server-side `@react-pdf/renderer` document
+  (`src/lib/reports/LeadershipReportPdf.tsx`) reachable at
+  `/api/reports/leadership/[id]/pdf`. Generates on-demand from
+  `payload_json` (which is frozen at finalise time, so the output is
+  deterministic). Returns the PDF as a streamed download with a
+  date-stamped filename.
+- **Tests** (`tests/e2e/m12-leadership-reports.spec.ts`) — admin sees
+  `/admin/reports` + `+ New report`; bd_head 404 on `/admin/reports`;
+  leadership 404 on `/admin/reports/new`; leadership + bd_head see
+  `/reports/leadership` archive heading; bd_manager 404 on archive and
+  on a specific viewer URL.
+
+New deps: `@react-pdf/renderer` (server-only render path).
+
+Deferred to v1.1: storing the PDF in Supabase Storage at finalise time
+(spec §5.6 mentions `pdf_storage_path`). On-demand generation gives the
+same UX without the bucket-management overhead — easy to bolt on later
+if leadership wants permanent download links.
 
 ## What's in milestone 11
 
