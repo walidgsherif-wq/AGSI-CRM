@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { AuditFilters } from './_components/AuditFilters';
 import { AuditEventRow } from './_components/AuditEventRow';
 
@@ -155,9 +156,12 @@ export default async function AdminAuditPage({
         </CardHeader>
         <CardContent className="p-0">
           {rows.length === 0 ? (
-            <p className="px-6 py-8 text-center text-sm text-agsi-darkGray">
-              No audit events match these filters.
-            </p>
+            <div className="px-4 py-6">
+              <EmptyState
+                title="No audit events match"
+                description="Either nothing destructive has happened in this filter window, or your filters are too narrow. Use Clear all in the filter bar to reset."
+              />
+            </div>
           ) : (
             <ul className="divide-y divide-agsi-lightGray">
               {rows.map((r) => (
