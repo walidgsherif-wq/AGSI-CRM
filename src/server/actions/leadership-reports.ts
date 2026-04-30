@@ -129,3 +129,55 @@ export async function saveStakeholderNarrative(rowId: string, narrative: string)
   revalidatePath(`/admin/reports/${report.id}/edit`);
   return { ok: true };
 }
+
+export async function finaliseReport(id: string) {
+  const user = await getCurrentUser();
+  if (user.role !== 'admin') return { error: 'admin only' };
+
+  const { error } = await supabase().rpc('finalise_leadership_report', {
+    p_report_id: id,
+  });
+  if (error) return { error: error.message };
+  revalidatePath('/admin/reports');
+  revalidatePath(`/admin/reports/${id}/edit`);
+  revalidatePath('/reports/leadership');
+  revalidatePath(`/reports/leadership/${id}`);
+  return { ok: true };
+}
+
+export async function archiveReport(id: string) {
+  const user = await getCurrentUser();
+  if (user.role !== 'admin') return { error: 'admin only' };
+
+  const { error } = await supabase().rpc('archive_leadership_report', {
+    p_report_id: id,
+  });
+  if (error) return { error: error.message };
+  revalidatePath('/admin/reports');
+  revalidatePath('/reports/leadership');
+  revalidatePath(`/reports/leadership/${id}`);
+  return { ok: true };
+}
+
+/**
+ * Leadership writes feedback on a finalised report. The
+ * enforce_leadership_feedback_only trigger (migration 0021) guards the
+ * column-mask: leadership can ONLY change leadership_feedback_text on
+ * status='finalised' rows, and feedback_by/feedback_at are stamped
+ * server-side. Admin / bd_head are blocked from writing feedback
+ * (only leadership role).
+ */
+export async function saveLeadershipFeedback(id: string, feedback: string) {
+  const user = await getCurrentUser();
+  if (user.role !== 'leadership') {
+    return { error: 'Only leadership can write report feedback.' };
+  }
+
+  const { error } = await supabase()
+    .from('leadership_reports')
+    .update({ leadership_feedback_text: feedback })
+    .eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath(`/reports/leadership/${id}`);
+  return { ok: true };
+}

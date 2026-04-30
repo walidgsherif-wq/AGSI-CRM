@@ -17,6 +17,10 @@ import { type Level } from '@/types/domain';
 import { ExecutiveSummaryEditor } from './_components/ExecutiveSummaryEditor';
 import { RegenerateButton } from './_components/RegenerateButton';
 import { StakeholderNarrativeEditor } from './_components/StakeholderNarrativeEditor';
+import {
+  ArchiveButton,
+  FinaliseButton,
+} from './_components/FinaliseButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -216,10 +220,31 @@ export default async function EditReportPage({ params }: { params: { id: string 
 
       {isDraft && (
         <Card>
-          <CardContent className="p-4 text-sm text-agsi-darkGray">
-            <strong>Next:</strong> finalise + leadership-feedback flow lands in PR 2 of
-            M12. For now, you can verify the payload renders correctly here, then either
-            regenerate against fresh data or wait for the finalise button.
+          <CardHeader>
+            <CardTitle>Finalise</CardTitle>
+            <CardDescription>
+              Locks the report and sends an in-app notification to every active
+              leadership user. After this, the executive summary, narratives, and
+              payload are read-only.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FinaliseButton reportId={report.id} />
+          </CardContent>
+        </Card>
+      )}
+
+      {report.status === 'finalised' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Archive</CardTitle>
+            <CardDescription>
+              Move this report to the Archived bucket. Stays readable as audit-of-record;
+              the spec disallows deletion.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ArchiveButton reportId={report.id} />
           </CardContent>
         </Card>
       )}
