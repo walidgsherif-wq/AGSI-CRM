@@ -180,6 +180,7 @@ AGSI-CRM/
 │   │   │       ├── inbound-email/page.tsx       # [M9] postmark unmatched-queue + resolve
 │   │   │       ├── level-requests/page.tsx      # [M7+] level-change approval queue
 │   │   │       ├── ecosystem-rebuild/page.tsx   # [M10] manual rebuild + backfill
+│   │   │       ├── notifications-eval/page.tsx  # [M13] manual stagnation/composition eval triggers
 │   │   │       ├── reports/                     # [M12]
 │   │   │       │   ├── page.tsx
 │   │   │       │   ├── new/page.tsx
@@ -205,6 +206,7 @@ AGSI-CRM/
 │   │       ├── EcosystemPanel.tsx               # [M10] §3.16 leadership-only dashboard tile
 │   │       ├── EcosystemTrendSpark.tsx          # [M10] recharts spark line for the panel
 │   │       ├── HeatMapExportButton.tsx          # [M11] §7.5 PNG export via html-to-image
+│   │       ├── NotificationBell.tsx             # [M13] sidebar bell with polling + dropdown
 │   │       ├── OwnerAvatar.tsx
 │   │       ├── StagnationIndicator.tsx
 │   │       ├── KPITile.tsx

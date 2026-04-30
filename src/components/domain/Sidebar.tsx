@@ -20,6 +20,7 @@ import type { Role } from '@/types/domain';
 import { ROLE_LABEL } from '@/types/domain';
 import { cn } from '@/lib/utils';
 import { DevRoleSwitcher } from './DevRoleSwitcher';
+import { NotificationBell } from './NotificationBell';
 
 type NavItem = {
   href: string;
@@ -150,7 +151,10 @@ export function Sidebar({ role, fullName, email }: { role: Role; fullName: strin
         <p className="mt-2 truncate text-xs text-agsi-darkGray" title={email}>
           {email}
         </p>
-        <form action="/auth/signout" method="post" className="mt-3">
+        <div className="mt-3">
+          <NotificationBell />
+        </div>
+        <form action="/auth/signout" method="post" className="mt-2">
           <button
             type="submit"
             className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-agsi-darkGray hover:bg-agsi-offWhite hover:text-agsi-navy"
