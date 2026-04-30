@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SnapshotPicker } from './_components/SnapshotPicker';
+import { TrendCharts, type TrendPoint, type PricePoint } from './_components/TrendCharts';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +97,7 @@ export default async function InsightsPage({
     return data ?? [];
   };
 
-  const [primaryData, compareData, uploadRefs] = await Promise.all([
+  const [primaryData, compareData, uploadRefs, trendRows, priceRows] = await Promise.all([
     fetchSnapshot(primary),
     compare ? fetchSnapshot(compare) : Promise.resolve<Row[]>([]),
     supabase
@@ -104,6 +105,26 @@ export default async function InsightsPage({
       .select('id, filename, file_date, uploaded_at, status')
       .in('file_date', compare ? [primary, compare] : [primary])
       .returns<UploadRef[]>(),
+    // Trend dataset — only the metric_codes we plot, across all snapshot dates.
+    supabase
+      .from('market_snapshots')
+      .select('snapshot_date, metric_code, dimension_key, metric_value_json')
+      .in('metric_code', ['projects_by_stage', 'rebar_window'])
+      .order('snapshot_date', { ascending: true })
+      .returns<
+        Array<{
+          snapshot_date: string;
+          metric_code: string;
+          dimension_key: string;
+          metric_value_json: Record<string, unknown> | null;
+        }>
+      >(),
+    // Rebar price history.
+    supabase
+      .from('rebar_price_history')
+      .select('effective_month, price_aed_per_tonne')
+      .order('effective_month', { ascending: true })
+      .returns<Array<{ effective_month: string; price_aed_per_tonne: number }>>(),
   ]);
 
   const refs = new Map((uploadRefs.data ?? []).map((u) => [u.file_date, u]));
@@ -112,6 +133,53 @@ export default async function InsightsPage({
 
   const p = group(primaryData);
   const c = compare ? group(compareData) : null;
+
+  // Build trend series: per snapshot_date, value-pre-construction +
+  // value-under-construction + rebar tonnes.
+  const PRE_CONSTRUCTION_STAGES = new Set([
+    'concept',
+    'design',
+    'tender',
+    'tender_evaluation',
+    'tender_submission',
+  ]);
+  const trendByDate = new Map<string, TrendPoint>();
+  for (const r of trendRows.data ?? []) {
+    const date = r.snapshot_date;
+    let entry = trendByDate.get(date);
+    if (!entry) {
+      entry = {
+        snapshot_date: date,
+        pre_construction_aed: 0,
+        under_construction_aed: 0,
+        rebar_tonnes: 0,
+      };
+      trendByDate.set(date, entry);
+    }
+    if (r.metric_code === 'projects_by_stage') {
+      const v = Number(
+        (r.metric_value_json as { value_aed?: number } | null)?.value_aed ?? 0,
+      );
+      if (PRE_CONSTRUCTION_STAGES.has(r.dimension_key)) {
+        entry.pre_construction_aed += v;
+      } else if (r.dimension_key === 'under_construction') {
+        entry.under_construction_aed += v;
+      }
+    } else if (r.metric_code === 'rebar_window') {
+      const j = r.metric_value_json as
+        | { in_window?: { remaining_rebar_tonnes?: number } }
+        | null;
+      entry.rebar_tonnes = Number(j?.in_window?.remaining_rebar_tonnes ?? 0);
+    }
+  }
+  const trendData = Array.from(trendByDate.values()).sort((a, b) =>
+    a.snapshot_date.localeCompare(b.snapshot_date),
+  );
+
+  const priceData: PricePoint[] = (priceRows.data ?? []).map((r) => ({
+    effective_month: r.effective_month.slice(0, 7),
+    price_aed_per_tonne: Number(r.price_aed_per_tonne),
+  }));
 
   return (
     <div className="space-y-6">
@@ -131,6 +199,8 @@ export default async function InsightsPage({
       </div>
 
       <FreshnessRow primary={primaryRef} compare={compareRef} />
+
+      <TrendCharts trend={trendData} prices={priceData} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <StageFunnelCard primary={p.stage_funnel} compare={c?.stage_funnel} />
@@ -184,6 +254,12 @@ export default async function InsightsPage({
       <ConstructionAvgCard
         primary={p.construction_value_avg?.[0]}
         compare={c?.construction_value_avg?.[0]}
+      />
+
+      <RebarWindowSection
+        primary={p.rebar_window?.[0]}
+        compare={c?.rebar_window?.[0]}
+        topRows={p.top_rebar_window_projects}
       />
     </div>
   );
@@ -662,6 +738,151 @@ function ConstructionAvgCard({
             prev={jc ? Number(jc.total_value_aed ?? 0) : null}
           />
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RebarWindowSection({
+  primary,
+  compare,
+  topRows,
+}: {
+  primary?: Row;
+  compare?: Row;
+  topRows?: Row[];
+}) {
+  type Bucket = { count?: number; value_aed?: number };
+  type Json = {
+    threshold_pct?: number;
+    in_window?: Bucket;
+    past_window?: Bucket;
+    unknown_completion?: Bucket;
+  };
+
+  const j = primary?.metric_value_json as Json | undefined;
+  const jc = compare?.metric_value_json as Json | undefined;
+
+  if (!j) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Rebar consumption window</CardTitle>
+          <CardDescription>
+            Re-run <strong>Generate market snapshot</strong> to populate this section.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-agsi-darkGray">
+            This snapshot was generated before migration <code>0041</code>. Open Admin →
+            BNC Uploads → the upload for this snapshot date → Generate market snapshot to
+            refresh.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const threshold = Number(j.threshold_pct ?? 45);
+  const inWin = j.in_window ?? {};
+  const past = j.past_window ?? {};
+  const unk = j.unknown_completion ?? {};
+  const inWinPrev = jc?.in_window;
+  const pastPrev = jc?.past_window;
+  const unkPrev = jc?.unknown_completion;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Rebar consumption window</CardTitle>
+        <CardDescription>
+          Rebar is consumed during the first <strong>{threshold}%</strong> of construction.
+          Projects under construction below that threshold are still in the active rebar
+          buying window — the addressable opportunity. Threshold is configurable via{' '}
+          <code>app_settings.rebar_consumption_window_pct</code>.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat
+            label={`In window (< ${threshold}%)`}
+            value={fmt(Number(inWin.count ?? 0))}
+            suffix={Number(inWin.value_aed ?? 0) > 0 ? `${fmtCurrency(Number(inWin.value_aed))} AED` : ''}
+            cur={Number(inWin.count ?? 0)}
+            prev={inWinPrev ? Number(inWinPrev.count ?? 0) : null}
+          />
+          <Stat
+            label={`Past window (≥ ${threshold}%)`}
+            value={fmt(Number(past.count ?? 0))}
+            suffix={Number(past.value_aed ?? 0) > 0 ? `${fmtCurrency(Number(past.value_aed))} AED` : ''}
+            cur={Number(past.count ?? 0)}
+            prev={pastPrev ? Number(pastPrev.count ?? 0) : null}
+          />
+          <Stat
+            label="Unknown completion"
+            value={fmt(Number(unk.count ?? 0))}
+            suffix={Number(unk.value_aed ?? 0) > 0 ? `${fmtCurrency(Number(unk.value_aed))} AED` : ''}
+            cur={Number(unk.count ?? 0)}
+            prev={unkPrev ? Number(unkPrev.count ?? 0) : null}
+          />
+        </div>
+
+        {topRows && topRows.length > 0 ? (
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-agsi-darkGray">
+              Top {topRows.length} in-window projects by value
+            </p>
+            <ul className="space-y-1 text-sm">
+              {topRows
+                .map((r) => ({
+                  id: r.dimension_key,
+                  j: r.metric_value_json as
+                    | {
+                        project_name?: string;
+                        city?: string;
+                        sector?: string;
+                        completion_pct?: number;
+                        value_aed?: number;
+                        estimated_completion_date?: string | null;
+                      }
+                    | null,
+                }))
+                .sort((a, b) => Number(b.j?.value_aed ?? 0) - Number(a.j?.value_aed ?? 0))
+                .map((r, i) => (
+                  <li
+                    key={r.id}
+                    className="grid grid-cols-[24px_1fr_auto_auto] items-center gap-3 border-b border-agsi-lightGray py-1 last:border-b-0"
+                  >
+                    <span className="text-xs text-agsi-darkGray">{i + 1}.</span>
+                    <Link
+                      href={`/projects/${r.id}`}
+                      className="truncate text-agsi-navy hover:underline"
+                      title={r.j?.project_name ?? '(unnamed)'}
+                    >
+                      {r.j?.project_name ?? '(unnamed)'}
+                      <span className="ml-2 text-xs text-agsi-darkGray">
+                        {r.j?.city ?? ''}
+                        {r.j?.sector ? ` · ${r.j.sector}` : ''}
+                      </span>
+                    </Link>
+                    <span className="text-right tabular-nums text-xs text-agsi-darkGray">
+                      {Number(r.j?.completion_pct ?? 0).toFixed(0)}% complete
+                    </span>
+                    <span className="text-right tabular-nums font-semibold text-agsi-navy">
+                      {fmtCurrency(Number(r.j?.value_aed ?? 0))} AED
+                    </span>
+                  </li>
+                ))}
+            </ul>
+            <p className="mt-2 text-xs italic text-agsi-darkGray">
+              These are the open-rebar opportunities to chase. BD priority list.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-agsi-darkGray">
+            No projects with known completion below {threshold}% in this snapshot.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

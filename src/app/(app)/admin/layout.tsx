@@ -16,6 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           { href: '/admin/targets', label: 'Targets' },
           { href: '/admin/ecosystem-rebuild', label: 'Ecosystem' },
           { href: '/admin/notifications-eval', label: 'Notifications eval' },
+          { href: '/admin/rebar-prices', label: 'Rebar prices' },
           { href: '/admin/reports', label: 'Reports' },
           { href: '/admin/settings', label: 'Settings' },
           { href: '/admin/audit', label: 'Audit log' },
