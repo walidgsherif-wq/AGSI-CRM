@@ -86,6 +86,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
           <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="snapshot_date"
+            tickFormatter={fmtMonthYear}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
           />
@@ -139,7 +140,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
               if (series === 'under_construction_aed') return [aed, 'Under construction'];
               return [aed, series];
             }}
-            labelFormatter={(label) => `Snapshot: ${String(label ?? '')}`}
+            labelFormatter={(label) => `Snapshot: ${fmtMonthYear(String(label ?? ''))}`}
           />
           <Line
             yAxisId="aed"
@@ -189,6 +190,7 @@ function PriceChart({ points }: { points: PricePoint[] }) {
           <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="effective_month"
+            tickFormatter={fmtMonthYear}
             tick={{ fontSize: 11, fill: '#4A5568' }}
             stroke="#C5CDD8"
           />
@@ -215,7 +217,7 @@ function PriceChart({ points }: { points: PricePoint[] }) {
               `${new Intl.NumberFormat().format(Number(value))} AED/t`,
               'Price',
             ]}
-            labelFormatter={(label) => `Month: ${String(label ?? '')}`}
+            labelFormatter={(label) => `Month: ${fmtMonthYear(String(label ?? ''))}`}
           />
           <Line
             type="monotone"
@@ -241,6 +243,24 @@ function Legend({ color, label }: { color: string; label: string }) {
       {label}
     </span>
   );
+}
+
+/**
+ * X-axis tick formatter. Accepts YYYY-MM or YYYY-MM-DD and returns
+ * "MMM-YY" (e.g. "JAN-26"). Falls through to the original string when
+ * the input doesn't parse.
+ */
+function fmtMonthYear(s: string): string {
+  const m = s.match(/^(\d{4})-(\d{2})/);
+  if (!m) return s;
+  const yyyy = m[1];
+  const mm = m[2];
+  const date = new Date(`${yyyy}-${mm}-01T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return s;
+  const month = date
+    .toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
+    .toUpperCase();
+  return `${month}-${yyyy.slice(2)}`;
 }
 
 /**
