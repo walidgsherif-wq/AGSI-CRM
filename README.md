@@ -22,8 +22,8 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 12 | Leadership reports | ✅ done |
 | 13 | Stagnation engine + notifications | ✅ done |
 | 14 | Insights module | ✅ done |
-| 15 | Reports archive + audit log | ⏳ next |
-| 16 | Polish pass | ⏳ |
+| 15 | Reports archive + audit log | ✅ done |
+| 16 | Polish pass | ⏳ next |
 
 ## What's in milestone 1
 
@@ -52,6 +52,28 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
   - BD Manager cannot see Admin / Reports / Maps
   - BD Manager hitting `/admin/users` → 404
   - Leadership cannot see Pipeline / Tasks but sees Reports
+
+## What's in milestone 15
+
+The leadership reports archive shipped already in M12 (`/reports/leadership`).
+M15 closes out the second half: the **filterable audit log viewer** at
+`/admin/audit`.
+
+- Reads `audit_events` (admin-only RLS, populated since M2).
+- Five event types currently flow in: `level_change`,
+  `level_change_approval`, `ownership_transfer`,
+  `credit_auto_dedup`, `engagement_delete`. Notifications and KPI
+  rebuilds intentionally do not write audit events.
+- URL-driven filters: event type, entity type, actor, from/to dates.
+  Shareable views.
+- 50 rows per page with offset pagination (Newer / Older).
+- Each row shows actor + timestamp + colour-tagged event badge + a
+  human-readable summary (e.g. "L2 → L3" for level_change, "Deleted
+  meeting: <subject>" for engagement_delete).
+- Click a row to expand a side-by-side `before` / `after` JSON diff.
+- Companies referenced by the row link to `/companies/[id]` (engagement
+  links omitted because the engagement row is gone after delete).
+- E2E: admin sees the page; bd_head, leadership, bd_manager → 404.
 
 ## What's in milestone 14
 
