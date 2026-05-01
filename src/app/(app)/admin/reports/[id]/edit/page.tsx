@@ -20,6 +20,7 @@ import { StakeholderNarrativeEditor } from './_components/StakeholderNarrativeEd
 import {
   ArchiveButton,
   FinaliseButton,
+  RegeneratePdfButton,
 } from './_components/FinaliseButton';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,7 @@ type Report = {
   generated_at: string;
   executive_summary: string | null;
   payload_json: LeadershipReportPayload;
+  pdf_storage_path: string | null;
 };
 
 type Stakeholder = {
@@ -62,7 +64,7 @@ export default async function EditReportPage({ params }: { params: { id: string 
   const { data: report } = await supabase
     .from('leadership_reports')
     .select(
-      'id, report_type, period_label, period_start, period_end, fiscal_year, fiscal_quarter, status, generated_at, executive_summary, payload_json',
+      'id, report_type, period_label, period_start, period_end, fiscal_year, fiscal_quarter, status, generated_at, executive_summary, payload_json, pdf_storage_path',
     )
     .eq('id', params.id)
     .maybeSingle<Report>();
@@ -230,6 +232,46 @@ export default async function EditReportPage({ params }: { params: { id: string 
           </CardHeader>
           <CardContent>
             <FinaliseButton reportId={report.id} />
+          </CardContent>
+        </Card>
+      )}
+
+      {(report.status === 'finalised' || report.status === 'archived') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              PDF snapshot{' '}
+              {report.pdf_storage_path ? (
+                <Badge variant="green">Persisted</Badge>
+              ) : (
+                <Badge variant="amber">Missing</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {report.pdf_storage_path ? (
+                <>
+                  Captured at finalise time and stored in the{' '}
+                  <code>leadership-reports</code> bucket. Downloads from{' '}
+                  <Link
+                    href={`/api/reports/leadership/${report.id}/pdf`}
+                    className="text-agsi-accent hover:underline"
+                  >
+                    /api/reports/leadership/{report.id}/pdf
+                  </Link>{' '}
+                  redirect to a 60s signed URL. Click below to overwrite the
+                  stored copy if the original render needs to be replaced.
+                </>
+              ) : (
+                <>
+                  No persisted PDF for this finalised report — the auto-render at
+                  finalise time likely failed. Click below to render and upload it
+                  now.
+                </>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RegeneratePdfButton reportId={report.id} />
           </CardContent>
         </Card>
       )}

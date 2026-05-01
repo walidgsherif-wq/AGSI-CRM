@@ -38,11 +38,15 @@ type ReportRow = {
   payload_json: LeadershipReportPayload;
   leadership_feedback_text: string | null;
   leadership_feedback_at: string | null;
+  pdf_storage_path: string | null;
   feedback_by:
     | { full_name: string }
     | { full_name: string }[]
     | null;
 };
+
+const PDF_BUCKET = 'leadership-reports';
+const SIGNED_URL_TTL_SECONDS = 60;
 
 export async function GET(
   _req: NextRequest,
@@ -64,7 +68,7 @@ export async function GET(
     .select(
       `id, period_label, period_start, period_end, fiscal_year, fiscal_quarter,
        report_type, status, finalised_at, executive_summary, payload_json,
-       leadership_feedback_text, leadership_feedback_at,
+       leadership_feedback_text, leadership_feedback_at, pdf_storage_path,
        feedback_by:profiles!leadership_reports_leadership_feedback_by_fkey(full_name)`,
     )
     .eq('id', params.id)
@@ -77,6 +81,19 @@ export async function GET(
   // Drafts are admin-only via this route too.
   if (report.status === 'draft' && user.role !== 'admin') {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
+
+  // If a persisted PDF exists in Storage, redirect to a short-lived
+  // signed URL. This keeps the public download URL stable while
+  // serving the immutable bytes that were captured at finalise time.
+  // Signed-URL failure falls through to live render (degraded path).
+  if (report.pdf_storage_path) {
+    const { data: signed } = await supabase.storage
+      .from(PDF_BUCKET)
+      .createSignedUrl(report.pdf_storage_path, SIGNED_URL_TTL_SECONDS);
+    if (signed?.signedUrl) {
+      return NextResponse.redirect(signed.signedUrl, 302);
+    }
   }
 
   const feedbackByName = pickName(report.feedback_by);
