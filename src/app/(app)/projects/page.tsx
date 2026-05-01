@@ -147,7 +147,8 @@ export default async function ProjectsPage({
               )}
             </p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
                   <th className="px-4 py-2 font-medium">Name</th>
@@ -198,6 +199,7 @@ export default async function ProjectsPage({
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

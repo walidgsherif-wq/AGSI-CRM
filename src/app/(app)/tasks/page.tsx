@@ -138,7 +138,8 @@ export default async function GlobalTasksPage({
           {tasks.length === 0 ? (
             <p className="p-6 text-sm text-agsi-darkGray">No tasks match these filters.</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
                   <th className="px-4 py-2 font-medium">Task</th>
@@ -209,6 +210,7 @@ export default async function GlobalTasksPage({
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

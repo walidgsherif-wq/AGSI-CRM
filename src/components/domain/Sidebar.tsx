@@ -14,6 +14,7 @@ import {
   Shield,
   Settings,
   LogOut,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@/types/domain';
@@ -92,23 +93,57 @@ const NAV: NavItem[] = [
   },
 ];
 
-export function Sidebar({ role, fullName, email }: { role: Role; fullName: string; email: string }) {
+export function Sidebar({
+  role,
+  fullName,
+  email,
+  isMobileOpen = false,
+  onMobileClose,
+}: {
+  role: Role;
+  fullName: string;
+  email: string;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}) {
   const pathname = usePathname();
   const items = NAV.filter((i) => i.roles.includes(role));
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-agsi-lightGray bg-white">
-      <div className="flex items-center gap-3 px-6 pt-6 pb-8">
-        <div
-          aria-hidden
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-agsi-navy text-sm font-bold text-white"
-        >
-          AG
+    <aside
+      className={cn(
+        'flex w-64 flex-col border-r border-agsi-lightGray bg-white',
+        // Desktop (≥lg): static, full height, always visible.
+        'lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:translate-x-0',
+        // Mobile (<lg): fixed overlay, slide in from left.
+        'fixed inset-y-0 left-0 z-40 h-screen transition-transform duration-200 ease-out',
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      )}
+      aria-hidden={!isMobileOpen ? undefined : false}
+    >
+      <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-8">
+        <div className="flex items-center gap-3">
+          <div
+            aria-hidden
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-agsi-navy text-sm font-bold text-white"
+          >
+            AG
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-agsi-navy">AGSI CRM</span>
+            <span className="text-xs text-agsi-darkGray">Business Development</span>
+          </div>
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-agsi-navy">AGSI CRM</span>
-          <span className="text-xs text-agsi-darkGray">Business Development</span>
-        </div>
+        {onMobileClose && (
+          <button
+            type="button"
+            onClick={onMobileClose}
+            aria-label="Close menu"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-agsi-darkGray hover:bg-agsi-offWhite hover:text-agsi-navy lg:hidden"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
