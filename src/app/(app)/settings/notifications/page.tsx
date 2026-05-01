@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getMyPreferences } from '@/server/actions/notifications';
+import { PreferenceToggles } from './_components/PreferenceToggles';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,14 +15,14 @@ const NOTIFICATION_TYPES: Array<{
   {
     key: 'stagnation_warning',
     label: 'Stagnation warning',
-    description: 'Account approaching the level-stagnation threshold (warn-pct%).',
+    description: 'Account approaching the level-stagnation threshold.',
     whoFires: 'Owner',
   },
   {
     key: 'stagnation_breach',
     label: 'Stagnation breach',
     description: 'Account exceeded the level-stagnation threshold.',
-    whoFires: 'Owner + escalation role (bd_head or admin)',
+    whoFires: 'Owner + escalation role',
   },
   {
     key: 'composition_warning',
@@ -31,7 +33,7 @@ const NOTIFICATION_TYPES: Array<{
   {
     key: 'composition_drift',
     label: 'Composition drift',
-    description: 'Mid-quarter ratio drifting off target. Early-correction signal.',
+    description: 'Mid-quarter ratio drifting off target.',
     whoFires: 'BDM + BD Head + admin',
   },
   {
@@ -67,8 +69,7 @@ const NOTIFICATION_TYPES: Array<{
   {
     key: 'unmatched_company',
     label: 'Unmatched company',
-    description:
-      'A BNC upload produced one or more company-name matches in the 0.75–0.85 confidence band that need manual review.',
+    description: 'BNC upload produced match-queue items that need manual review.',
     whoFires: 'Admins',
   },
   {
@@ -85,13 +86,17 @@ const NOTIFICATION_TYPES: Array<{
   },
 ];
 
-export default function NotificationSettingsPage() {
+export default async function NotificationSettingsPage() {
+  const prefs = await getMyPreferences();
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-agsi-navy">Notifications</h1>
         <p className="mt-1 text-sm text-agsi-darkGray">
-          What fires, who gets it, and where it shows up. Open your{' '}
+          Per-type opt-out controls for the in-app channel. Email and WhatsApp toggles
+          are visible but disabled — those channels are deferred to v1.1 per
+          architecture decision D-3. Open your{' '}
           <Link
             href={'/notifications' as never}
             className="text-agsi-accent hover:underline"
@@ -106,8 +111,8 @@ export default function NotificationSettingsPage() {
         <CardHeader>
           <CardTitle>Channels</CardTitle>
           <CardDescription>
-            Per-channel delivery toggles. In-app is always on; email and WhatsApp are
-            deferred to v1.1.
+            In-app is always on at the channel level; per-type toggles below let you
+            mute specific notification types.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -125,7 +130,7 @@ export default function NotificationSettingsPage() {
             <ChannelRow
               name="WhatsApp"
               status="v1.1"
-              note="Pluggable WhatsAppChannel via Meta Business API + BSP (Twilio or 360dialog). Gated on admin-verified phone number."
+              note="Pluggable via Meta Business API + BSP (Twilio or 360dialog). Gated on admin-verified phone number."
             />
           </ul>
         </CardContent>
@@ -133,27 +138,56 @@ export default function NotificationSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Notification catalogue</CardTitle>
+          <CardTitle>Per-type preferences</CardTitle>
           <CardDescription>
-            Full list of notification types this CRM emits, who receives each, and what
-            triggers it. Per-type opt-out is a v1.1 add-on.
+            Toggle the in-app delivery on or off for each type. Muted types stay in
+            the audit trail (still inserted into the notifications table) but are
+            hidden from your bell + inbox.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <ul className="divide-y divide-agsi-lightGray">
-            {NOTIFICATION_TYPES.map((n) => (
-              <li key={n.key} className="px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs text-agsi-darkGray">{n.key}</span>
-                  <span className="text-sm font-semibold text-agsi-navy">{n.label}</span>
-                </div>
-                <p className="mt-1 text-xs text-agsi-darkGray">{n.description}</p>
-                <p className="mt-0.5 text-xs italic text-agsi-darkGray">
-                  Recipient: {n.whoFires}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
+                  <th className="px-4 py-2 font-medium">Notification type</th>
+                  <th className="px-4 py-2 text-center font-medium">In-app</th>
+                  <th className="px-4 py-2 text-center font-medium">Email</th>
+                  <th className="px-4 py-2 text-center font-medium">WhatsApp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {NOTIFICATION_TYPES.map((n) => {
+                  const pref = prefs[n.key];
+                  return (
+                    <tr key={n.key} className="border-b border-agsi-lightGray/50">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-agsi-navy">{n.label}</p>
+                        <p className="mt-0.5 text-xs text-agsi-darkGray">
+                          {n.description}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[10px] text-agsi-darkGray">
+                          {n.key} · recipient: {n.whoFires}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <PreferenceToggles
+                          notificationType={n.key}
+                          inApp={pref?.in_app_enabled ?? true}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center text-xs text-agsi-darkGray">
+                        <Badge variant="neutral">v1.1</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-center text-xs text-agsi-darkGray">
+                        <Badge variant="neutral">v1.1</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

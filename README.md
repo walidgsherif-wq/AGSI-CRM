@@ -23,7 +23,46 @@ Built to the v2.3 architecture pack in `architecture/` — read that first.
 | 13 | Stagnation engine + notifications | ✅ done |
 | 14 | Insights module | ✅ done |
 | 15 | Reports archive + audit log | ✅ done |
-| 16 | Polish pass | ⏳ next |
+| 16 | Polish pass | ✅ done |
+
+## What's in milestone 16
+
+The final polish pass, shipped across three slices.
+
+**M16.0 — primitives + states:**
+- New shared components: `DataFreshnessBadge` (colour-tiered "Data as
+  of …" pill), `Skeleton` (animated grey block), `EmptyState` (title +
+  description + CTA).
+- `(app)/error.tsx` route-group error boundary; replaces the bare
+  Next.js 500 page with a friendly retry / dashboard escape.
+- Co-located `loading.tsx` for `/insights`, `/dashboard`, `/admin/audit`,
+  `/reports/leadership` plus a generic fallback for the rest of `(app)`.
+- Wired `DataFreshnessBadge` into `/insights` and `/dashboard` headers.
+
+**M16.1 — mobile responsiveness:**
+- New `AppShell` client wrapper around the authenticated layout. Owns
+  the mobile-menu open/close state. Closes on route change, ESC, and
+  backdrop click; locks body scroll while open.
+- Below `lg` breakpoint: sidebar lives fixed off-screen and slides in
+  via `translate-x` from a top-bar hamburger trigger. Above `lg`:
+  sticky-left as before.
+- Wide list tables (`/companies`, `/projects`, `/tasks`, `/admin/users`)
+  wrapped in `overflow-x-auto` with `min-w-[640px]` so narrow viewports
+  scroll horizontally instead of crushing columns.
+
+**M16.2 — preferences + PDF + close:**
+- Migration `0044_notification_preferences.sql` — per-user, per-type
+  table with `in_app_enabled` / `email_enabled` / `whatsapp_enabled`
+  columns. RLS scopes to `auth.uid()`.
+- Functional `/settings/notifications` page with in-app toggle per type
+  (email + WhatsApp deferred to v1.1). Notifications still fire and
+  insert (audit trail intact); they're just hidden from the bell +
+  inbox of users who opted out via a `.not('notification_type', 'in', …)`
+  filter on read.
+- Leadership-report PDF cosmetics — top brand band fixed across pages
+  (navy with gold AG logo + "AGSI · NET ZERO STEEL" wordmark + period
+  label), gold left-accent on the hero card, gold left-stripe on every
+  section title, uppercase tracked-out section labels for hierarchy.
 
 ## What's in milestone 1
 
