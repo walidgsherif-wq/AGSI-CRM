@@ -773,6 +773,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? summary.warnings.slice(0, 50).join('\n') : null,
     }).eq('id', uploadId);
 
+    // Auto-generate the §4.4 market snapshot. Called via the user
+    // client so auth.uid()/auth_role() satisfy the SECURITY DEFINER
+    // gate on generate_market_snapshot. Failure here does NOT fail
+    // the upload — admins can re-run from /admin/uploads/[id].
+    let snapshotGenerated = false;
+    try {
+      const { error: snapErr } = await userClient.rpc('generate_market_snapshot', {
+        p_upload_id: uploadId,
+      });
+      if (snapErr) {
+        summary.warnings.push(`market snapshot: ${snapErr.message}`);
+      } else {
+        snapshotGenerated = true;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      summary.warnings.push(`market snapshot: ${msg}`);
+    }
+
     // In-app notification to all admins
     const { data: admins } = await admin
       .from('profiles').select('id').eq('role', 'admin');
@@ -788,7 +807,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    return jsonResponse({ ok: true, upload_id: uploadId, summary });
+    return jsonResponse({
+      ok: true,
+      upload_id: uploadId,
+      summary,
+      snapshot_generated: snapshotGenerated,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await admin.from('bnc_uploads')
