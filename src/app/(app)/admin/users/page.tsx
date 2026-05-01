@@ -70,7 +70,8 @@ export default async function AdminUsersPage() {
           ) : !users || users.length === 0 ? (
             <p className="text-sm text-agsi-darkGray">No users yet.</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
                   <th className="py-2 font-medium">Name</th>
@@ -118,6 +119,7 @@ export default async function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
