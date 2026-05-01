@@ -15,6 +15,7 @@ const COLORS = {
   green: '#2E7D52',
   amber: '#DD8E2A',
   red: '#C53030',
+  gold: '#D4AF37',
   darkGray: '#4A5568',
   midGray: '#C5CDD8',
   lightGray: '#E8EDF4',
@@ -23,46 +24,107 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 36,
+    paddingTop: 60,
+    paddingBottom: 50,
+    paddingHorizontal: 40,
     fontSize: 10,
     fontFamily: 'Helvetica',
     color: COLORS.navy,
   },
+  // Top brand band — fixed across pages.
+  brandBand: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 28,
+    backgroundColor: COLORS.navy,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    justifyContent: 'space-between',
+  },
+  brandBandLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    backgroundColor: COLORS.gold,
+    color: COLORS.navy,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    textAlign: 'center',
+    paddingTop: 3,
+  },
+  brandWordmark: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    letterSpacing: 1.2,
+  },
+  brandSubtitle: {
+    color: COLORS.midGray,
+    fontSize: 8,
+    letterSpacing: 0.5,
+  },
   hero: {
     marginBottom: 18,
-    padding: 14,
+    padding: 16,
     borderRadius: 6,
     backgroundColor: COLORS.offWhite,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.gold,
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderTopColor: COLORS.lightGray,
+    borderRightColor: COLORS.lightGray,
+    borderBottomColor: COLORS.lightGray,
+  },
+  heroEyebrow: {
+    fontSize: 8,
+    color: COLORS.darkGray,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   heroTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: 'Helvetica-Bold',
     color: COLORS.navy,
+    letterSpacing: -0.3,
   },
   heroMeta: {
-    marginTop: 4,
+    marginTop: 6,
     fontSize: 9,
     color: COLORS.darkGray,
   },
   heroDisclaimer: {
-    marginTop: 8,
+    marginTop: 10,
     fontSize: 8,
     fontStyle: 'italic',
     color: COLORS.darkGray,
   },
   section: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: 'Helvetica-Bold',
     color: COLORS.navy,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     marginBottom: 6,
     paddingBottom: 4,
+    paddingLeft: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.gold,
   },
   paragraph: {
     fontSize: 10,
@@ -217,13 +279,27 @@ export function LeadershipReportPdf({ report, payload }: Props) {
       subject={`Frozen ${REPORT_TYPE_LABEL[report.report_type] ?? report.report_type} for ${report.period_label}`}
     >
       <Page size="A4" style={styles.page} wrap>
+        {/* Brand band — fixed, repeats across pages */}
+        <View style={styles.brandBand} fixed>
+          <View style={styles.brandBandLeft}>
+            <Text style={styles.brandLogo}>AG</Text>
+            <View>
+              <Text style={styles.brandWordmark}>AGSI · NET ZERO STEEL</Text>
+            </View>
+          </View>
+          <Text style={styles.brandSubtitle}>
+            Leadership report · {report.period_label}
+          </Text>
+        </View>
+
         {/* Hero */}
         <View style={styles.hero}>
+          <Text style={styles.heroEyebrow}>
+            {REPORT_TYPE_LABEL[report.report_type] ?? report.report_type}
+          </Text>
           <Text style={styles.heroTitle}>{report.period_label}</Text>
           <Text style={styles.heroMeta}>
-            {REPORT_TYPE_LABEL[report.report_type] ?? report.report_type} ·
-            {' FY'}
-            {report.fiscal_year}
+            FY{report.fiscal_year}
             {report.fiscal_quarter ? ` Q${report.fiscal_quarter}` : ''} · period{' '}
             {report.period_start} → {report.period_end}
             {report.finalised_at &&
