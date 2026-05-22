@@ -5,9 +5,11 @@ import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { Sidebar } from '@/components/domain/Sidebar';
 import type { Role } from '@/types/domain';
+import type { FeatureKey } from '@/lib/auth/features';
 
 type Props = {
   user: { role: Role; fullName: string; email: string };
+  features: FeatureKey[];
   children: React.ReactNode;
 };
 
@@ -18,7 +20,7 @@ type Props = {
  * overlay triggered by the top-bar hamburger. Backdrop click + ESC +
  * route change all close the menu.
  */
-export function AppShell({ user, children }: Props) {
+export function AppShell({ user, features, children }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -49,6 +51,7 @@ export function AppShell({ user, children }: Props) {
     <div className="flex min-h-screen bg-agsi-offWhite">
       <Sidebar
         role={user.role}
+        features={features}
         fullName={user.fullName}
         email={user.email}
         isMobileOpen={open}

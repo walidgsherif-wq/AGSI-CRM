@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
-import { requireRole } from '@/lib/auth/require-role';
+import { requireFeature } from '@/lib/auth/features';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ROLE_LABEL } from '@/types/domain';
@@ -16,7 +16,7 @@ type Profile = {
 };
 
 export default async function ReportsHubPage() {
-  await requireRole(['admin', 'leadership', 'bd_head']);
+  await requireFeature('reports');
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',

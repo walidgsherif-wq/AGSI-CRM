@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { requireRole } from '@/lib/auth/require-role';
@@ -109,11 +110,21 @@ export default async function AdminUsersPage() {
                       )}
                     </td>
                     <td className="py-3 text-right">
-                      <UserRoleActions
-                        userId={u.id}
-                        currentRole={u.role}
-                        isActive={u.is_active}
-                      />
+                      <div className="flex items-center justify-end gap-3">
+                        {u.role !== 'admin' && (
+                          <Link
+                            href={`/admin/users/${u.id}/access` as never}
+                            className="text-xs font-medium text-agsi-accent hover:underline"
+                          >
+                            Manage access
+                          </Link>
+                        )}
+                        <UserRoleActions
+                          userId={u.id}
+                          currentRole={u.role}
+                          isActive={u.is_active}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
