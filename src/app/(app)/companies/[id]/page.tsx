@@ -25,6 +25,7 @@ type LinkedProjectRow = {
     name: string;
     stage: keyof typeof PROJECT_STAGE_LABEL;
     city: string | null;
+    value_aed: number | null;
   } | null;
 };
 
@@ -55,10 +56,32 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
 
   const { data: linked } = await supabase
     .from('project_companies')
-    .select('role, project:projects(id, name, stage, city)')
+    .select('role, project:projects(id, name, stage, city, value_aed)')
     .eq('company_id', params.id)
     .eq('is_current', true)
     .returns<LinkedProjectRow[]>();
+
+  // Per-stakeholder "project value involved": sum the full value of
+  // every distinct project this company is linked to. Dedupe by
+  // project_id because a company can hold multiple roles on the same
+  // project (owner + developer, for instance) and we'd otherwise
+  // double-count. Null values count as 0. Intentionally not divided
+  // across co-stakeholders — this is a priority signal per company,
+  // not a revenue split.
+  const seenProjects = new Set<string>();
+  let projectValueInvolved = 0;
+  for (const l of linked ?? []) {
+    if (!l.project) continue;
+    if (seenProjects.has(l.project.id)) continue;
+    seenProjects.add(l.project.id);
+    projectValueInvolved += Number(l.project.value_aed ?? 0);
+  }
+  const aedFmt = new Intl.NumberFormat('en-AE', {
+    style: 'currency',
+    currency: 'AED',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  });
 
   const editable =
     user.role === 'admin' ||
@@ -90,8 +113,12 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
         <CardHeader>
           <CardTitle>Linked projects</CardTitle>
           <CardDescription>
-            {(linked?.length ?? 0)} current project links. Use the Engagements / Tasks / Notes /
-            Documents tabs to log activity per company.
+            {(linked?.length ?? 0)} current project links · Project value involved:{' '}
+            <span className="font-medium text-agsi-navy">
+              {aedFmt.format(projectValueInvolved)}
+            </span>
+            . Use the Engagements / Tasks / Notes / Documents tabs to log activity
+            per company.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
