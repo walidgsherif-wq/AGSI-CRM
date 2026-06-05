@@ -207,31 +207,87 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: emailErr } = await admin.from('engagement_emails').insert({
-      engagement_id: ins.id,
-      message_id: email.message_id,
-      from_email: email.from_email,
-      from_name: email.from_name,
-      to_emails: email.to_emails,
-      cc_emails: email.cc_emails,
-      subject: email.subject,
-      body_text: email.body_text,
-      body_html: email.body_html,
-      has_attachments: !!email.has_attachments,
-      received_at: receivedAt,
-      raw_payload: raw,
-      direction,
-    });
-    if (emailErr) {
+    const { data: emailRow, error: emailErr } = await admin
+      .from('engagement_emails')
+      .insert({
+        engagement_id: ins.id,
+        message_id: email.message_id,
+        from_email: email.from_email,
+        from_name: email.from_name,
+        to_emails: email.to_emails,
+        cc_emails: email.cc_emails,
+        subject: email.subject,
+        body_text: email.body_text,
+        body_html: email.body_html,
+        has_attachments: !!email.has_attachments,
+        received_at: receivedAt,
+        raw_payload: raw,
+        direction,
+      })
+      .select('id')
+      .single<{ id: string }>();
+    if (emailErr || !emailRow) {
       // Rollback the engagement to avoid orphaned rows
       await admin.from('engagements').delete().eq('id', ins.id);
-      return NextResponse.json({ error: emailErr.message }, { status: 500 });
+      return NextResponse.json(
+        { error: emailErr?.message ?? 'email insert failed' },
+        { status: 500 },
+      );
+    }
+
+    // Attachments — Postmark sends them as base64 Content in the
+    // top-level Attachments array. We upload each to the
+    // email-attachments bucket and record metadata. Failures (oversize,
+    // network) are logged into attachment_warnings but don't fail the
+    // engagement — the email row is still useful on its own.
+    const attachmentWarnings: string[] = [];
+    const rawAttachments = Array.isArray(raw.Attachments) ? raw.Attachments : [];
+    for (const att of rawAttachments as Array<Record<string, unknown>>) {
+      const name = typeof att.Name === 'string' ? att.Name : null;
+      const contentType =
+        typeof att.ContentType === 'string' ? att.ContentType : 'application/octet-stream';
+      const content = typeof att.Content === 'string' ? att.Content : null;
+      if (!name || !content) {
+        attachmentWarnings.push(`skipped attachment with missing Name/Content`);
+        continue;
+      }
+      let bytes: Buffer;
+      try {
+        bytes = Buffer.from(content, 'base64');
+      } catch {
+        attachmentWarnings.push(`base64 decode failed: ${name}`);
+        continue;
+      }
+      // Filename collisions inside one email are rare but possible (two
+      // PDFs both named "scan.pdf"); the email-id-scoped path plus an
+      // index suffix on collision keeps uploads idempotent.
+      const safeName = name.replace(/[/\\]/g, '_').slice(0, 200);
+      const storagePath = `${emailRow.id}/${safeName}`;
+      const { error: upErr } = await admin.storage
+        .from('email-attachments')
+        .upload(storagePath, bytes, { contentType, upsert: false });
+      if (upErr) {
+        attachmentWarnings.push(`upload failed for ${name}: ${upErr.message}`);
+        continue;
+      }
+      const { error: metaErr } = await admin
+        .from('engagement_email_attachments')
+        .insert({
+          engagement_email_id: emailRow.id,
+          filename: name,
+          content_type: contentType,
+          size_bytes: bytes.byteLength,
+          storage_path: storagePath,
+        });
+      if (metaErr) attachmentWarnings.push(`metadata insert failed for ${name}: ${metaErr.message}`);
     }
 
     return NextResponse.json({
       ok: true,
       matched: true,
       engagement_id: ins.id,
+      attachments_stored: rawAttachments.length - attachmentWarnings.length,
+      attachment_warnings: attachmentWarnings,
       direction,
     });
   }

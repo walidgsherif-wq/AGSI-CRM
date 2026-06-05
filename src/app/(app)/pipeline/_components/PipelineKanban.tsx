@@ -77,10 +77,12 @@ export function PipelineKanban({
   cards,
   userRole,
   userId,
+  inboundEmailAddress,
 }: {
   cards: CardData[];
   userRole: Role;
   userId: string;
+  inboundEmailAddress: string;
 }) {
   const [dragging, setDragging] = useState<{ cardId: string; from: Level } | null>(null);
   const [forced, setForced] = useState<{ card: CardData; toLevel: Level } | null>(null);
@@ -213,7 +215,15 @@ export function PipelineKanban({
                         </p>
                         {c.engagement_bucket === 'cold' && (
                           <p className="mt-1 text-[11px] text-rag-red">
-                            No recent activity — log a touchpoint to warm this up.
+                            {inboundEmailAddress ? (
+                              <>
+                                No recent activity — log a touchpoint or BCC{' '}
+                                <span className="font-medium">{inboundEmailAddress}</span>{' '}
+                                on client emails.
+                              </>
+                            ) : (
+                              <>No recent activity — log a touchpoint to warm this up.</>
+                            )}
                           </p>
                         )}
                         {c.pending_count > 0 && (
