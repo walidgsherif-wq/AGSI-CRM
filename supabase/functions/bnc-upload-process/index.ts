@@ -462,11 +462,23 @@ async function processBncRows(
     if (!existing) projectsByRef.set(ref ?? `__name__${name.toLowerCase()}`, { id, ref });
     projectIdByRowIndex.set(i, id);
 
+    // BNC exports dropped the "Value AED" column starting in mid-2026 —
+    // only "Value(USD)" is published now. The UAE dirham is hard-pegged
+    // to USD at 3.6725 (fixed since 1997), so we derive AED from USD
+    // when the source column is absent. Prefer an explicit AED column
+    // if BNC ever reintroduces it.
+    const USD_TO_AED_PEG = 3.6725;
+    const valueUsd = parseNumber(
+      pickColumn(row, ['Value(USD)', 'Value (USD)', 'Value USD']),
+    );
+    const valueAedDirect = parseNumber(
+      pickColumn(row, ['Value AED', 'Value (AED)']),
+    );
     const fields: ProjectFields = {
       id, name, stage,
       project_type: pickColumn(row, ['Project Type']),
-      value_aed: parseNumber(pickColumn(row, ['Value AED', 'Value (AED)'])),
-      value_usd: parseNumber(pickColumn(row, ['Value(USD)', 'Value (USD)', 'Value USD'])),
+      value_aed: valueAedDirect ?? (valueUsd === null ? null : valueUsd * USD_TO_AED_PEG),
+      value_usd: valueUsd,
       city: pickColumn(row, ['City']),
       location: pickColumn(row, ['Location']),
       sector: pickColumn(row, ['Sector']),
