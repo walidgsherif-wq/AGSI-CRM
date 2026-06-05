@@ -29,7 +29,7 @@
 -- 1) features registry
 -- =====================================================================
 
-CREATE TABLE features (
+CREATE TABLE IF NOT EXISTS features (
     key           text       PRIMARY KEY,
     label         text       NOT NULL,
     description   text       NOT NULL DEFAULT '',
@@ -58,12 +58,19 @@ INSERT INTO features (key, label, description, default_roles, sort_order) VALUES
      ARRAY['admin','bd_head','bd_manager']::role_t[], 50),
     ('tasks',              'Tasks',
      'The /tasks list + task management.',
-     ARRAY['admin','bd_head','bd_manager']::role_t[], 60);
+     ARRAY['admin','bd_head','bd_manager']::role_t[], 60)
+ON CONFLICT (key) DO UPDATE SET
+    label         = EXCLUDED.label,
+    description   = EXCLUDED.description,
+    default_roles = EXCLUDED.default_roles,
+    sort_order    = EXCLUDED.sort_order;
 
 ALTER TABLE features ENABLE ROW LEVEL SECURITY;
 
 -- Registry is readable by any authenticated user (needed to compute
 -- defaults app-side); only admin may change it.
+DROP POLICY IF EXISTS features_select_all  ON features;
+DROP POLICY IF EXISTS features_write_admin ON features;
 CREATE POLICY features_select_all
     ON features FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY features_write_admin
@@ -75,7 +82,7 @@ CREATE POLICY features_write_admin
 -- 2) feature_access overrides
 -- =====================================================================
 
-CREATE TABLE feature_access (
+CREATE TABLE IF NOT EXISTS feature_access (
     user_id      uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     feature_key  text        NOT NULL REFERENCES features(key) ON DELETE CASCADE,
     allowed      boolean     NOT NULL,
@@ -84,18 +91,20 @@ CREATE TABLE feature_access (
     PRIMARY KEY (user_id, feature_key)
 );
 
-CREATE INDEX feature_access_user_idx ON feature_access (user_id);
+CREATE INDEX IF NOT EXISTS feature_access_user_idx ON feature_access (user_id);
 
 ALTER TABLE feature_access ENABLE ROW LEVEL SECURITY;
 
 -- A user can read their own overrides (so the app can compute their
 -- effective access without elevated privileges). Admin can read all.
+DROP POLICY IF EXISTS feature_access_select_self_or_admin ON feature_access;
 CREATE POLICY feature_access_select_self_or_admin
     ON feature_access FOR SELECT
     USING (user_id = auth.uid() OR auth_role() = 'admin');
 
 -- Writes go through SECURITY DEFINER fns below (for audit), but we also
 -- allow admin direct write for completeness / migrations.
+DROP POLICY IF EXISTS feature_access_write_admin ON feature_access;
 CREATE POLICY feature_access_write_admin
     ON feature_access FOR ALL
     USING (auth_role() = 'admin')
@@ -224,23 +233,27 @@ GRANT EXECUTE ON FUNCTION clear_feature_access_with_audit(uuid, text) TO authent
 -- =====================================================================
 
 -- insights → market_snapshots
-DROP POLICY IF EXISTS market_snapshots_select_all ON market_snapshots;
+DROP POLICY IF EXISTS market_snapshots_select_all     ON market_snapshots;
+DROP POLICY IF EXISTS market_snapshots_select_feature ON market_snapshots;
 CREATE POLICY market_snapshots_select_feature
     ON market_snapshots FOR SELECT
     USING (auth.uid() IS NOT NULL AND public.has_feature('insights'));
 
 -- insights_ecosystem → ecosystem_events / point_scale / awareness_current
 DROP POLICY IF EXISTS ecosystem_events_select_non_manager ON ecosystem_events;
+DROP POLICY IF EXISTS ecosystem_events_select_feature     ON ecosystem_events;
 CREATE POLICY ecosystem_events_select_feature
     ON ecosystem_events FOR SELECT
     USING (public.has_feature('insights_ecosystem'));
 
 DROP POLICY IF EXISTS ecosystem_point_scale_select_non_manager ON ecosystem_point_scale;
+DROP POLICY IF EXISTS ecosystem_point_scale_select_feature     ON ecosystem_point_scale;
 CREATE POLICY ecosystem_point_scale_select_feature
     ON ecosystem_point_scale FOR SELECT
     USING (public.has_feature('insights_ecosystem'));
 
 DROP POLICY IF EXISTS ecosystem_awareness_current_select_non_manager ON ecosystem_awareness_current;
+DROP POLICY IF EXISTS ecosystem_awareness_current_select_feature     ON ecosystem_awareness_current;
 CREATE POLICY ecosystem_awareness_current_select_feature
     ON ecosystem_awareness_current FOR SELECT
     USING (public.has_feature('insights_ecosystem'));
