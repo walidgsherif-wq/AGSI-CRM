@@ -95,19 +95,30 @@ export default async function PipelinePage({
     last_engagement_at: string | null;
     count_90d: number;
   };
-  // Fetch every company's score row unfiltered: the view has one row per
-  // company (LEFT JOIN of companies), so the cardinality matches what an
-  // `.in('company_id', ids)` filter would return — but a 2000-uuid `.in`
-  // blows past PostgREST's URL length limit and returns nothing, leaving
-  // every card stuck at score 0 / bucket 'cold'. The Map lookup below
-  // naturally restricts to the visible cards.
-  const { data: scoreRows } = await supabase
-    .from('company_engagement_score')
-    .select('company_id, score, bucket, last_engagement_at, count_90d')
-    .limit(5000)
-    .returns<ScoreRow[]>();
+  // Chunk the .in() filter so each URL stays well under PostgREST's
+  // length cap. A single .in(...2000 uuids) request balloons to ~76 KB
+  // and is silently dropped (every card stuck at score 0 / cold), and
+  // an unfiltered fetch hits Supabase's default max-rows cap when total
+  // company count is large — half the cards came back missing. 100
+  // uuids per chunk keeps each URL ~4 KB; ~20 parallel requests for a
+  // 2000-card page complete well inside the existing request budget.
+  const ids = all.map((c) => c.id);
+  const CHUNK = 100;
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+  const chunkResults = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from('company_engagement_score')
+        .select('company_id, score, bucket, last_engagement_at, count_90d')
+        .in('company_id', chunk)
+        .returns<ScoreRow[]>(),
+    ),
+  );
   const scoreByCompany = new Map<string, ScoreRow>();
-  for (const r of scoreRows ?? []) scoreByCompany.set(r.company_id, r);
+  for (const res of chunkResults) {
+    for (const r of res.data ?? []) scoreByCompany.set(r.company_id, r);
+  }
 
   const cards: CardData[] = all.map((c) => {
     const s = scoreByCompany.get(c.id);
