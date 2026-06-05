@@ -120,8 +120,10 @@ export default async function PipelinePage({
     for (const r of res.data ?? []) scoreByCompany.set(r.company_id, r);
   }
 
-  // Configurable BCC address — surfaced on cold-card hints so the
-  // nudge is actionable. Empty until an admin sets it from
+  // Configurable inbound Cc address — surfaced on cold-card hints so
+  // the nudge is actionable. Cc rather than BCC so stakeholder replies
+  // via Reply All also flow into the webhook (BCC drops out of the
+  // thread after one hop). Empty until an admin sets it from
   // /admin/settings → "Inbound email" card.
   const { data: settingRow } = await supabase
     .from('app_settings')
@@ -198,7 +200,7 @@ export default async function PipelinePage({
         <LegendChip color="amber" label="Cooling · 2-4" />
         <LegendChip color="red" label="Cold · 0-1" />
         <span className="ml-auto text-[11px] text-agsi-midGray">
-          Log a call, meeting, or BCC client emails to keep cards green.
+          Log a call, meeting, or Cc client emails to keep cards green.
         </span>
       </div>
 
