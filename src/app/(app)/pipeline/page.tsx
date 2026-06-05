@@ -64,20 +64,38 @@ export default async function PipelinePage({
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  let query = supabase
-    .from('companies')
-    .select(
-      'id, canonical_name, company_type, current_level, city, is_key_stakeholder, has_active_projects, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
-    )
-    .eq('is_active', true)
-    .order('canonical_name', { ascending: true })
-    .limit(2000);
-
-  if (searchParams.type) query = query.eq('company_type', searchParams.type);
-  if (searchParams.owner) query = query.eq('owner_id', searchParams.owner);
-
-  const { data, error } = await query.returns<CardRow[]>();
-  const all = data ?? [];
+  // Paginated fetch: a single .limit(2000) silently truncated the
+  // alphabetic tail under the "All" filter, hiding whole levels
+  // (notably L5 — rare partnerships that happened to land past the
+  // cap). Chips appeared to work only because each company_type
+  // subset stayed under 2000. We page through PostgREST's per-
+  // request window (1000 rows) until exhausted so every active
+  // company renders. HARD_CAP is a safety ceiling, well above any
+  // realistic active-company count.
+  const PAGE_SIZE = 1000;
+  const HARD_CAP = 20_000;
+  const all: CardRow[] = [];
+  let error: { message: string } | null = null;
+  for (let offset = 0; offset < HARD_CAP; offset += PAGE_SIZE) {
+    let query = supabase
+      .from('companies')
+      .select(
+        'id, canonical_name, company_type, current_level, city, is_key_stakeholder, has_active_projects, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
+      )
+      .eq('is_active', true)
+      .order('canonical_name', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (searchParams.type) query = query.eq('company_type', searchParams.type);
+    if (searchParams.owner) query = query.eq('owner_id', searchParams.owner);
+    const { data: batch, error: batchErr } = await query.returns<CardRow[]>();
+    if (batchErr) {
+      error = batchErr;
+      break;
+    }
+    const rows = batch ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
 
   const { data: pendingRows } = await supabase
     .from('level_change_requests')
