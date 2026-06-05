@@ -136,6 +136,21 @@ export default async function InsightsPage({
   const p = group(primaryData);
   const c = compare ? group(compareData) : null;
 
+  // Market aggregate "total project value tracked": sum value_aed
+  // across the projects_by_stage rows in the primary snapshot. Each
+  // project lands in exactly one stage bucket, so the sum counts every
+  // tracked project once regardless of how many stakeholders touch it.
+  const marketTotalAed = (p.projects_by_stage ?? []).reduce((acc, r) => {
+    const v = (r.metric_value_json as { value_aed?: number } | null)?.value_aed;
+    return acc + Number(v ?? 0);
+  }, 0);
+  const aedMarketFmt = new Intl.NumberFormat('en-AE', {
+    style: 'currency',
+    currency: 'AED',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  });
+
   // Build trend series: per snapshot_date, value-pre-construction +
   // value-under-construction + rebar tonnes.
   const PRE_CONSTRUCTION_STAGES = new Set([
@@ -205,6 +220,11 @@ export default async function InsightsPage({
           compare={compare}
         />
       </div>
+
+      <p className="text-sm text-agsi-navy">
+        Market — total project value tracked:{' '}
+        <span className="font-semibold">{aedMarketFmt.format(marketTotalAed)}</span>
+      </p>
 
       <FreshnessRow primary={primaryRef} compare={compareRef} />
 
