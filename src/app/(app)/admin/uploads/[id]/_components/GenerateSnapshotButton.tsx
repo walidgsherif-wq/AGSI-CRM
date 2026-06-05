@@ -5,22 +5,32 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { generateMarketSnapshot } from '@/server/actions/insights';
 
-export function GenerateSnapshotButton({ uploadId }: { uploadId: string }) {
+export function GenerateSnapshotButton({
+  uploadId,
+  hasExisting = false,
+}: {
+  uploadId: string;
+  hasExisting?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<{ ok?: true; error?: string } | null>(null);
+
+  const idleLabel = hasExisting ? 'Regenerate snapshot' : 'Generate market snapshot';
+  const pendingLabel = hasExisting ? 'Regenerating…' : 'Generating…';
 
   return (
     <div className="flex items-center gap-3">
       <Button
         type="button"
         size="sm"
+        variant={hasExisting ? 'secondary' : 'primary'}
         disabled={pending}
         onClick={() => {
           setStatus(null);
           startTransition(async () => {
             const r = await generateMarketSnapshot(uploadId);
-            if (r.error) setStatus({ error: r.error });
+            if ('error' in r) setStatus({ error: r.error });
             else {
               setStatus({ ok: true });
               router.refresh();
@@ -28,7 +38,7 @@ export function GenerateSnapshotButton({ uploadId }: { uploadId: string }) {
           });
         }}
       >
-        {pending ? 'Generating…' : 'Generate market snapshot'}
+        {pending ? pendingLabel : idleLabel}
       </Button>
       {status?.ok && (
         <span className="text-xs text-agsi-green">
