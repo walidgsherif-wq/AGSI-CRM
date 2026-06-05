@@ -95,14 +95,17 @@ export default async function PipelinePage({
     last_engagement_at: string | null;
     count_90d: number;
   };
-  const ids = all.map((c) => c.id);
-  const { data: scoreRows } = ids.length
-    ? await supabase
-        .from('company_engagement_score')
-        .select('company_id, score, bucket, last_engagement_at, count_90d')
-        .in('company_id', ids)
-        .returns<ScoreRow[]>()
-    : { data: [] as ScoreRow[] };
+  // Fetch every company's score row unfiltered: the view has one row per
+  // company (LEFT JOIN of companies), so the cardinality matches what an
+  // `.in('company_id', ids)` filter would return — but a 2000-uuid `.in`
+  // blows past PostgREST's URL length limit and returns nothing, leaving
+  // every card stuck at score 0 / bucket 'cold'. The Map lookup below
+  // naturally restricts to the visible cards.
+  const { data: scoreRows } = await supabase
+    .from('company_engagement_score')
+    .select('company_id, score, bucket, last_engagement_at, count_90d')
+    .limit(5000)
+    .returns<ScoreRow[]>();
   const scoreByCompany = new Map<string, ScoreRow>();
   for (const r of scoreRows ?? []) scoreByCompany.set(r.company_id, r);
 
