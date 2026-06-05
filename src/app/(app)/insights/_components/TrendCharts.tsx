@@ -51,6 +51,13 @@ export function TrendCharts({
           </CardHeader>
           <CardContent>
             <PipelineChart points={trend} />
+            <p className="mt-2 text-[11px] italic text-agsi-darkGray">
+              Data note: BNC began publishing values for pre-construction
+              projects (concept / design / tender) from the 2026-06-05 export
+              onward. Earlier snapshots show $0 for those stages because
+              source values weren&apos;t reported, not because the pipeline
+              was empty.
+            </p>
           </CardContent>
         </Card>
       )}
