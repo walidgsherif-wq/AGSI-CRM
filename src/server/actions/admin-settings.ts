@@ -83,6 +83,19 @@ export async function updateFiscalYearStartMonth(month: number): Promise<ActionR
   return updateAppSetting('fiscal_year_start_month', { month });
 }
 
+export async function updateInboundEmailAddress(address: string): Promise<ActionResult> {
+  const trimmed = address.trim();
+  // Empty string is allowed — clears the address back to the generic
+  // cold-card copy. Otherwise loose validation: must contain '@' with
+  // a domain. Heavier RFC checks aren't worth the false-negative risk.
+  if (trimmed !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return { error: 'Address must be empty or a valid email like log@yourdomain.com.' };
+  }
+  // Stored as a bare JSON string so consumers can read .value_json
+  // directly without an object wrapper.
+  return updateAppSetting('inbound_email_address', trimmed);
+}
+
 export async function updateCompositionWarning(thresholds: {
   headline_pct: number;
   composition_pct: number;

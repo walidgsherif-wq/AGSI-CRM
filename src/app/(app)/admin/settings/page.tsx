@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { StagnationRulesEditor } from './_components/StagnationRulesEditor';
 import { FiscalYearCard } from './_components/FiscalYearCard';
+import { InboundEmailAddressCard } from './_components/InboundEmailAddressCard';
 import { UniverseSizesCard } from './_components/UniverseSizesCard';
 import { CompositionCard } from './_components/CompositionCard';
 import { EcosystemTuningCard } from './_components/EcosystemTuningCard';
@@ -73,6 +74,12 @@ export default async function AdminSettingsPage() {
   for (const s of settingsRes.data ?? []) settingsMap.set(s.key, s.value_json ?? {});
 
   const fyMonth = Number(get<{ month?: number }>(settingsMap, 'fiscal_year_start_month')?.month ?? 1);
+  // inbound_email_address is stored as a bare string (jsonb '"..."').
+  // The shared `settingsMap` types its values as records, so cast
+  // through unknown and narrow with typeof.
+  const inboundEmailAddressRaw = settingsMap.get('inbound_email_address') as unknown;
+  const inboundEmailAddress =
+    typeof inboundEmailAddressRaw === 'string' ? inboundEmailAddressRaw : '';
   const universe = (get<{
     developers?: number;
     consultants?: number;
@@ -124,6 +131,7 @@ export default async function AdminSettingsPage() {
       </div>
 
       <FiscalYearCard initialMonth={fyMonth} />
+      <InboundEmailAddressCard initialAddress={inboundEmailAddress} />
       <UniverseSizesCard
         initialDevelopers={Number(universe.developers ?? 0)}
         initialConsultants={Number(universe.consultants ?? 0)}

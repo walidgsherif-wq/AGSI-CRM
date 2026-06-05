@@ -37,6 +37,13 @@ export type EngagementDetails = {
     received_at: string;
     direction: 'inbound' | 'outbound';
     raw_payload: unknown;
+    attachments: Array<{
+      id: string;
+      filename: string;
+      content_type: string;
+      size_bytes: number;
+      download_url: string | null;
+    }>;
   } | null;
 };
 
@@ -138,6 +145,35 @@ function pickOne<T>(v: T | T[] | null | undefined): T | null {
   return v ?? null;
 }
 
+async function loadAttachments(emailId: string) {
+  const sb = supabase();
+  type Row = { id: string; filename: string; content_type: string; size_bytes: number; storage_path: string };
+  const { data } = await sb
+    .from('engagement_email_attachments')
+    .select('id, filename, content_type, size_bytes, storage_path')
+    .eq('engagement_email_id', emailId)
+    .order('created_at', { ascending: true })
+    .returns<Row[]>();
+  const rows = data ?? [];
+  // Sign each path for ~1 hour. Sheet typically stays open well under
+  // that; if not, refresh re-fetches and re-signs.
+  const signed = await Promise.all(
+    rows.map(async (r) => {
+      const { data: s } = await sb.storage
+        .from('email-attachments')
+        .createSignedUrl(r.storage_path, 60 * 60);
+      return {
+        id: r.id,
+        filename: r.filename,
+        content_type: r.content_type,
+        size_bytes: r.size_bytes,
+        download_url: s?.signedUrl ?? null,
+      };
+    }),
+  );
+  return signed;
+}
+
 export async function getEngagement(
   id: string,
 ): Promise<{ data: EngagementDetails | null; error?: string }> {
@@ -200,6 +236,7 @@ export async function getEngagement(
         raw_payload: includeRawPayload
           ? (rawEmail as unknown as { raw_payload: unknown }).raw_payload ?? null
           : null,
+        attachments: await loadAttachments(rawEmail.id),
       }
     : null;
 

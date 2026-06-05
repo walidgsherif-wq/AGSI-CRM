@@ -312,12 +312,38 @@ function EmailView({
         <Row label="Direction">
           <Badge variant={e.direction === 'inbound' ? 'blue' : 'neutral'}>{e.direction}</Badge>
         </Row>
-        {e.has_attachments && (
+        {e.attachments.length > 0 ? (
           <Row label="Attachments">
-            <span className="text-agsi-darkGray">
-              had attachments (file bytes not stored in v1)
-            </span>
+            <ul className="space-y-1">
+              {e.attachments.map((a) => (
+                <li key={a.id} className="flex items-center gap-2">
+                  {a.download_url ? (
+                    <a
+                      href={a.download_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-agsi-accent hover:underline"
+                    >
+                      {a.filename}
+                    </a>
+                  ) : (
+                    <span className="text-agsi-darkGray">{a.filename}</span>
+                  )}
+                  <span className="text-[10px] text-agsi-darkGray">
+                    {formatBytes(a.size_bytes)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </Row>
+        ) : (
+          e.has_attachments && (
+            <Row label="Attachments">
+              <span className="text-agsi-darkGray">
+                attachments were present but exceeded the 5 MB per-file storage cap
+              </span>
+            </Row>
+          )
         )}
       </div>
 
@@ -489,4 +515,10 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }

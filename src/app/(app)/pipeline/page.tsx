@@ -120,6 +120,17 @@ export default async function PipelinePage({
     for (const r of res.data ?? []) scoreByCompany.set(r.company_id, r);
   }
 
+  // Configurable BCC address — surfaced on cold-card hints so the
+  // nudge is actionable. Empty until an admin sets it from
+  // /admin/settings → "Inbound email" card.
+  const { data: settingRow } = await supabase
+    .from('app_settings')
+    .select('value_json')
+    .eq('key', 'inbound_email_address')
+    .maybeSingle<{ value_json: unknown }>();
+  const inboundEmailAddress =
+    typeof settingRow?.value_json === 'string' ? settingRow.value_json : '';
+
   const cards: CardData[] = all.map((c) => {
     const s = scoreByCompany.get(c.id);
     return {
@@ -199,7 +210,12 @@ export default async function PipelinePage({
         </Card>
       )}
 
-      <PipelineKanban cards={cards} userRole={user.role} userId={user.id} />
+      <PipelineKanban
+        cards={cards}
+        userRole={user.role}
+        userId={user.id}
+        inboundEmailAddress={inboundEmailAddress}
+      />
 
       <Card>
         <CardHeader>
