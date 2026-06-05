@@ -29,11 +29,14 @@ export function InboundEmailAddressCard({
       <CardHeader>
         <CardTitle>Inbound email</CardTitle>
         <CardDescription>
-          BCC address surfaced on pipeline cold-card hints and shown to the team
-          as the auto-log channel. The actual webhook URL is configured per
-          provider in <code>supabase/APPLY-M9-EMAIL.md</code>; this setting is
-          just the friendly address you tell people to BCC. Leave empty to keep
-          the generic copy.
+          Auto-log address surfaced on pipeline cold-card hints. Put it in{' '}
+          <strong>Cc</strong> (not BCC) on real client emails — replies via
+          Reply All then ride along on the thread, so both directions of every
+          conversation get captured automatically. BCC drops out after one hop
+          and loses the reply. The actual webhook URL is configured per
+          provider in <code>supabase/APPLY-M9-EMAIL.md</code>; this setting
+          is just the friendly address the team Cc&apos;s. Leave empty to keep
+          the generic cold-card copy.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -47,7 +50,7 @@ export function InboundEmailAddressCard({
             setAddress(e.target.value);
             setStatus(null);
           }}
-          placeholder="log@yourdomain.com"
+          placeholder="crm@yourdomain.com"
           className="mt-1 w-72 rounded-lg border border-agsi-midGray bg-white px-3 py-1.5 text-sm"
         />
         <SaveBar

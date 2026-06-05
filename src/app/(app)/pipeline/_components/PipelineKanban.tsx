@@ -217,7 +217,7 @@ export function PipelineKanban({
                           <p className="mt-1 text-[11px] text-rag-red">
                             {inboundEmailAddress ? (
                               <>
-                                No recent activity — log a touchpoint or BCC{' '}
+                                No recent activity — log a touchpoint or Cc{' '}
                                 <span className="font-medium">{inboundEmailAddress}</span>{' '}
                                 on client emails.
                               </>
