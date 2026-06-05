@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { requireRole } from '@/lib/auth/require-role';
+import { requireFeature } from '@/lib/auth/features';
 
 export default async function MapsLayout({ children }: { children: React.ReactNode }) {
-  // §7.5: heat maps blocked for bd_manager
-  await requireRole(['admin', 'leadership', 'bd_head']);
+  // §7.5: heat maps blocked for bd_manager by default; per-user
+  // overrides managed at /admin/users.
+  await requireFeature('insights_maps');
 
   return (
     <div className="space-y-6">

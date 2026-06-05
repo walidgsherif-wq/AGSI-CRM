@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { Role } from '@/types/domain';
 import { ROLE_LABEL } from '@/types/domain';
+import type { FeatureKey } from '@/lib/auth/features';
 import { cn } from '@/lib/utils';
 import { DevRoleSwitcher } from './DevRoleSwitcher';
 import { NotificationBell } from './NotificationBell';
@@ -28,6 +29,11 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   roles: Role[];
+  /**
+   * When set, visibility is governed by the user's effective feature
+   * access (role default + per-user override) rather than role alone.
+   */
+  feature?: FeatureKey;
 };
 
 const NAV: NavItem[] = [
@@ -42,6 +48,7 @@ const NAV: NavItem[] = [
     label: 'Pipeline',
     icon: KanbanSquare,
     roles: ['admin', 'bd_head', 'bd_manager'],
+    feature: 'pipeline',
   },
   {
     href: '/companies',
@@ -60,24 +67,28 @@ const NAV: NavItem[] = [
     label: 'Tasks',
     icon: CheckSquare,
     roles: ['admin', 'bd_head', 'bd_manager'],
+    feature: 'tasks',
   },
   {
     href: '/insights',
     label: 'Insights',
     icon: LineChart,
     roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
+    feature: 'insights',
   },
   {
     href: '/insights/maps/geographic',
     label: 'Maps',
     icon: MapIcon,
     roles: ['admin', 'leadership', 'bd_head'],
+    feature: 'insights_maps',
   },
   {
     href: '/reports',
     label: 'Reports',
     icon: FileText,
     roles: ['admin', 'leadership', 'bd_head'],
+    feature: 'reports',
   },
   {
     href: '/settings/notifications',
@@ -95,19 +106,24 @@ const NAV: NavItem[] = [
 
 export function Sidebar({
   role,
+  features,
   fullName,
   email,
   isMobileOpen = false,
   onMobileClose,
 }: {
   role: Role;
+  features: FeatureKey[];
   fullName: string;
   email: string;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
 }) {
   const pathname = usePathname();
-  const items = NAV.filter((i) => i.roles.includes(role));
+  const featureSet = new Set(features);
+  const items = NAV.filter((i) =>
+    i.feature ? featureSet.has(i.feature) : i.roles.includes(role),
+  );
 
   return (
     <aside

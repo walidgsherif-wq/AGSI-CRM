@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireRole } from '@/lib/auth/require-role';
+import { requireFeature } from '@/lib/auth/features';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
@@ -17,7 +17,7 @@ import { SegmentationView } from './_components/SegmentationView';
 export const dynamic = 'force-dynamic';
 
 export default async function EcosystemInsightsPage() {
-  await requireRole(['admin', 'leadership', 'bd_head']);
+  await requireFeature('insights_ecosystem');
 
   const summary = await getEcosystemSummary(120, 10, 10);
   if ('error' in summary) {

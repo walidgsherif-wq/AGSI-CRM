@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
-import { requireRole } from '@/lib/auth/require-role';
+import { requireFeature } from '@/lib/auth/features';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,7 +59,7 @@ export default async function LeadershipReportViewer({
 }: {
   params: { id: string };
 }) {
-  await requireRole(['admin', 'leadership', 'bd_head']);
+  await requireFeature('reports');
   const user = await getCurrentUser();
 
   const supabase = createServerClient(

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
-import { requireRole } from '@/lib/auth/require-role';
+import { requireFeature } from '@/lib/auth/features';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
@@ -56,7 +56,7 @@ export default async function PipelinePage({
 }: {
   searchParams: { type?: string; owner?: string };
 }) {
-  const user = await requireRole(['admin', 'bd_head', 'bd_manager']);
+  const user = await requireFeature('pipeline');
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
