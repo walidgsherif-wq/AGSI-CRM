@@ -9,6 +9,8 @@ import { LEVELS, type Level, type Role } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { cn } from '@/lib/utils';
 
+export type EngagementBucket = 'hot' | 'warm' | 'cooling' | 'cold';
+
 export type CardData = {
   id: string;
   canonical_name: string;
@@ -20,7 +22,38 @@ export type CardData = {
   owner_id: string | null;
   owner_full_name: string | null;
   pending_count: number;
+  engagement_score: number;
+  engagement_bucket: EngagementBucket;
+  last_engagement_at: string | null;
+  engagement_count_90d: number;
 };
+
+const GLOW_CLASSES: Record<EngagementBucket, string> = {
+  hot: 'border-rag-green/40 bg-rag-green/5 ring-1 ring-rag-green/30 shadow-[0_0_12px_rgba(46,125,82,0.25)]',
+  warm: 'border-agsi-accent/30 bg-agsi-accent/5 ring-1 ring-agsi-accent/20',
+  cooling: 'border-rag-amber/40 bg-rag-amber/5',
+  cold: 'border-rag-red/50 bg-white ring-1 ring-rag-red/15',
+};
+
+const CHIP_CLASSES: Record<EngagementBucket, string> = {
+  hot: 'bg-rag-green text-white',
+  warm: 'bg-agsi-accent text-white',
+  cooling: 'bg-rag-amber text-white',
+  cold: 'bg-rag-red text-white',
+};
+
+function daysAgo(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(ms / 86_400_000));
+}
+
+function engagementTooltip(c: CardData): string {
+  const d = daysAgo(c.last_engagement_at);
+  const recency =
+    d === null ? 'No engagement on record' : `Last engagement ${d}d ago`;
+  return `${recency} · ${c.engagement_count_90d} in last 90d · score ${c.engagement_score}/10`;
+}
 
 const LEVEL_INDEX: Record<Level, number> = {
   L0: 0,
@@ -140,8 +173,10 @@ export function PipelineKanban({
                           setDragging({ cardId: c.id, from: c.current_level });
                         }}
                         onDragEnd={() => setDragging(null)}
+                        title={engagementTooltip(c)}
                         className={cn(
-                          'rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm',
+                          'rounded-lg border p-3 transition-shadow',
+                          GLOW_CLASSES[c.engagement_bucket],
                           draggable && 'cursor-grab active:cursor-grabbing',
                           dragging?.cardId === c.id && 'opacity-50',
                         )}
@@ -156,11 +191,18 @@ export function PipelineKanban({
                           >
                             {c.canonical_name}
                           </Link>
-                          {c.is_key_stakeholder && (
-                            <Badge variant="gold" className="shrink-0">
-                              Key
-                            </Badge>
-                          )}
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {c.is_key_stakeholder && <Badge variant="gold">Key</Badge>}
+                            <span
+                              aria-label={`Engagement score ${c.engagement_score} of 10`}
+                              className={cn(
+                                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
+                                CHIP_CLASSES[c.engagement_bucket],
+                              )}
+                            >
+                              {c.engagement_score}
+                            </span>
+                          </div>
                         </div>
                         <p className="mt-1 text-xs text-agsi-darkGray">
                           {COMPANY_TYPE_LABEL[c.company_type]}
@@ -169,6 +211,11 @@ export function PipelineKanban({
                         <p className="mt-1 text-xs text-agsi-darkGray">
                           Owner: {c.owner_full_name ?? 'Unassigned'}
                         </p>
+                        {c.engagement_bucket === 'cold' && (
+                          <p className="mt-1 text-[11px] text-rag-red">
+                            No recent activity — log a touchpoint to warm this up.
+                          </p>
+                        )}
                         {c.pending_count > 0 && (
                           <Badge variant="amber" className="mt-2">
                             {c.pending_count} pending review

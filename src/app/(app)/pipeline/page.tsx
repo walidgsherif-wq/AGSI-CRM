@@ -22,6 +22,27 @@ type CardRow = {
   owner: { full_name: string } | null;
 };
 
+function LegendChip({
+  color,
+  label,
+}: {
+  color: 'green' | 'blue' | 'amber' | 'red';
+  label: string;
+}) {
+  const swatch = {
+    green: 'bg-rag-green',
+    blue: 'bg-agsi-accent',
+    amber: 'bg-rag-amber',
+    red: 'bg-rag-red',
+  }[color];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`h-2.5 w-2.5 rounded-full ${swatch}`} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
 /** Stakeholder-type filter buckets. Each maps to one company_type enum. */
 const STAKEHOLDER_FILTERS = [
   { key: 'developer', label: 'Owner' },
@@ -67,18 +88,43 @@ export default async function PipelinePage({
     pendingByCompany.set(r.company_id, (pendingByCompany.get(r.company_id) ?? 0) + 1);
   }
 
-  const cards: CardData[] = all.map((c) => ({
-    id: c.id,
-    canonical_name: c.canonical_name,
-    company_type: c.company_type,
-    current_level: c.current_level,
-    city: c.city,
-    is_key_stakeholder: c.is_key_stakeholder,
-    has_active_projects: c.has_active_projects,
-    owner_id: c.owner_id,
-    owner_full_name: c.owner?.full_name ?? null,
-    pending_count: pendingByCompany.get(c.id) ?? 0,
-  }));
+  type ScoreRow = {
+    company_id: string;
+    score: number;
+    bucket: 'hot' | 'warm' | 'cooling' | 'cold';
+    last_engagement_at: string | null;
+    count_90d: number;
+  };
+  const ids = all.map((c) => c.id);
+  const { data: scoreRows } = ids.length
+    ? await supabase
+        .from('company_engagement_score')
+        .select('company_id, score, bucket, last_engagement_at, count_90d')
+        .in('company_id', ids)
+        .returns<ScoreRow[]>()
+    : { data: [] as ScoreRow[] };
+  const scoreByCompany = new Map<string, ScoreRow>();
+  for (const r of scoreRows ?? []) scoreByCompany.set(r.company_id, r);
+
+  const cards: CardData[] = all.map((c) => {
+    const s = scoreByCompany.get(c.id);
+    return {
+      id: c.id,
+      canonical_name: c.canonical_name,
+      company_type: c.company_type,
+      current_level: c.current_level,
+      city: c.city,
+      is_key_stakeholder: c.is_key_stakeholder,
+      has_active_projects: c.has_active_projects,
+      owner_id: c.owner_id,
+      owner_full_name: c.owner?.full_name ?? null,
+      pending_count: pendingByCompany.get(c.id) ?? 0,
+      engagement_score: s?.score ?? 0,
+      engagement_bucket: s?.bucket ?? 'cold',
+      last_engagement_at: s?.last_engagement_at ?? null,
+      engagement_count_90d: s?.count_90d ?? 0,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -118,6 +164,17 @@ export default async function PipelinePage({
             {f.label}
           </Link>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-agsi-lightGray bg-white px-3 py-2 text-xs text-agsi-darkGray">
+        <span className="font-medium text-agsi-navy">Engagement glow</span>
+        <LegendChip color="green" label="Hot · 8-10" />
+        <LegendChip color="blue" label="Warm · 5-7" />
+        <LegendChip color="amber" label="Cooling · 2-4" />
+        <LegendChip color="red" label="Cold · 0-1" />
+        <span className="ml-auto text-[11px] text-agsi-midGray">
+          Log a call, meeting, or BCC client emails to keep cards green.
+        </span>
       </div>
 
       {error && (
