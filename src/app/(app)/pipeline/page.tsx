@@ -136,19 +136,6 @@ export default async function PipelinePage({
     for (const r of res.data ?? []) scoreByCompany.set(r.company_id, r);
   }
 
-  // Configurable inbound Cc address — surfaced on cold-card hints so
-  // the nudge is actionable. Cc rather than BCC so stakeholder replies
-  // via Reply All also flow into the webhook (BCC drops out of the
-  // thread after one hop). Empty until an admin sets it from
-  // /admin/settings → "Inbound email" card.
-  const { data: settingRow } = await supabase
-    .from('app_settings')
-    .select('value_json')
-    .eq('key', 'inbound_email_address')
-    .maybeSingle<{ value_json: unknown }>();
-  const inboundEmailAddress =
-    typeof settingRow?.value_json === 'string' ? settingRow.value_json : '';
-
   const cards: CardData[] = all.map((c) => {
     const s = scoreByCompany.get(c.id);
     return {
@@ -230,7 +217,6 @@ export default async function PipelinePage({
         cards={cards}
         userRole={user.role}
         userId={user.id}
-        inboundEmailAddress={inboundEmailAddress}
       />
 
       <Card>
