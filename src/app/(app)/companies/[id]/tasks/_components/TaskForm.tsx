@@ -40,14 +40,15 @@ export function TaskForm({
   canAssignToOthers = false,
 }: {
   mode: 'create' | 'edit';
-  companyId: string;
+  /** Null for standalone / ad-hoc tasks (FX-014c). When null, the
+   *  hidden company_id input is skipped and the task lands with
+   *  company_id = NULL — invisible to every company's Tasks tab,
+   *  visible only on /tasks. */
+  companyId: string | null;
   profiles: ProfileOption[];
   defaultOwnerId: string;
   initial?: TaskFormInitial;
   onClose?: () => void;
-  /** When false, the Owner selector is hidden and the owner is pinned
-   *  to defaultOwnerId. RLS (migration 0051) blocks anything else for
-   *  bd_manager regardless, but hiding the field avoids confusion. */
   canAssignToOthers?: boolean;
 }) {
   const router = useRouter();
@@ -104,7 +105,7 @@ export function TaskForm({
       className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4"
     >
       {mode === 'edit' && initial && <input type="hidden" name="id" value={initial.id} />}
-      <input type="hidden" name="company_id" value={companyId} />
+      {companyId && <input type="hidden" name="company_id" value={companyId} />}
 
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">Title</label>

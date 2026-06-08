@@ -14,6 +14,7 @@ import {
   type TaskStatus,
 } from '@/lib/zod/task';
 import { GlobalTaskStatusSelect } from './_components/GlobalTaskRowActions';
+import { TaskForm } from '../companies/[id]/tasks/_components/TaskForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,12 +78,25 @@ export default async function GlobalTasksPage({
   const tasks = data ?? [];
   const today = new Date().toISOString().slice(0, 10);
 
+  // For the standalone-task form: BD members for the assign-to
+  // selector. Same filter as the per-company tasks page.
+  const { data: profilesRaw } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('is_active', true)
+    .in('role', ['admin', 'bd_head', 'bd_manager'])
+    .order('full_name');
+  const profiles = (profilesRaw ?? []) as Array<{ id: string; full_name: string }>;
+  const canAssignToOthers = user.role === 'admin' || user.role === 'bd_head';
+  const canCreate = user.role !== 'leadership';
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-agsi-navy">Tasks</h1>
         <p className="mt-1 text-sm text-agsi-darkGray">
-          Manual + system-generated tasks across companies and projects.
+          Manual + system-generated tasks across companies and projects, plus
+          ad-hoc work not tied to any stakeholder.
         </p>
       </div>
 
@@ -129,11 +143,23 @@ export default async function GlobalTasksPage({
         </div>
       </div>
 
+      {canCreate && (
+        <TaskForm
+          mode="create"
+          companyId={null}
+          profiles={profiles}
+          defaultOwnerId={user.id}
+          canAssignToOthers={canAssignToOthers}
+        />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>{tasks.length} tasks</CardTitle>
           <CardDescription>
-            Create new tasks from a company&apos;s Tasks tab.
+            Standalone tasks (no company link) are visible here but never on a
+            company&apos;s Tasks tab. Company-linked tasks created from the
+            company&apos;s Tasks tab continue to show in both places.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
