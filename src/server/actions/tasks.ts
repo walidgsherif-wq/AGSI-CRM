@@ -65,6 +65,42 @@ async function syncReminders(
   return null;
 }
 
+/**
+ * Create a follow-up task from a logged engagement.
+ *
+ * Loads the source engagement, then delegates to {@link createTask} via
+ * synthesised FormData so every existing safeguard runs once (zod
+ * validation, leadership RBAC gate, reminders, revalidation). No
+ * parallel task-create path.
+ *
+ * The tasks table has no engagement_id FK today (verified against
+ * migration 0008 + all subsequent), so the new task links to the
+ * company only. If you want to surface "spawned from engagement X" on
+ * the task row, that's a separate migration adding the column +
+ * surfacing it in the task UI.
+ */
+export async function createFollowUpTask(engagementId: string) {
+  const user = await getCurrentUser();
+  if (user.role === 'leadership') return { error: 'Leadership cannot create tasks.' };
+  const { data: eng } = await supabase()
+    .from('engagements')
+    .select('company_id, summary')
+    .eq('id', engagementId)
+    .maybeSingle<{ company_id: string; summary: string }>();
+  if (!eng) return { error: 'Engagement not found.' };
+
+  const summaryTrim = (eng.summary ?? '').trim();
+  const title = `Follow up: ${summaryTrim || 'engagement'}`.slice(0, 280);
+
+  const fd = new FormData();
+  fd.append('company_id', eng.company_id);
+  fd.append('title', title);
+  fd.append('owner_id', user.id);
+  fd.append('priority', 'med');
+  fd.append('status', 'open');
+  return createTask(fd);
+}
+
 export async function createTask(formData: FormData) {
   const user = await getCurrentUser();
   if (user.role === 'leadership') return { error: 'Leadership cannot create tasks.' };

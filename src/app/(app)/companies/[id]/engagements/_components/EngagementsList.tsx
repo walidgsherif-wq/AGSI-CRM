@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ENGAGEMENT_TYPE_LABEL, type EngagementType } from '@/lib/zod/engagement';
 import { EngagementDetailsSheet } from '@/components/domain/EngagementDetailsSheet';
+import { FollowUpTaskButton } from './FollowUpTaskButton';
 
 type Role = 'admin' | 'leadership' | 'bd_head' | 'bd_manager';
 
@@ -62,11 +63,11 @@ export function EngagementsList({
           ) : (
             <ul className="divide-y divide-agsi-lightGray">
               {engagements.map((e) => (
-                <li key={e.id} className="px-0 py-0">
+                <li key={e.id} className="flex items-stretch hover:bg-agsi-offWhite">
                   <button
                     type="button"
                     onClick={() => openDrawer(e.id)}
-                    className="block w-full px-4 py-3 text-left transition-colors hover:bg-agsi-offWhite focus:outline-none focus:ring-2 focus:ring-inset focus:ring-agsi-accent"
+                    className="flex-1 px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-agsi-accent"
                     aria-label={`View ${ENGAGEMENT_TYPE_LABEL[e.engagement_type]} from ${e.engagement_date}`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
@@ -83,6 +84,11 @@ export function EngagementsList({
                       by {e.author_name ?? 'Unknown'}
                     </p>
                   </button>
+                  {canCreate && (
+                    <div className="flex items-center pr-4">
+                      <FollowUpTaskButton engagementId={e.id} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
