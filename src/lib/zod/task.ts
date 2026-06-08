@@ -69,10 +69,9 @@ export const taskCreateSchema = z
       .or(z.literal(''))
       .transform((v) => (v === '' ? null : v ?? null)),
   })
-  .refine((d) => d.company_id || d.project_id, {
-    message: 'Task must be linked to a company or a project.',
-    path: ['company_id'],
-  })
+  // Ad-hoc / standalone tasks (FX-014c) — general BD work not tied
+  // to any stakeholder ("prepare board deck", "book CPD venue") — are
+  // valid: both company_id and project_id may be NULL.
   .refine(
     (d) =>
       !d.reminder_kinds.includes('custom') ||
