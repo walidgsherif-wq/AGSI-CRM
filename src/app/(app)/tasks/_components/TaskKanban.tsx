@@ -1,0 +1,225 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { setTaskStatus } from '@/server/actions/tasks';
+import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+// 3-column board over the user's tasks. Mirrors PipelineKanban's
+// HTML5-native DnD pattern (no library, no new schema) — see
+// /pipeline/_components/PipelineKanban.tsx. Drops call the existing
+// setTaskStatus(id, status) server action, no parallel mutation path.
+//
+// Column mapping uses existing task_status_t values:
+//   To-do       = open
+//   In Progress = in_progress
+//   Done        = done
+// 'cancelled' tasks are excluded from the board (it's still a valid
+// status, just not relevant to the work-in-flight view).
+
+export type TaskKanbanCard = {
+  id: string;
+  title: string;
+  status: 'open' | 'in_progress' | 'done' | 'cancelled';
+  due_date: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  owner_full_name: string | null;
+  has_reminders: boolean;
+  assigned_by_name: string | null;
+};
+
+type BoardStatus = 'open' | 'in_progress' | 'done';
+
+const COLUMNS: ReadonlyArray<{ key: BoardStatus; label: string; tone: string }> = [
+  { key: 'open',        label: 'To-do',       tone: 'border-agsi-midGray' },
+  { key: 'in_progress', label: 'In progress', tone: 'border-agsi-accent/50' },
+  { key: 'done',        label: 'Done',        tone: 'border-rag-green/40' },
+];
+
+export function TaskKanban({ cards }: { cards: TaskKanbanCard[] }) {
+  const router = useRouter();
+  const [dragging, setDragging] = useState<{ cardId: string; from: BoardStatus } | null>(null);
+  const [, startTransition] = useTransition();
+
+  // Pre-group by status. Cards with status 'cancelled' are not bucketed
+  // into any column and simply don't render — drag from cancelled into
+  // the board isn't a flow we expose here.
+  const grouped: Record<BoardStatus, TaskKanbanCard[]> = { open: [], in_progress: [], done: [] };
+  for (const c of cards) {
+    if (c.status === 'cancelled') continue;
+    grouped[c.status].push(c);
+  }
+
+  function handleDrop(target: BoardStatus) {
+    if (!dragging) return;
+    if (dragging.from === target) {
+      setDragging(null);
+      return;
+    }
+    const cardId = dragging.cardId;
+    setDragging(null);
+    startTransition(async () => {
+      const r = await setTaskStatus(cardId, target);
+      if (!r.error) router.refresh();
+    });
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {COLUMNS.map((col) => {
+        const colCards = grouped[col.key];
+        const isDropTarget = dragging !== null && dragging.from !== col.key;
+        return (
+          <div
+            key={col.key}
+            onDragOver={(e) => {
+              if (isDropTarget) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }
+            }}
+            onDrop={(e) => {
+              if (!isDropTarget) return;
+              e.preventDefault();
+              handleDrop(col.key);
+            }}
+            className={cn(
+              'flex min-h-[180px] flex-col rounded-lg border-t-2 bg-white p-2 transition-colors',
+              col.tone,
+              isDropTarget && 'bg-agsi-accent/5 ring-2 ring-agsi-accent/40',
+              dragging?.from === col.key && 'opacity-70',
+            )}
+          >
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-agsi-darkGray">
+                {col.label}
+              </h3>
+              <span className="text-xs text-agsi-darkGray">{colCards.length}</span>
+            </div>
+            <div className="space-y-2">
+              {colCards.length === 0 ? (
+                <p className="rounded border border-dashed border-agsi-lightGray p-3 text-xs text-agsi-darkGray">
+                  {dragging && isDropTarget ? 'Drop here' : 'Nothing here.'}
+                </p>
+              ) : (
+                colCards.map((c) => (
+                  <TaskCard
+                    key={c.id}
+                    card={c}
+                    today={today}
+                    onDragStart={() => setDragging({ cardId: c.id, from: c.status as BoardStatus })}
+                    onDragEnd={() => setDragging(null)}
+                    isBeingDragged={dragging?.cardId === c.id}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TaskCard({
+  card,
+  today,
+  onDragStart,
+  onDragEnd,
+  isBeingDragged,
+}: {
+  card: TaskKanbanCard;
+  today: string;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  isBeingDragged: boolean;
+}) {
+  const isOverdue =
+    card.status !== 'done' && card.due_date !== null && card.due_date < today;
+  // Company-linked cards link out to the company's Tasks tab (where
+  // the existing edit flow lives). Ad-hoc cards stay non-clickable
+  // for now — editing them isn't surfaced yet (separate item).
+  const editHref = card.company_id
+    ? `/companies/${card.company_id}/tasks?edit=${card.id}`
+    : null;
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className={cn(
+        'cursor-grab rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm active:cursor-grabbing',
+        isBeingDragged && 'opacity-50',
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        {editHref ? (
+          <Link
+            href={editHref as never}
+            draggable={false}
+            className="text-sm font-medium text-agsi-navy hover:underline"
+          >
+            {card.title}
+          </Link>
+        ) : (
+          <p className="text-sm font-medium text-agsi-navy">{card.title}</p>
+        )}
+        <Avatar
+          name={card.owner_full_name}
+          size="xs"
+          title={`Owner: ${card.owner_full_name ?? 'Unassigned'}`}
+        />
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {card.company_id ? (
+          <Link
+            href={`/companies/${card.company_id}`}
+            draggable={false}
+            className="text-xs text-agsi-accent hover:underline"
+          >
+            {card.company_name ?? 'Company'}
+          </Link>
+        ) : (
+          <Badge variant="neutral">Ad-hoc</Badge>
+        )}
+        {card.due_date && (
+          <span
+            className={cn(
+              'text-xs',
+              isOverdue ? 'font-semibold text-rag-red' : 'text-agsi-darkGray',
+            )}
+            title={isOverdue ? 'Overdue' : 'Due date'}
+          >
+            {isOverdue ? `Overdue · ${card.due_date}` : `Due ${card.due_date}`}
+          </span>
+        )}
+        {card.has_reminders && (
+          <span
+            className="text-xs text-agsi-darkGray"
+            title="Has reminders"
+            aria-label="Has reminders"
+          >
+            🔔
+          </span>
+        )}
+      </div>
+
+      {card.assigned_by_name && (
+        <p className="mt-1 text-[11px] italic text-agsi-midGray">
+          assigned by {card.assigned_by_name}
+        </p>
+      )}
+    </div>
+  );
+}
