@@ -124,6 +124,16 @@ export function Sidebar({
   const items = NAV.filter((i) =>
     i.feature ? featureSet.has(i.feature) : i.roles.includes(role),
   );
+  // Score each nav item against the current pathname and let the
+  // highest score win. Handles three cases:
+  //   - exact match              (e.g. /pipeline ↔ /pipeline)
+  //   - sub-route                (e.g. /companies/[id] ↔ /companies)
+  //   - same top-level segment   (e.g. /admin/audit ↔ /admin/users)
+  // The "longest matching prefix wins" rule keeps /insights/maps/...
+  // highlighting Maps rather than Insights when both could match.
+  const scores = items.map((i) => navMatchScore(i.href, pathname));
+  const maxScore = Math.max(...scores, 0);
+  const activeIndex = maxScore > 0 ? scores.indexOf(maxScore) : -1;
 
   return (
     <aside
@@ -163,19 +173,18 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {items.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href));
+        {items.map((item, idx) => {
+          const isActive = idx === activeIndex;
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href as never}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-agsi-offWhite text-agsi-navy'
+                  ? 'bg-agsi-navy text-white'
                   : 'text-agsi-darkGray hover:bg-agsi-offWhite hover:text-agsi-navy',
               )}
             >
@@ -230,4 +239,12 @@ function initials(name: string) {
     .slice(0, 2)
     .join('')
     .toUpperCase();
+}
+
+export function navMatchScore(itemHref: string, pathname: string): number {
+  if (itemHref === pathname) return Number.POSITIVE_INFINITY;
+  if (pathname.startsWith(itemHref + '/')) return itemHref.length;
+  const top = (p: string) => p.match(/^\/[^/]+/)?.[0] ?? '/';
+  const t = top(itemHref);
+  return t !== '/' && t === top(pathname) ? 1 : 0;
 }
