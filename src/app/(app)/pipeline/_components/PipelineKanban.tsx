@@ -22,10 +22,8 @@ export type CardData = {
   owner_id: string | null;
   owner_full_name: string | null;
   pending_count: number;
-  engagement_score: number;
   engagement_bucket: EngagementBucket;
-  last_engagement_at: string | null;
-  engagement_count_90d: number;
+  engagement_days_since: number | null;
 };
 
 const GLOW_CLASSES: Record<EngagementBucket, string> = {
@@ -42,17 +40,14 @@ const CHIP_CLASSES: Record<EngagementBucket, string> = {
   cold: 'bg-rag-red text-white',
 };
 
-function daysAgo(iso: string | null): number | null {
-  if (!iso) return null;
-  const ms = Date.now() - new Date(iso).getTime();
-  return Math.max(0, Math.floor(ms / 86_400_000));
+function engagementTooltip(c: CardData): string {
+  return c.engagement_days_since === null
+    ? 'No engagement on record'
+    : `Last engagement ${c.engagement_days_since}d ago`;
 }
 
-function engagementTooltip(c: CardData): string {
-  const d = daysAgo(c.last_engagement_at);
-  const recency =
-    d === null ? 'No engagement on record' : `Last engagement ${d}d ago`;
-  return `${recency} · ${c.engagement_count_90d} in last 90d · score ${c.engagement_score}/10`;
+function engagementBadgeLabel(c: CardData): string {
+  return c.engagement_days_since === null ? '—' : `${c.engagement_days_since}d`;
 }
 
 const LEVEL_INDEX: Record<Level, number> = {
@@ -196,13 +191,17 @@ export function PipelineKanban({
                           <div className="flex shrink-0 items-center gap-1.5">
                             {c.is_key_stakeholder && <Badge variant="gold">Key</Badge>}
                             <span
-                              aria-label={`Engagement score ${c.engagement_score} of 10`}
+                              aria-label={
+                                c.engagement_days_since === null
+                                  ? 'No engagement on record'
+                                  : `${c.engagement_days_since} days since last engagement`
+                              }
                               className={cn(
                                 'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
                                 CHIP_CLASSES[c.engagement_bucket],
                               )}
                             >
-                              {c.engagement_score}
+                              {engagementBadgeLabel(c)}
                             </span>
                           </div>
                         </div>

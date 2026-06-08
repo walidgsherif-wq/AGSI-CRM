@@ -108,10 +108,8 @@ export default async function PipelinePage({
 
   type ScoreRow = {
     company_id: string;
-    score: number;
     bucket: 'hot' | 'warm' | 'cooling' | 'cold';
-    last_engagement_at: string | null;
-    count_90d: number;
+    days_since_last_engagement: number | null;
   };
   // Chunk the .in() filter so each URL stays well under PostgREST's
   // length cap. A single .in(...2000 uuids) request balloons to ~76 KB
@@ -128,7 +126,7 @@ export default async function PipelinePage({
     chunks.map((chunk) =>
       supabase
         .from('company_engagement_score')
-        .select('company_id, score, bucket, last_engagement_at, count_90d')
+        .select('company_id, bucket, days_since_last_engagement')
         .in('company_id', chunk)
         .returns<ScoreRow[]>(),
     ),
@@ -164,10 +162,8 @@ export default async function PipelinePage({
       owner_id: c.owner_id,
       owner_full_name: c.owner?.full_name ?? null,
       pending_count: pendingByCompany.get(c.id) ?? 0,
-      engagement_score: s?.score ?? 0,
       engagement_bucket: s?.bucket ?? 'cold',
-      last_engagement_at: s?.last_engagement_at ?? null,
-      engagement_count_90d: s?.count_90d ?? 0,
+      engagement_days_since: s?.days_since_last_engagement ?? null,
     };
   });
 
@@ -213,10 +209,10 @@ export default async function PipelinePage({
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-agsi-lightGray bg-white px-3 py-2 text-xs text-agsi-darkGray">
         <span className="font-medium text-agsi-navy">Engagement glow</span>
-        <LegendChip color="green" label="Hot · 8-10" />
-        <LegendChip color="blue" label="Warm · 5-7" />
-        <LegendChip color="amber" label="Cooling · 2-4" />
-        <LegendChip color="red" label="Cold · 0-1" />
+        <LegendChip color="green" label="Hot · ≤30d" />
+        <LegendChip color="blue" label="Warm · ≤60d" />
+        <LegendChip color="amber" label="Cooling · ≤90d" />
+        <LegendChip color="red" label="Cold · 90d+" />
         <span className="ml-auto text-[11px] text-agsi-midGray">
           Log a call, meeting, or Cc client emails to keep cards green.
         </span>
