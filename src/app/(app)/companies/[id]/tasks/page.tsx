@@ -25,8 +25,10 @@ type TaskRow = {
   priority: TaskPriority;
   status: TaskStatus;
   owner_id: string;
+  assigned_by_id: string | null;
   source: string;
   owner: { full_name: string } | null;
+  assigned_by: { full_name: string } | null;
   reminders: { reminder_kind: ReminderKind; reminder_at: string; sent_at: string | null }[];
 };
 
@@ -65,18 +67,22 @@ export default async function CompanyTasksTab({
     supabase
       .from('tasks')
       .select(
-        'id, title, description, due_date, priority, status, owner_id, source, owner:profiles!tasks_owner_id_fkey(full_name), reminders:task_reminders(reminder_kind, reminder_at, sent_at)',
+        'id, title, description, due_date, priority, status, owner_id, assigned_by_id, source, owner:profiles!tasks_owner_id_fkey(full_name), assigned_by:profiles!tasks_assigned_by_id_fkey(full_name), reminders:task_reminders(reminder_kind, reminder_at, sent_at)',
       )
       .eq('company_id', params.id)
       .order('status', { ascending: true })
       .order('due_date', { ascending: true, nullsFirst: false })
       .returns<TaskRow[]>(),
+    // BD members only — leadership doesn't take task ownership.
     supabase
       .from('profiles')
       .select('id, full_name')
       .eq('is_active', true)
+      .in('role', ['admin', 'bd_head', 'bd_manager'])
       .order('full_name'),
   ]);
+
+  const canAssignToOthers = user.role === 'admin' || user.role === 'bd_head';
 
   const tasks = tasksRes.data ?? [];
   const profiles = (profilesRes.data ?? []) as Array<{ id: string; full_name: string }>;
@@ -113,6 +119,7 @@ export default async function CompanyTasksTab({
           profiles={profiles}
           defaultOwnerId={user.id}
           initial={editInitial}
+          canAssignToOthers={canAssignToOthers}
         />
       ) : (
         <TaskForm
@@ -120,6 +127,7 @@ export default async function CompanyTasksTab({
           companyId={params.id}
           profiles={profiles}
           defaultOwnerId={user.id}
+          canAssignToOthers={canAssignToOthers}
         />
       )}
 
@@ -179,7 +187,14 @@ export default async function CompanyTasksTab({
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">{t.owner?.full_name ?? '—'}</td>
+                      <td className="px-4 py-3 text-agsi-darkGray">
+                        <div>{t.owner?.full_name ?? '—'}</div>
+                        {t.assigned_by?.full_name && (
+                          <div className="text-[11px] italic text-agsi-midGray">
+                            assigned by {t.assigned_by.full_name}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={overdue ? 'text-rag-red' : 'text-agsi-darkGray'}>
                           {t.due_date ?? '—'}

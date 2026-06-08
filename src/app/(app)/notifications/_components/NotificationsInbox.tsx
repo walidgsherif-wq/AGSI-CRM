@@ -17,6 +17,7 @@ const TYPE_LABEL: Record<string, string> = {
   stagnation_breach: 'Stagnation breach',
   task_due: 'Task due',
   task_overdue: 'Task overdue',
+  task_assigned: 'Task assigned',
   level_change: 'Level change',
   upload_complete: 'Upload complete',
   upload_failed: 'Upload failed',
@@ -36,6 +37,7 @@ const TYPE_VARIANT: Record<string, 'amber' | 'red' | 'blue' | 'green' | 'neutral
   upload_complete: 'green',
   unmatched_company: 'amber',
   leadership_report_finalised: 'blue',
+  task_assigned: 'blue',
 };
 
 const ALL_TYPES = Object.keys(TYPE_LABEL);
