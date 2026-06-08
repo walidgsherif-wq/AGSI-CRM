@@ -37,6 +37,7 @@ export function TaskForm({
   defaultOwnerId,
   initial,
   onClose,
+  canAssignToOthers = false,
 }: {
   mode: 'create' | 'edit';
   companyId: string;
@@ -44,6 +45,10 @@ export function TaskForm({
   defaultOwnerId: string;
   initial?: TaskFormInitial;
   onClose?: () => void;
+  /** When false, the Owner selector is hidden and the owner is pinned
+   *  to defaultOwnerId. RLS (migration 0051) blocks anything else for
+   *  bd_manager regardless, but hiding the field avoids confusion. */
+  canAssignToOthers?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -123,19 +128,36 @@ export function TaskForm({
       </div>
       <div className="grid gap-3 sm:grid-cols-4">
         <div>
-          <label className="block text-xs font-medium text-agsi-darkGray">Owner</label>
-          <select
-            name="owner_id"
-            required
-            defaultValue={initial?.owner_id ?? defaultOwnerId}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          >
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name}
-              </option>
-            ))}
-          </select>
+          <label className="block text-xs font-medium text-agsi-darkGray">
+            {canAssignToOthers ? 'Assign to' : 'Owner'}
+          </label>
+          {canAssignToOthers ? (
+            <select
+              name="owner_id"
+              required
+              defaultValue={initial?.owner_id ?? defaultOwnerId}
+              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            >
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <input
+                type="hidden"
+                name="owner_id"
+                value={initial?.owner_id ?? defaultOwnerId}
+              />
+              <p className="mt-1 rounded-lg border border-agsi-lightGray bg-agsi-offWhite px-3 py-2 text-sm text-agsi-darkGray">
+                {profiles.find(
+                  (p) => p.id === (initial?.owner_id ?? defaultOwnerId),
+                )?.full_name ?? 'You'}
+              </p>
+            </>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Due date</label>

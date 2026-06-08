@@ -108,13 +108,32 @@ export async function createTask(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join('; ') };
 
   const { reminder_kinds, reminder_custom_at, ...taskFields } = parsed.data;
-  const insert = { ...taskFields, source: 'manual' as const };
+  // Cross-member assignment: stamp assigned_by_id only when the
+  // assigner and assignee differ. RLS (migration 0051) blocks
+  // bd_manager from inserting with someone else's owner_id, so this
+  // is purely metadata for the UI / audit trail.
+  const isCrossAssignment = taskFields.owner_id !== user.id;
+  const insert = {
+    ...taskFields,
+    source: 'manual' as const,
+    assigned_by_id: isCrossAssignment ? user.id : null,
+  };
   const { data: created, error } = await supabase()
     .from('tasks')
     .insert(insert)
     .select('id')
     .single();
   if (error || !created) return { error: error?.message ?? 'Insert failed.' };
+
+  if (isCrossAssignment) {
+    // SECURITY DEFINER fn — notifications RLS forbids direct INSERT,
+    // mirroring the stagnation pattern. Self-assignments are no-ops
+    // inside the fn anyway, but we skip the round-trip.
+    await supabase().rpc('send_task_assigned_notification', {
+      p_task_id: created.id,
+      p_recipient_id: taskFields.owner_id,
+    });
+  }
 
   if (reminder_kinds.length > 0) {
     const remErr = await syncReminders(
@@ -144,9 +163,26 @@ export async function updateTask(formData: FormData) {
   const patch: Record<string, unknown> = { ...update };
   if (update.status === 'done') patch.completed_at = new Date().toISOString();
   if (update.status && update.status !== 'done') patch.completed_at = null;
+  // Re-assignment via update: if owner_id is in the patch, stamp
+  // assigned_by_id (or clear it on a self-reassign). Same RLS gate
+  // as create — bd_manager can't end up here with a foreign owner_id
+  // because UPDATE WITH CHECK from 0022 pins owner_id to auth.uid().
+  const isReassignment =
+    'owner_id' in update && update.owner_id !== undefined && update.owner_id !== user.id;
+  const isSelfReassignment =
+    'owner_id' in update && update.owner_id === user.id;
+  if (isReassignment) patch.assigned_by_id = user.id;
+  else if (isSelfReassignment) patch.assigned_by_id = null;
 
   const { error } = await supabase().from('tasks').update(patch).eq('id', id);
   if (error) return { error: error.message };
+
+  if (isReassignment && update.owner_id) {
+    await supabase().rpc('send_task_assigned_notification', {
+      p_task_id: id,
+      p_recipient_id: update.owner_id,
+    });
+  }
 
   // Only re-sync reminders if the form explicitly carried reminder_kinds
   // (the global status-only inline updater doesn't carry them).

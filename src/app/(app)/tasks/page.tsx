@@ -25,10 +25,12 @@ type TaskRow = {
   priority: TaskPriority;
   status: TaskStatus;
   owner_id: string;
+  assigned_by_id: string | null;
   source: string;
   company_id: string | null;
   project_id: string | null;
   owner: { full_name: string } | null;
+  assigned_by: { full_name: string } | null;
   company: { id: string; canonical_name: string } | null;
   project: { id: string; name: string } | null;
 };
@@ -62,7 +64,7 @@ export default async function GlobalTasksPage({
   let query = supabase
     .from('tasks')
     .select(
-      'id, title, description, due_date, priority, status, owner_id, source, company_id, project_id, owner:profiles!tasks_owner_id_fkey(full_name), company:companies(id, canonical_name), project:projects(id, name)',
+      'id, title, description, due_date, priority, status, owner_id, assigned_by_id, source, company_id, project_id, owner:profiles!tasks_owner_id_fkey(full_name), assigned_by:profiles!tasks_assigned_by_id_fkey(full_name), company:companies(id, canonical_name), project:projects(id, name)',
     )
     .order('status', { ascending: true })
     .order('due_date', { ascending: true, nullsFirst: false })
@@ -190,7 +192,14 @@ export default async function GlobalTasksPage({
                           </Link>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">{t.owner?.full_name ?? '—'}</td>
+                      <td className="px-4 py-3 text-agsi-darkGray">
+                        <div>{t.owner?.full_name ?? '—'}</div>
+                        {t.assigned_by?.full_name && (
+                          <div className="text-[11px] italic text-agsi-midGray">
+                            assigned by {t.assigned_by.full_name}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={overdue ? 'text-rag-red' : 'text-agsi-darkGray'}>
                           {t.due_date ?? '—'}
