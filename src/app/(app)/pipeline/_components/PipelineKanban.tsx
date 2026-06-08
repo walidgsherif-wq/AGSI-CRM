@@ -47,7 +47,7 @@ function engagementTooltip(c: CardData): string {
 }
 
 function engagementBadgeLabel(c: CardData): string {
-  return c.engagement_days_since === null ? '—' : `${c.engagement_days_since}d`;
+  return c.engagement_days_since === null ? 'Never' : `${c.engagement_days_since}d`;
 }
 
 const LEVEL_INDEX: Record<Level, number> = {
@@ -72,12 +72,10 @@ export function PipelineKanban({
   cards,
   userRole,
   userId,
-  inboundEmailAddress,
 }: {
   cards: CardData[];
   userRole: Role;
   userId: string;
-  inboundEmailAddress: string;
 }) {
   const [dragging, setDragging] = useState<{ cardId: string; from: Level } | null>(null);
   const [forced, setForced] = useState<{ card: CardData; toLevel: Level } | null>(null);
@@ -212,19 +210,6 @@ export function PipelineKanban({
                         <p className="mt-1 text-xs text-agsi-darkGray">
                           Owner: {c.owner_full_name ?? 'Unassigned'}
                         </p>
-                        {c.engagement_bucket === 'cold' && (
-                          <p className="mt-1 text-[11px] text-rag-red">
-                            {inboundEmailAddress ? (
-                              <>
-                                No recent activity — log a touchpoint or Cc{' '}
-                                <span className="font-medium">{inboundEmailAddress}</span>{' '}
-                                on client emails.
-                              </>
-                            ) : (
-                              <>No recent activity — log a touchpoint to warm this up.</>
-                            )}
-                          </p>
-                        )}
                         {c.pending_count > 0 && (
                           <Badge variant="amber" className="mt-2">
                             {c.pending_count} pending review
