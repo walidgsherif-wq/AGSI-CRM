@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
+import { cn } from '@/lib/utils';
 import {
   REPORT_STATUS_LABEL,
   REPORT_TYPE_LABEL,
@@ -94,12 +95,33 @@ export default async function LeadershipReportViewer({
     .order('company_name_at_time')
     .returns<Stakeholder[]>();
 
+  // Previous finalised/archived report of the same scope, immediately
+  // preceding this one — drives the ↑/↓ deltas on the relationship
+  // headline. Returns null on the first report or if scope has no
+  // match; UI falls back to "—" (no comparison).
+  const { data: previous } = await supabase
+    .from('leadership_reports')
+    .select('id, period_end, payload_json')
+    .eq('report_type', report.report_type)
+    .lt('period_end', report.period_start)
+    .in('status', ['finalised', 'archived'])
+    .order('period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string; period_end: string; payload_json: LeadershipReportPayload }>();
+  const previousPayload = previous?.payload_json ?? null;
+
   const payload = report.payload_json;
   const feedbackByName = pickName(report.feedback_by);
 
   return (
     <div className="space-y-6">
       <Hero report={report} />
+
+      <RelationshipHeadline
+        current={payload.executive_headlines ?? {}}
+        previous={previousPayload?.executive_headlines ?? null}
+        previousLabel={previous ? `vs prev (period ending ${previous.period_end})` : null}
+      />
 
       {report.status === 'finalised' && user.role === 'leadership' && (
         <FeedbackPanel
@@ -139,7 +161,7 @@ export default async function LeadershipReportViewer({
         stakeholders={(stakeholders ?? []).filter((s) => s.is_key_stakeholder)}
         narrativesFromPayload={payload.key_stakeholder_progress}
       />
-      <MarketReference payload={payload} />
+      <MarketContext payload={payload} />
 
       {report.status === 'archived' && (
         <Card>
@@ -237,6 +259,110 @@ function FeedbackPanel({
   );
 }
 
+// Relationship-progress leads the report — these are the numbers the
+// reader should see first. Money figures are deliberately NOT here.
+const HEADLINE_METRICS: ReadonlyArray<readonly [string, string]> = [
+  ['mous_signed', 'MOUs signed'],
+  ['new_l5_this_period', 'New L5'],
+  ['new_l4_this_period', 'New L4'],
+  ['new_l3_this_period', 'New L3'],
+  ['site_banners_installed', 'Site banners'],
+  ['case_studies_published', 'Case studies'],
+  ['announcements', 'Announcements'],
+  ['total_active_accounts', 'Active accounts'],
+];
+
+function RelationshipHeadline({
+  current,
+  previous,
+  previousLabel,
+}: {
+  current: Record<string, number>;
+  previous: Record<string, number> | null;
+  previousLabel: string | null;
+}) {
+  const allZero = HEADLINE_METRICS.every(([k]) => !Number(current[k] ?? 0));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Relationship progress</CardTitle>
+        <CardDescription>
+          MOUs, level advancements, and on-the-ground moves recorded this period.{' '}
+          {previousLabel ?? 'No prior report — deltas show next time.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {allZero ? (
+          <p className="text-sm text-agsi-darkGray">No movement this period.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {HEADLINE_METRICS.map(([key, label]) => {
+              const value = Number(current[key] ?? 0);
+              const delta = previous ? value - Number(previous[key] ?? 0) : null;
+              return (
+                <div
+                  key={key}
+                  className="rounded-lg border border-agsi-lightGray bg-white p-3"
+                >
+                  <p className="text-xs font-medium uppercase tracking-wide text-agsi-darkGray">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-agsi-navy">
+                    {value === 0 ? '—' : fmt(value)}
+                  </p>
+                  <DeltaPill delta={delta} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DeltaPill({ delta }: { delta: number | null }) {
+  if (delta === null) {
+    return <p className="mt-0.5 text-[11px] text-agsi-darkGray">first report</p>;
+  }
+  if (delta === 0) {
+    return <p className="mt-0.5 text-[11px] text-agsi-darkGray">— no change</p>;
+  }
+  const positive = delta > 0;
+  return (
+    <p
+      className={cn(
+        'mt-0.5 text-[11px] font-medium',
+        positive ? 'text-rag-green' : 'text-rag-red',
+      )}
+    >
+      {positive ? '↑' : '↓'} {Math.abs(delta)} vs prev
+    </p>
+  );
+}
+
+function GapToTargetBar({ actual, target }: { actual: number; target: number }) {
+  if (!(target > 0)) {
+    return <p className="mt-1.5 text-[11px] italic text-agsi-darkGray">no target set</p>;
+  }
+  const ratio = actual / target;
+  const fillPct = Math.min(100, Math.max(0, ratio * 100));
+  const tone =
+    ratio >= 1 ? 'bg-rag-green' : ratio >= 0.5 ? 'bg-rag-amber' : 'bg-rag-red';
+  return (
+    <div
+      className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-agsi-lightGray"
+      role="meter"
+      aria-valuenow={Math.round(ratio * 100)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Gap to target"
+    >
+      <div className={`h-full ${tone}`} style={{ width: `${fillPct}%` }} />
+    </div>
+  );
+}
+
 function KPIScorecard({ payload }: { payload: LeadershipReportPayload }) {
   const team = payload.kpi_scorecard?.team_rollup ?? {};
   const perBdm = payload.kpi_scorecard?.per_bdm ?? [];
@@ -266,7 +392,8 @@ function KPIScorecard({ payload }: { payload: LeadershipReportPayload }) {
                 <p className="mt-1 text-xl font-semibold tabular-nums text-agsi-navy">
                   {fmt(t.actual)} / {fmt(t.target)}
                 </p>
-                <p className="text-xs text-agsi-darkGray">{fmtPct(pct)}%</p>
+                <p className="text-xs text-agsi-darkGray">{fmtPct(pct)}% to target</p>
+                <GapToTargetBar actual={Number(t.actual)} target={Number(t.target)} />
               </div>
             );
           })}
@@ -509,29 +636,46 @@ function KeyStakeholdersSection({
   );
 }
 
-function MarketReference({ payload }: { payload: LeadershipReportPayload }) {
+function MarketContext({ payload }: { payload: LeadershipReportPayload }) {
   const m = payload.market_snapshot_reference;
   if (!m || !m.source_upload_id) return null;
   const stages = m.projects_by_stage ?? {};
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Market snapshot reference</CardTitle>
+        <CardTitle>Market context</CardTitle>
         <CardDescription>
-          From BNC upload dated {m.source_upload_date}. Total market value{' '}
-          {fmt(m.total_market_value_aed)} AED.
+          The size of the addressable construction market visible to AGSI this
+          period — <strong>not</strong> AGSI revenue, pipeline value, or anything
+          we&apos;ll book. Useful for sizing our share of voice.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-          {Object.entries(stages).map(([stage, count]) => (
-            <div key={stage} className="rounded border border-agsi-lightGray p-2">
-              <p className="font-medium text-agsi-darkGray">{stage}</p>
-              <p className="mt-0.5 text-base font-semibold tabular-nums text-agsi-navy">
-                {Number(count)}
-              </p>
-            </div>
-          ))}
+      <CardContent className="space-y-3">
+        <div className="rounded-lg border border-agsi-lightGray bg-agsi-offWhite p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-agsi-darkGray">
+            Market — total project value tracked
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-agsi-navy">
+            AED {fmt(m.total_market_value_aed)}
+          </p>
+          <p className="text-[11px] text-agsi-darkGray">
+            from BNC upload dated {m.source_upload_date}
+          </p>
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-agsi-darkGray">
+            Projects by stage in that upload
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            {Object.entries(stages).map(([stage, count]) => (
+              <div key={stage} className="rounded border border-agsi-lightGray p-2">
+                <p className="font-medium text-agsi-darkGray">{stage}</p>
+                <p className="mt-0.5 text-base font-semibold tabular-nums text-agsi-navy">
+                  {Number(count)}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>

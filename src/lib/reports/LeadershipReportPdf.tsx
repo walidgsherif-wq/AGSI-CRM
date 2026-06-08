@@ -269,9 +269,12 @@ type Props = {
     feedback_by_name: string | null;
   };
   payload: LeadershipReportPayload;
+  /** Optional payload of the previous finalised report of the same
+   *  scope. When provided, executive headlines render ↑/↓ deltas. */
+  previousPayload?: LeadershipReportPayload | null;
 };
 
-export function LeadershipReportPdf({ report, payload }: Props) {
+export function LeadershipReportPdf({ report, payload, previousPayload }: Props) {
   return (
     <Document
       title={`AGSI Leadership Report — ${report.period_label}`}
@@ -333,31 +336,66 @@ export function LeadershipReportPdf({ report, payload }: Props) {
           </View>
         )}
 
-        {/* Executive headlines */}
+        {/* Relationship progress — leads the report. No money figure here. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Executive headlines</Text>
-          <View style={styles.grid}>
-            {[
-              ['total_active_accounts', 'Total active accounts'],
-              ['new_l3_this_period', 'New L3'],
-              ['new_l4_this_period', 'New L4'],
-              ['new_l5_this_period', 'New L5'],
+          <Text style={styles.sectionTitle}>Relationship progress</Text>
+          {(() => {
+            const headlineMetrics: ReadonlyArray<readonly [string, string]> = [
               ['mous_signed', 'MOUs signed'],
-              ['announcements', 'Announcements'],
+              ['new_l5_this_period', 'New L5'],
+              ['new_l4_this_period', 'New L4'],
+              ['new_l3_this_period', 'New L3'],
               ['site_banners_installed', 'Site banners'],
               ['case_studies_published', 'Case studies'],
-            ].map(([k, label]) => (
-              <View key={k} style={styles.statCard}>
-                <Text style={styles.statLabel}>{label}</Text>
-                <Text style={styles.statValue}>
-                  {num(payload.executive_headlines?.[k as string] ?? 0)}
-                </Text>
+              ['announcements', 'Announcements'],
+              ['total_active_accounts', 'Active accounts'],
+            ];
+            const allZero = headlineMetrics.every(
+              ([k]) => !Number(payload.executive_headlines?.[k] ?? 0),
+            );
+            if (allZero) {
+              return (
+                <Text style={styles.statHint}>No movement this period.</Text>
+              );
+            }
+            return (
+              <View style={styles.grid}>
+                {headlineMetrics.map(([k, label]) => {
+                  const value = Number(payload.executive_headlines?.[k] ?? 0);
+                  const delta = previousPayload
+                    ? value - Number(previousPayload.executive_headlines?.[k] ?? 0)
+                    : null;
+                  return (
+                    <View key={k} style={styles.statCard}>
+                      <Text style={styles.statLabel}>{label}</Text>
+                      <Text style={styles.statValue}>
+                        {value === 0 ? '—' : num(value)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.statHint,
+                          delta != null && delta > 0
+                            ? { color: COLORS.green }
+                            : delta != null && delta < 0
+                            ? { color: COLORS.red }
+                            : {},
+                        ]}
+                      >
+                        {delta === null
+                          ? 'first report'
+                          : delta === 0
+                          ? '— no change'
+                          : `${delta > 0 ? '↑' : '↓'} ${Math.abs(delta)} vs prev`}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
-            ))}
-          </View>
+            );
+          })()}
         </View>
 
-        {/* KPI scorecard */}
+        {/* KPI scorecard — gap-to-target visualised as a horizontal bar */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>KPI scorecard — team rollup</Text>
           <View style={styles.grid}>
@@ -366,17 +404,47 @@ export function LeadershipReportPdf({ report, payload }: Props) {
                 actual: 0,
                 target: 0,
               };
-              const p =
-                Number(t.target) > 0
-                  ? (Number(t.actual) / Number(t.target)) * 100
-                  : 0;
+              const target = Number(t.target);
+              const actual = Number(t.actual);
+              const ratio = target > 0 ? actual / target : 0;
+              const fillPct = Math.min(100, Math.max(0, ratio * 100));
+              const barColor =
+                ratio >= 1 ? COLORS.green : ratio >= 0.5 ? COLORS.amber : COLORS.red;
               return (
                 <View key={d} style={styles.statCard}>
                   <Text style={styles.statLabel}>Driver {d}</Text>
                   <Text style={styles.statValue}>
-                    {num(t.actual)} / {num(t.target)}
+                    {num(actual)} / {num(target)}
                   </Text>
-                  <Text style={styles.statHint}>{pct(p)}%</Text>
+                  <Text style={styles.statHint}>{pct(ratio * 100)}% to target</Text>
+                  {target > 0 ? (
+                    <View
+                      style={{
+                        marginTop: 4,
+                        height: 4,
+                        backgroundColor: COLORS.lightGray,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 4,
+                          width: `${fillPct}%`,
+                          backgroundColor: barColor,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </View>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.statHint,
+                        { fontStyle: 'italic', marginTop: 2 },
+                      ]}
+                    >
+                      no target set
+                    </Text>
+                  )}
                 </View>
               );
             })}
@@ -553,17 +621,26 @@ export function LeadershipReportPdf({ report, payload }: Props) {
           </View>
         )}
 
-        {/* Market snapshot reference */}
+        {/* Market context — explicitly NOT revenue / pipeline value */}
         {payload.market_snapshot_reference?.source_upload_id && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Market snapshot reference</Text>
-            <Text style={styles.small}>
-              From BNC upload dated{' '}
-              {payload.market_snapshot_reference.source_upload_date} · total market
-              value{' '}
-              {num(payload.market_snapshot_reference.total_market_value_aed)} AED
+            <Text style={styles.sectionTitle}>Market context</Text>
+            <Text style={[styles.small, { marginBottom: 4 }]}>
+              Size of the addressable construction market visible to AGSI this
+              period — not AGSI revenue, pipeline value, or anything we&apos;ll
+              book. For sizing our share of voice.
             </Text>
-            <Text style={[styles.small, { marginTop: 3 }]}>
+            <Text style={styles.statLabel}>
+              MARKET — TOTAL PROJECT VALUE TRACKED
+            </Text>
+            <Text style={styles.statValue}>
+              AED {num(payload.market_snapshot_reference.total_market_value_aed)}
+            </Text>
+            <Text style={styles.statHint}>
+              from BNC upload dated{' '}
+              {payload.market_snapshot_reference.source_upload_date}
+            </Text>
+            <Text style={[styles.small, { marginTop: 6 }]}>
               {Object.entries(
                 payload.market_snapshot_reference.projects_by_stage ?? {},
               )

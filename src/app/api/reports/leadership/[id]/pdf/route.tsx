@@ -98,6 +98,18 @@ export async function GET(
 
   const feedbackByName = pickName(report.feedback_by);
 
+  // Previous finalised report of the same scope — used to render
+  // ↑/↓ deltas on the relationship-progress headlines.
+  const { data: previous } = await supabase
+    .from('leadership_reports')
+    .select('payload_json')
+    .eq('report_type', report.report_type)
+    .lt('period_end', report.period_start)
+    .in('status', ['finalised', 'archived'])
+    .order('period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle<{ payload_json: LeadershipReportPayload }>();
+
   const buffer = await renderToBuffer(
     <LeadershipReportPdf
       report={{
@@ -116,6 +128,7 @@ export async function GET(
         feedback_by_name: feedbackByName,
       }}
       payload={report.payload_json}
+      previousPayload={previous?.payload_json ?? null}
     />,
   );
 
