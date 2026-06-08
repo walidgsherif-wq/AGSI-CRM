@@ -3,6 +3,7 @@
 import { useDeferredValue, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { Avatar } from '@/components/ui/avatar';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { LevelChangeDialog, adjacentTargets } from '@/components/domain/LevelChangeDialog';
 import { LEVELS, type Level, type Role } from '@/types/domain';
@@ -260,14 +261,16 @@ export function PipelineKanban({
                             >
                               {engagementBadgeLabel(c)}
                             </span>
+                            <Avatar
+                              name={c.owner_full_name}
+                              size="xs"
+                              title={`Owner: ${c.owner_full_name ?? 'Unassigned'}`}
+                            />
                           </div>
                         </div>
                         <p className="mt-1 text-xs text-agsi-darkGray">
                           {COMPANY_TYPE_LABEL[c.company_type]}
                           {c.city && ` · ${c.city}`}
-                        </p>
-                        <p className="mt-1 text-xs text-agsi-darkGray">
-                          Owner: {c.owner_full_name ?? 'Unassigned'}
                         </p>
                         {c.pending_count > 0 && (
                           <Badge variant="amber" className="mt-2">
