@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
@@ -83,11 +83,37 @@ export function PipelineKanban({
   // default and bloats render. Hide it unless the user opts in via the
   // toggle below. Simple local state — no broader filter system yet.
   const [showL0, setShowL0] = useState(false);
+  // Live company-name search. Composes AND with the (server-side)
+  // stakeholder-type filter, normalises whitespace + case, and reveals
+  // L0 cards as soon as the query matches one — even though L0 is
+  // hidden by default — otherwise the not-yet-engaged backlog is
+  // unsearchable. useDeferredValue keeps typing snappy on a large card
+  // set without an explicit debounce.
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredQuery = useDeferredValue(searchQuery);
+  const normalizedQuery = deferredQuery.trim().toLowerCase().replace(/\s+/g, ' ');
+  const searchActive = normalizedQuery.length > 0;
+
+  // L0 count from the unfiltered card set — the toggle label always
+  // reflects the full backlog, not the in-search hit count.
+  const totalL0Count = cards.reduce(
+    (n, c) => n + (c.current_level === 'L0' ? 1 : 0),
+    0,
+  );
+
+  const visibleCards = searchActive
+    ? cards.filter((c) =>
+        c.canonical_name.toLowerCase().replace(/\s+/g, ' ').includes(normalizedQuery),
+      )
+    : cards;
 
   const grouped: Record<Level, CardData[]> = { L0: [], L1: [], L2: [], L3: [], L4: [], L5: [] };
-  for (const c of cards) grouped[c.current_level].push(c);
-  const l0Count = grouped.L0.length;
-  const visibleLevels = showL0 ? LEVELS : LEVELS.filter((l) => l !== 'L0');
+  for (const c of visibleCards) grouped[c.current_level].push(c);
+
+  // Reveal L0 if the user opted in OR a search is active with L0 hits.
+  // Clearing the search reverts to the toggle state.
+  const showL0Effective = showL0 || (searchActive && grouped.L0.length > 0);
+  const visibleLevels = showL0Effective ? LEVELS : LEVELS.filter((l) => l !== 'L0');
 
   function canChange(card: CardData) {
     return userRole === 'admin' || card.owner_id === userId;
@@ -124,7 +150,15 @@ export function PipelineKanban({
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search companies…"
+          aria-label="Search companies by name"
+          className="w-64 rounded border border-agsi-midGray bg-white px-3 py-1 text-xs text-agsi-navy placeholder:text-agsi-darkGray focus:border-agsi-navy focus:outline-none"
+        />
         <button
           type="button"
           onClick={() => setShowL0((v) => !v)}
@@ -135,13 +169,13 @@ export function PipelineKanban({
               : 'rounded border border-agsi-midGray px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
           }
         >
-          {showL0 ? 'Hide' : 'Show'} not-yet-engaged · L0 · {l0Count.toLocaleString()}
+          {showL0 ? 'Hide' : 'Show'} not-yet-engaged · L0 · {totalL0Count.toLocaleString()}
         </button>
       </div>
       <div
         className={cn(
           'grid gap-3 sm:grid-cols-2 lg:grid-cols-3',
-          showL0 ? 'xl:grid-cols-6' : 'xl:grid-cols-5',
+          showL0Effective ? 'xl:grid-cols-6' : 'xl:grid-cols-5',
         )}
       >
         {visibleLevels.map((level) => {
