@@ -79,9 +79,15 @@ export function PipelineKanban({
 }) {
   const [dragging, setDragging] = useState<{ cardId: string; from: Level } | null>(null);
   const [forced, setForced] = useState<{ card: CardData; toLevel: Level } | null>(null);
+  // L0 (~thousands of "not yet engaged" companies) buries L1–L5 by
+  // default and bloats render. Hide it unless the user opts in via the
+  // toggle below. Simple local state — no broader filter system yet.
+  const [showL0, setShowL0] = useState(false);
 
   const grouped: Record<Level, CardData[]> = { L0: [], L1: [], L2: [], L3: [], L4: [], L5: [] };
   for (const c of cards) grouped[c.current_level].push(c);
+  const l0Count = grouped.L0.length;
+  const visibleLevels = showL0 ? LEVELS : LEVELS.filter((l) => l !== 'L0');
 
   function canChange(card: CardData) {
     return userRole === 'admin' || card.owner_id === userId;
@@ -118,8 +124,27 @@ export function PipelineKanban({
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {LEVELS.map((level) => {
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowL0((v) => !v)}
+          aria-pressed={showL0}
+          className={
+            showL0
+              ? 'rounded border border-agsi-navy bg-agsi-navy px-3 py-1 text-xs font-medium text-white'
+              : 'rounded border border-agsi-midGray px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
+          }
+        >
+          {showL0 ? 'Hide' : 'Show'} not-yet-engaged · L0 · {l0Count.toLocaleString()}
+        </button>
+      </div>
+      <div
+        className={cn(
+          'grid gap-3 sm:grid-cols-2 lg:grid-cols-3',
+          showL0 ? 'xl:grid-cols-6' : 'xl:grid-cols-5',
+        )}
+      >
+        {visibleLevels.map((level) => {
           const colCards = grouped[level];
           const isAdjacentTarget = dragging ? isAdjacent(dragging.from, level) : false;
           const isSourceCol = dragging?.from === level;
