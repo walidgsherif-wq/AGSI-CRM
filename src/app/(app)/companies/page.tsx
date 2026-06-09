@@ -85,6 +85,7 @@ export default async function CompaniesPage({
     mou?: string;
     sort?: string;
     dir?: string;
+    show_all?: string;
   };
 }) {
   const user = await getCurrentUser();
@@ -113,6 +114,13 @@ export default async function CompaniesPage({
       : null;
   const regionFilter = (searchParams.region ?? '').trim();
   const mouOnly = searchParams.mou === '1';
+  // Currently-active-only default — list defaults to companies whose
+  // has_active_projects is true (the FX-015b sweep makes this truthful
+  // at file granularity). Tick the "Show all" box to include
+  // historicals. Unchecked submit produces no `show_all` param, which
+  // is the same as the default load — so the toggle stays consistent
+  // across direct URL, refresh, and form submission.
+  const showAll = searchParams.show_all === '1';
   const qFilter = (searchParams.q ?? '').trim();
 
   // Fetch profiles for the owner dropdown.
@@ -173,6 +181,7 @@ export default async function CompaniesPage({
         .in('id', chunk);
       if (typeFilter) q = q.eq('company_type', typeFilter);
       if (regionFilter) q = q.ilike('city', `%${regionFilter}%`);
+      if (!showAll) q = q.eq('has_active_projects', true);
       return q.returns<CompanyAttrs[]>();
     }),
   );
@@ -194,7 +203,7 @@ export default async function CompaniesPage({
           <h1 className="text-2xl font-semibold text-agsi-navy">Companies</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
             Canonical stakeholder master. Showing {rows.length} of {stats.length} matching
-            company_stats. Sort and filter at top.
+            company_stats. {showAll ? 'Showing all (incl. companies with no current projects).' : 'Currently-active companies only — tick "Show all" to include historicals.'} Sort and filter at top.
           </p>
         </div>
         {canCreate && (
@@ -299,6 +308,21 @@ export default async function CompaniesPage({
                   className="h-4 w-4 rounded border-agsi-midGray"
                 />
                 Has MOU (L4+)
+              </label>
+            </div>
+            <div className="flex items-end">
+              <label
+                className="flex items-center gap-2 text-sm text-agsi-navy"
+                title="Off by default — only companies with at least one project in the most recent BNC upload are shown."
+              >
+                <input
+                  type="checkbox"
+                  name="show_all"
+                  value="1"
+                  defaultChecked={showAll}
+                  className="h-4 w-4 rounded border-agsi-midGray"
+                />
+                Show all (incl. no current projects)
               </label>
             </div>
             <div>
