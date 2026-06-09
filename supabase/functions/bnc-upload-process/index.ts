@@ -292,6 +292,7 @@ async function processBncRows(
   uploadId: string,
   fileDate: string | null,
   rows: RawRow[],
+  invokerId: string,
 ): Promise<ProcessSummary> {
   const startedAt = Date.now();
   const summary: ProcessSummary = {
@@ -661,6 +662,114 @@ async function processBncRows(
   }
   summary.warnings.push(`phase5 flush in ${((Date.now() - phase5Started) / 1000).toFixed(1)}s`);
 
+  // ===================================================================
+  // Phase 6 (FX-015b) — category-scoped staleness sweep.
+  //
+  // Companies that fall into categories THIS upload covered, but did
+  // NOT appear in the file (and aren't queued for human review as
+  // potential typo matches), have has_active_projects flipped to
+  // false. Categories not covered by the file are untouched.
+  //
+  // Typo guard (FX-015b "lightest"): protect
+  //   (a) seenCompanyIds — directly matched + newly inserted, and
+  //   (b) suggested_company_id of match-queue rows CREATED IN THIS
+  //       UPLOAD — those might be the right company under a near-
+  //       miss spelling pending admin merge.
+  //
+  // Audit: per-row INSERT into audit_events so /admin/audit can later
+  // explain why a specific company shows no active projects.
+  //
+  // Sanity stop: if zero project rows were processed (empty file /
+  // mangled parse), skip the sweep entirely so a bad upload can't
+  // mass-deflate the dataset.
+  const phase6Started = Date.now();
+  const rowsProcessed = projectsToInsert.length + projectsToUpdate.length;
+  if (rowsProcessed > 0 && seenCompanyIds.size > 0) {
+    const protectedIds = new Set<string>(seenCompanyIds);
+    for (const q of matchQueueEntries) {
+      if (q.suggested_company_id) protectedIds.add(q.suggested_company_id);
+    }
+
+    // Discover the categories present in this upload from the seen
+    // companies' company_type column. Authoritative even after the
+    // INSERT/UPDATE flush.
+    const seenIds = Array.from(seenCompanyIds);
+    const categoriesPresent = new Set<string>();
+    for (let i = 0; i < seenIds.length; i += 200) {
+      const slice = seenIds.slice(i, i + 200);
+      const { data: types } = await supabase
+        .from('companies')
+        .select('company_type')
+        .in('id', slice);
+      for (const r of (types ?? []) as Array<{ company_type: string }>) {
+        categoriesPresent.add(r.company_type);
+      }
+    }
+
+    if (categoriesPresent.size > 0) {
+      const { data: candidates } = await supabase
+        .from('companies')
+        .select('id, canonical_name, company_type')
+        .in('company_type', Array.from(categoriesPresent))
+        .eq('has_active_projects', true);
+      const toFlip = (
+        (candidates ?? []) as Array<{
+          id: string;
+          canonical_name: string;
+          company_type: string;
+        }>
+      ).filter((c) => !protectedIds.has(c.id));
+
+      if (toFlip.length > 0) {
+        const flipIds = toFlip.map((c) => c.id);
+        for (let i = 0; i < flipIds.length; i += 200) {
+          const slice = flipIds.slice(i, i + 200);
+          const { error } = await supabase
+            .from('companies')
+            .update({ has_active_projects: false })
+            .in('id', slice);
+          if (error) summary.warnings.push(`phase6 flip: ${error.message}`);
+        }
+
+        const categoriesArr = Array.from(categoriesPresent);
+        const auditRows = toFlip.map((c) => ({
+          actor_id: invokerId,
+          event_type: 'company_active_projects_cleared',
+          entity_type: 'companies',
+          entity_id: c.id,
+          before_json: {
+            has_active_projects: true,
+            company_type: c.company_type,
+            canonical_name: c.canonical_name,
+          },
+          after_json: {
+            has_active_projects: false,
+            reason: 'absent from BNC upload',
+            bnc_upload_id: uploadId,
+            categories_in_upload: categoriesArr,
+          },
+        }));
+        for (let i = 0; i < auditRows.length; i += 1000) {
+          const slice = auditRows.slice(i, i + 1000);
+          const { error } = await supabase.from('audit_events').insert(slice);
+          if (error) summary.warnings.push(`phase6 audit: ${error.message}`);
+        }
+
+        summary.warnings.push(
+          `phase6 cleared has_active_projects on ${toFlip.length} ${categoriesArr.join('/')} compan${toFlip.length === 1 ? 'y' : 'ies'} absent from this upload in ${((Date.now() - phase6Started) / 1000).toFixed(1)}s`,
+        );
+      } else {
+        summary.warnings.push(
+          `phase6 swept ${Array.from(categoriesPresent).join('/')}, no flips needed`,
+        );
+      }
+    }
+  } else {
+    summary.warnings.push(
+      `phase6 skipped (rows=${rowsProcessed}, seen=${seenCompanyIds.size}) — sanity stop on empty/broken upload`,
+    );
+  }
+
   summary.warnings.unshift(`processed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
   return summary;
 }
@@ -770,7 +879,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // Process
   try {
-    const summary = await processBncRows(admin, uploadId, fileDate, rows);
+    const summary = await processBncRows(admin, uploadId, fileDate, rows, user.id);
 
     await admin.from('bnc_uploads').update({
       status: 'completed',
