@@ -96,6 +96,14 @@ export default async function GlobalTasksPage({
             </Link>
           ))}
         </div>
+        {(user.role === 'admin' || user.role === 'bd_head') && (
+          <Link
+            href={'/tasks/oversight' as never}
+            className="ml-auto rounded border border-agsi-midGray bg-white px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40"
+          >
+            Team oversight →
+          </Link>
+        )}
       </div>
 
       {canCreate && (
