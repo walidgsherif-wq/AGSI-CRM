@@ -109,6 +109,7 @@ export default async function GlobalTasksPage({
       )}
 
       <TaskKanban
+        currentUserId={user.id}
         cards={tasks.map((t) => ({
           id: t.id,
           title: t.title,
@@ -116,7 +117,9 @@ export default async function GlobalTasksPage({
           due_date: t.due_date,
           company_id: t.company?.id ?? null,
           company_name: t.company?.canonical_name ?? null,
+          owner_id: t.owner_id,
           owner_full_name: t.owner?.full_name ?? null,
+          assigned_by_id: t.assigned_by_id,
           assigned_by_name: t.assigned_by?.full_name ?? null,
           has_reminders: (t.reminders ?? []).length > 0,
         }))}

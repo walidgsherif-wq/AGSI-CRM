@@ -27,8 +27,10 @@ export type TaskKanbanCard = {
   due_date: string | null;
   company_id: string | null;
   company_name: string | null;
+  owner_id: string;
   owner_full_name: string | null;
   has_reminders: boolean;
+  assigned_by_id: string | null;
   assigned_by_name: string | null;
 };
 
@@ -40,10 +42,43 @@ const COLUMNS: ReadonlyArray<{ key: BoardStatus; label: string; tone: string }> 
   { key: 'done',        label: 'Done',        tone: 'border-rag-green/40' },
 ];
 
-export function TaskKanban({ cards }: { cards: TaskKanbanCard[] }) {
+type ProvenanceFilter = 'all' | 'assigned_to_me' | 'created_by_me';
+
+const FILTER_OPTIONS: ReadonlyArray<{ key: ProvenanceFilter; label: string }> = [
+  { key: 'all',            label: 'All' },
+  { key: 'assigned_to_me', label: 'Assigned to me by others' },
+  { key: 'created_by_me',  label: 'Created by me' },
+];
+
+export function TaskKanban({
+  cards,
+  currentUserId,
+}: {
+  cards: TaskKanbanCard[];
+  currentUserId: string;
+}) {
   const router = useRouter();
   const [dragging, setDragging] = useState<{ cardId: string; from: BoardStatus } | null>(null);
+  const [filter, setFilter] = useState<ProvenanceFilter>('all');
   const [, startTransition] = useTransition();
+
+  // Provenance filter: who originated each task.
+  //   assigned_to_me → I'm the owner AND someone else delegated to me
+  //                   (FX-014b only stamps assigned_by_id when assigner
+  //                    ≠ owner, so this is sufficient).
+  //   created_by_me  → I'm the originator: either I own it and nobody
+  //                   delegated, or I'm the one who delegated it.
+  function passesFilter(c: TaskKanbanCard): boolean {
+    if (filter === 'all') return true;
+    if (filter === 'assigned_to_me') {
+      return c.owner_id === currentUserId && c.assigned_by_id !== null;
+    }
+    // created_by_me
+    return (
+      (c.assigned_by_id === null && c.owner_id === currentUserId) ||
+      c.assigned_by_id === currentUserId
+    );
+  }
 
   // Pre-group by status. Cards with status 'cancelled' are not bucketed
   // into any column and simply don't render — drag from cancelled into
@@ -51,6 +86,7 @@ export function TaskKanban({ cards }: { cards: TaskKanbanCard[] }) {
   const grouped: Record<BoardStatus, TaskKanbanCard[]> = { open: [], in_progress: [], done: [] };
   for (const c of cards) {
     if (c.status === 'cancelled') continue;
+    if (!passesFilter(c)) continue;
     grouped[c.status].push(c);
   }
 
@@ -71,6 +107,25 @@ export function TaskKanban({ cards }: { cards: TaskKanbanCard[] }) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
+    <div className="space-y-3">
+    <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Provenance filter">
+      {FILTER_OPTIONS.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          role="radio"
+          aria-checked={filter === o.key}
+          onClick={() => setFilter(o.key)}
+          className={
+            filter === o.key
+              ? 'rounded border border-agsi-navy bg-agsi-navy px-3 py-1 text-xs font-medium text-white'
+              : 'rounded border border-agsi-midGray px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
+          }
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {COLUMNS.map((col) => {
         const colCards = grouped[col.key];
@@ -124,6 +179,7 @@ export function TaskKanban({ cards }: { cards: TaskKanbanCard[] }) {
         );
       })}
     </div>
+    </div>
   );
 }
 
@@ -174,11 +230,28 @@ function TaskCard({
         ) : (
           <p className="text-sm font-medium text-agsi-navy">{card.title}</p>
         )}
-        <Avatar
-          name={card.owner_full_name}
-          size="xs"
-          title={`Owner: ${card.owner_full_name ?? 'Unassigned'}`}
-        />
+        {/* Delegation marker: when assigned_by is set, show the
+            assigner avatar to the LEFT of the owner avatar with a
+            small arrow — reads as "<assigner> delegated to <owner>". */}
+        <div className="flex shrink-0 items-center gap-1">
+          {card.assigned_by_name && (
+            <>
+              <Avatar
+                name={card.assigned_by_name}
+                size="xs"
+                title={`Delegated by ${card.assigned_by_name}`}
+              />
+              <span className="text-[10px] text-agsi-darkGray" aria-hidden>
+                →
+              </span>
+            </>
+          )}
+          <Avatar
+            name={card.owner_full_name}
+            size="xs"
+            title={`Owner: ${card.owner_full_name ?? 'Unassigned'}`}
+          />
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -215,11 +288,6 @@ function TaskCard({
         )}
       </div>
 
-      {card.assigned_by_name && (
-        <p className="mt-1 text-[11px] italic text-agsi-midGray">
-          assigned by {card.assigned_by_name}
-        </p>
-      )}
     </div>
   );
 }
