@@ -256,18 +256,21 @@ export default async function InsightsPage({
           rows={p.top_developer}
           compareRows={c?.top_developer}
           countKey="project_count"
+          listHref="/companies?type=developer&sort=count&dir=desc"
         />
         <TopCompaniesCard
           title="Top 20 main contractors"
           rows={p.top_main_contractor}
           compareRows={c?.top_main_contractor}
           countKey="active_project_count"
+          listHref="/companies?type=main_contractor&sort=count&dir=desc"
         />
         <TopCompaniesCard
           title="Top 20 consultants"
           rows={p.top_consultant}
           compareRows={c?.top_consultant}
           countKey="active_project_count"
+          listHref="/companies?type=design_consultant&sort=count&dir=desc"
         />
       </div>
 
@@ -522,11 +525,16 @@ function TopCompaniesCard({
   rows,
   compareRows,
   countKey,
+  listHref,
 }: {
   title: string;
   rows?: Row[];
   compareRows?: Row[];
   countKey: 'project_count' | 'active_project_count';
+  /** Pre-filtered Companies-list URL (FX-024b reads ?type/&sort/&dir
+   *  from searchParams). Renders a small "View all →" link in the
+   *  card header that explains the ranking just clicked. */
+  listHref?: string;
 }) {
   const compareLookup = new Map<string, number>();
   for (const r of compareRows ?? []) {
@@ -552,8 +560,20 @@ function TopCompaniesCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>By project count and total value.</CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>By project count and total value.</CardDescription>
+          </div>
+          {listHref && (
+            <Link
+              href={listHref as never}
+              className="shrink-0 rounded border border-agsi-midGray bg-white px-2 py-1 text-[11px] font-medium text-agsi-navy hover:bg-agsi-lightGray/40"
+            >
+              View all →
+            </Link>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {sorted.length === 0 ? (
