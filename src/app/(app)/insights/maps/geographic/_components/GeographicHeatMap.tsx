@@ -79,6 +79,7 @@ const TYPE_COLOR: Record<CompanyType, string> = {
   mep_consultant: '#D4AF37',
   mep_contractor: '#1F3C6E',
   authority: '#4A5568',
+  society: '#9CAF44',
   other: '#C5CDD8',
 };
 

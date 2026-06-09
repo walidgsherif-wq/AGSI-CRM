@@ -7,6 +7,7 @@ const COMPANY_TYPES = [
   'mep_consultant',
   'mep_contractor',
   'authority',
+  'society',
   'other',
 ] as const;
 
@@ -69,5 +70,6 @@ export const COMPANY_TYPE_LABEL: Record<(typeof COMPANY_TYPES)[number], string> 
   mep_consultant: 'MEP Consultant',
   mep_contractor: 'MEP Contractor',
   authority: 'Authority',
+  society: 'Societies / professional bodies',
   other: 'Other',
 };
