@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { PipelineKanban, type CardData } from './_components/PipelineKanban';
+import { OwnerFilter } from './_components/OwnerFilter';
+import { fetchOwnerOptions } from '@/lib/auth/owner-options';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +66,15 @@ export default async function PipelinePage({
     { cookies: serverComponentCookies(cookies()) },
   );
 
+  // Owner filter is only rendered for roles that can SEE multiple
+  // owners. bd_manager's RLS already constrains their pipeline to
+  // companies they own, so the filter would be a no-op for them and
+  // we hide it. leadership is included because they may receive
+  // pipeline feature access via the per-user override (PR #26).
+  const canFilterByOwner =
+    user.role === 'admin' || user.role === 'bd_head' || user.role === 'leadership';
+  const ownerOptions = canFilterByOwner ? await fetchOwnerOptions(supabase) : [];
+
   // Paginated fetch: a single .limit(2000) silently truncated the
   // alphabetic tail under the "All" filter, hiding whole levels
   // (notably L5 — rare partnerships that happened to land past the
@@ -86,7 +97,11 @@ export default async function PipelinePage({
       .order('canonical_name', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
     if (searchParams.type) query = query.eq('company_type', searchParams.type);
-    if (searchParams.owner) query = query.eq('owner_id', searchParams.owner);
+    if (searchParams.owner === 'unassigned') {
+      query = query.is('owner_id', null);
+    } else if (searchParams.owner) {
+      query = query.eq('owner_id', searchParams.owner);
+    }
     const { data: batch, error: batchErr } = await query.returns<CardRow[]>();
     if (batchErr) {
       error = batchErr;
@@ -192,6 +207,11 @@ export default async function PipelinePage({
             {f.label}
           </Link>
         ))}
+        {canFilterByOwner && (
+          <div className="ml-auto">
+            <OwnerFilter current={searchParams.owner ?? ''} options={ownerOptions} />
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-agsi-lightGray bg-white px-3 py-2 text-xs text-agsi-darkGray">
