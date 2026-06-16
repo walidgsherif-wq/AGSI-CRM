@@ -14,10 +14,14 @@ export function InviteUserForm() {
     setMessage(null);
     startTransition(async () => {
       const result = await inviteUser(formData);
-      if (result.error) {
+      if ('error' in result && result.error) {
         setMessage({ kind: 'error', text: result.error });
+      } else if ('message' in result && result.message) {
+        // result.message tells the admin whether this was a fresh
+        // invite or a re-sent link for an existing user.
+        setMessage({ kind: 'ok', text: result.message });
       } else {
-        setMessage({ kind: 'ok', text: 'Invite sent. They will receive an email shortly.' });
+        setMessage({ kind: 'ok', text: 'Done.' });
       }
     });
   }
