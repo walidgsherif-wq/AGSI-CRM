@@ -188,3 +188,67 @@ export async function setUserActive(userId: string, isActive: boolean) {
   if (error) throw new Error(error.message);
   revalidatePath('/admin/users');
 }
+
+/**
+ * Permanently delete a user — auth.users + profiles in one shot.
+ *
+ * Use case: testing the invite/access flow. After verifying the
+ * trigger / invite path works, the admin may want to delete a test
+ * user and re-invite the same email instead of finding a fresh one.
+ *
+ * Cascades: profiles.id → auth.users.id ON DELETE CASCADE (the
+ * profile row disappears with the auth row). Every other reference
+ * (companies.owner_id, engagements.created_by, notes.author_id,
+ * documents.uploaded_by, tasks.owner_id / assigned_by_id, …) is
+ * ON DELETE SET NULL — those rows survive but their owner/author
+ * fields go null. We surface the orphan counts in the result so the
+ * admin sees what just happened.
+ *
+ * Guards:
+ *  - admin only (assertCallerIsAdmin)
+ *  - cannot delete self
+ */
+export async function deleteUser(userId: string) {
+  const callerId = await assertCallerIsAdmin();
+  if (userId === callerId) {
+    return { error: 'You cannot delete your own account.' };
+  }
+
+  const admin = adminClient();
+
+  // Count what's about to be orphaned. Service-role bypasses RLS, so
+  // the counts are accurate even if the caller couldn't see all rows.
+  const [companies, engagements, tasksOwned, notes, documents] = await Promise.all([
+    admin.from('companies').select('id', { count: 'exact', head: true }).eq('owner_id', userId),
+    admin.from('engagements').select('id', { count: 'exact', head: true }).eq('created_by', userId),
+    admin.from('tasks').select('id', { count: 'exact', head: true }).eq('owner_id', userId),
+    admin.from('notes').select('id', { count: 'exact', head: true }).eq('author_id', userId),
+    admin.from('documents').select('id', { count: 'exact', head: true }).eq('uploaded_by', userId),
+  ]);
+
+  // Fetch identity for the confirmation message before the row goes away.
+  const { data: target } = await admin
+    .from('profiles')
+    .select('email, full_name')
+    .eq('id', userId)
+    .maybeSingle<{ email: string; full_name: string }>();
+
+  const { error: delErr } = await admin.auth.admin.deleteUser(userId);
+  if (delErr) {
+    return { error: `Delete failed: ${delErr.message}` };
+  }
+
+  revalidatePath('/admin/users');
+  return {
+    ok: true,
+    deletedEmail: target?.email ?? null,
+    deletedName: target?.full_name ?? null,
+    orphaned: {
+      companies: companies.count ?? 0,
+      engagements: engagements.count ?? 0,
+      tasks: tasksOwned.count ?? 0,
+      notes: notes.count ?? 0,
+      documents: documents.count ?? 0,
+    },
+  };
+}
