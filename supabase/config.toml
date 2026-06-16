@@ -32,6 +32,23 @@ enable_signup = false
 double_confirm_changes = true
 enable_confirmations = false
 
+# ---- SMTP delivery via Resend ---------------------------------------
+# config.toml drives LOCAL Supabase only. The same settings must also
+# be set in the SUPABASE CLOUD DASHBOARD (Authentication → Emails →
+# SMTP Settings) for production deliveries. Apply doc:
+# supabase/APPLY-RESEND-SMTP.md walks through both.
+#
+# Resend uses a fixed username ('resend') with the API key as the
+# password. The sender email must be on a domain verified in Resend
+# (SPF + DKIM via DNS — apply doc covers this).
+[auth.email.smtp]
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "no-reply@agsi.ae"
+sender_name = "AGSI CRM"
+
 [storage]
 enabled = true
 file_size_limit = "50MiB"
