@@ -53,8 +53,9 @@ export default async function AdminUsersPage() {
         <CardHeader>
           <CardTitle>Invite a new user</CardTitle>
           <CardDescription>
-            They&apos;ll receive a magic-link email from Supabase. On first sign-in, a
-            profile row is created automatically at their selected role.
+            Provisions an account at the selected role. Tell the teammate to sign in at
+            /login with their Google account using this exact email — no invite email is
+            sent.
           </CardDescription>
         </CardHeader>
         <CardContent>

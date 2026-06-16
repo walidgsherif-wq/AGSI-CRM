@@ -9,8 +9,10 @@ test.describe('M3 auth', () => {
   test('/login renders the sign-in form', async ({ page }) => {
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await expect(page.getByLabel('Email address')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Send sign-in link' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Sign in with email link instead' }),
+    ).toBeVisible();
   });
 
   test('/login surfaces the ?error= query param', async ({ page }) => {
@@ -18,8 +20,9 @@ test.describe('M3 auth', () => {
     await expect(page.getByText('profile_missing')).toBeVisible();
   });
 
-  test('submit button stays disabled until an email is typed', async ({ page }) => {
+  test('magic-link fallback toggles open and gates submit on email', async ({ page }) => {
     await page.goto('/login');
+    await page.getByRole('button', { name: 'Sign in with email link instead' }).click();
     const button = page.getByRole('button', { name: 'Send sign-in link' });
     await expect(button).toBeDisabled();
     await page.getByLabel('Email address').fill('walid.g.sherif@gmail.com');

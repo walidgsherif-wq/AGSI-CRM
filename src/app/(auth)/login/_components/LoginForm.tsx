@@ -9,8 +9,34 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 export function LoginForm({ error, next }: { error?: string; next: string }) {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
+  const [googleSending, setGoogleSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+
+  async function onGoogle() {
+    setGoogleSending(true);
+    setLocalError(null);
+    const supabase = createSupabaseBrowserClient();
+    const origin = window.location.origin;
+    // Strangers with a Google account *can* OAuth — Supabase has no way
+    // to refuse the handshake without a pre-existing user row. The
+    // invite-only gate runs after: 0055 trigger does NOT create a
+    // profile for non-bootstrap inserts, and get-user.ts redirects
+    // sessions with no profile to /login?error=profile_missing.
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+    if (oauthError) {
+      setGoogleSending(false);
+      setLocalError(oauthError.message);
+    }
+    // On success the browser is already navigating to Google — no
+    // state to clear.
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,9 +57,6 @@ export function LoginForm({ error, next }: { error?: string; next: string }) {
     });
     setSending(false);
     if (otpError) {
-      // Map the known "user not registered" responses to a friendly,
-      // info-safe message. Other errors (rate limit, network, etc.)
-      // pass through so admins can debug.
       const m = (otpError.message ?? '').toLowerCase();
       const isUnknownUser =
         m.includes('signups not allowed') ||
@@ -83,38 +106,63 @@ export function LoginForm({ error, next }: { error?: string; next: string }) {
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
         <CardDescription>
-          Enter your AGSI email. We&apos;ll send you a one-click sign-in link.
+          Continue with your AGSI Google account. Access is invite-only.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-xs font-medium text-agsi-darkGray">
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@agsi.ae"
-              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm text-agsi-navy placeholder:text-agsi-midGray focus:border-agsi-accent focus:outline-none focus:ring-1 focus:ring-agsi-accent"
-            />
-          </div>
+        <Button
+          type="button"
+          onClick={onGoogle}
+          disabled={googleSending}
+          variant="outline"
+          className="w-full"
+        >
+          {googleSending ? 'Redirecting…' : 'Continue with Google'}
+        </Button>
 
-          {(error || localError) && (
-            <p className="text-xs text-rag-red">
-              {localError ?? decodeURIComponent(error ?? '')}
-            </p>
+        {(error || localError) && (
+          <p className="mt-3 text-xs text-rag-red">
+            {localError ?? decodeURIComponent(error ?? '')}
+          </p>
+        )}
+
+        <div className="mt-6 border-t border-agsi-lightGray pt-4">
+          {!showMagicLink ? (
+            <button
+              type="button"
+              onClick={() => setShowMagicLink(true)}
+              className="text-xs font-medium text-agsi-accent hover:underline"
+            >
+              Sign in with email link instead
+            </button>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-xs font-medium text-agsi-darkGray"
+                >
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@agsi.ae"
+                  className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm text-agsi-navy placeholder:text-agsi-midGray focus:border-agsi-accent focus:outline-none focus:ring-1 focus:ring-agsi-accent"
+                />
+              </div>
+
+              <Button type="submit" disabled={sending || !email} className="w-full">
+                {sending ? 'Sending…' : 'Send sign-in link'}
+              </Button>
+            </form>
           )}
-
-          <Button type="submit" disabled={sending || !email} className="w-full">
-            {sending ? 'Sending…' : 'Send sign-in link'}
-          </Button>
-        </form>
+        </div>
 
         <p className="mt-4 text-xs text-agsi-darkGray">
           Don&apos;t have an AGSI account? Contact your administrator — access is invite-only.
