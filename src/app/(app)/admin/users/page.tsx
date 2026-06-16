@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { requireRole } from '@/lib/auth/require-role';
+import { getCurrentUser } from '@/lib/auth/get-user';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,7 @@ type ProfileRow = {
 
 export default async function AdminUsersPage() {
   await requireRole(['admin']);
+  const caller = await getCurrentUser();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -123,6 +125,9 @@ export default async function AdminUsersPage() {
                           userId={u.id}
                           currentRole={u.role}
                           isActive={u.is_active}
+                          canDelete={u.id !== caller.id}
+                          email={u.email}
+                          fullName={u.full_name}
                         />
                       </div>
                     </td>
