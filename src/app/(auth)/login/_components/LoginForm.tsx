@@ -22,12 +22,28 @@ export function LoginForm({ error, next }: { error?: string; next: string }) {
       email,
       options: {
         emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        shouldCreateUser: true,
+        // Invite-only: never create a new auth.users row from the
+        // login form. config.toml has enable_signup = false; this
+        // honours that at the client too. An uninvited email lands
+        // on the friendly message below.
+        shouldCreateUser: false,
       },
     });
     setSending(false);
     if (otpError) {
-      setLocalError(otpError.message);
+      // Map the known "user not registered" responses to a friendly,
+      // info-safe message. Other errors (rate limit, network, etc.)
+      // pass through so admins can debug.
+      const m = (otpError.message ?? '').toLowerCase();
+      const isUnknownUser =
+        m.includes('signups not allowed') ||
+        m.includes('user not found') ||
+        m.includes('invalid login credentials');
+      setLocalError(
+        isUnknownUser
+          ? 'No AGSI account found for that email. Contact your administrator — access is invite-only.'
+          : otpError.message,
+      );
     } else {
       setSent(true);
     }
