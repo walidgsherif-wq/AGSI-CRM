@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { createCompany, updateCompany } from '@/server/actions/companies';
 
@@ -82,129 +85,100 @@ export function CompanyForm({
 
       <Section title="Identity">
         <Field label="Canonical name" required>
-          <input
+          <Input
             name="canonical_name"
             defaultValue={data.canonical_name}
             required
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Company type" required>
-          <select
-            name="company_type"
-            defaultValue={data.company_type}
-            disabled={ro}
-            className={inputClass(ro)}
-          >
+          <Select name="company_type" defaultValue={data.company_type} disabled={ro}>
             {COMPANY_TYPES.map((t) => (
               <option key={t} value={t}>
                 {COMPANY_TYPE_LABEL[t]}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label="Country">
-          <input
+          <Input
             name="country"
             defaultValue={data.country ?? 'United Arab Emirates'}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="City">
-          <input
-            name="city"
-            defaultValue={data.city ?? ''}
-            readOnly={ro}
-            className={inputClass(ro)}
-          />
+          <Input name="city" defaultValue={data.city ?? ''} readOnly={ro} />
         </Field>
       </Section>
 
       <Section title="Contact">
         <Field label="Phone">
-          <input
-            name="phone"
-            type="tel"
-            defaultValue={data.phone ?? ''}
-            readOnly={ro}
-            className={inputClass(ro)}
-          />
+          <Input name="phone" type="tel" defaultValue={data.phone ?? ''} readOnly={ro} />
         </Field>
         <Field label="Email">
-          <input
+          <Input
             name="email"
             type="email"
             defaultValue={data.email ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Website" full>
-          <input
+          <Input
             name="website"
             type="url"
             defaultValue={data.website ?? ''}
             placeholder="https://"
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
       </Section>
 
       <Section title="Key contact">
         <Field label="Name">
-          <input
+          <Input
             name="key_contact_name"
             defaultValue={data.key_contact_name ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Role">
-          <input
+          <Input
             name="key_contact_role"
             defaultValue={data.key_contact_role ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Email">
-          <input
+          <Input
             name="key_contact_email"
             type="email"
             defaultValue={data.key_contact_email ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Phone">
-          <input
+          <Input
             name="key_contact_phone"
             type="tel"
             defaultValue={data.key_contact_phone ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
       </Section>
 
       <Section title="Ownership & flags">
         <Field label="Owner (BDM)">
-          <select
-            name="owner_id"
-            defaultValue={data.owner_id ?? ''}
-            disabled={ro}
-            className={inputClass(ro)}
-          >
+          <Select name="owner_id" defaultValue={data.owner_id ?? ''} disabled={ro}>
             <option value="">— Unassigned —</option>
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.full_name} ({p.role})
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label="Key stakeholder">
           <label className="mt-2 inline-flex items-center gap-2 text-sm text-agsi-navy">
@@ -222,12 +196,11 @@ export function CompanyForm({
 
       <Section title="Internal notes">
         <Field label="Notes" full>
-          <textarea
+          <Textarea
             name="notes_internal"
             defaultValue={data.notes_internal ?? ''}
             rows={4}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
       </Section>
@@ -281,14 +254,4 @@ function Field({
       <div className="mt-1">{children}</div>
     </div>
   );
-}
-
-function inputClass(readOnly: boolean) {
-  return [
-    'w-full rounded-lg border bg-white px-3 py-2 text-sm text-agsi-navy',
-    'border-agsi-midGray placeholder:text-agsi-midGray',
-    readOnly
-      ? 'cursor-not-allowed bg-agsi-lightGray/40 text-agsi-darkGray'
-      : 'focus:border-agsi-accent focus:outline-none focus:ring-1 focus:ring-agsi-accent',
-  ].join(' ');
 }
