@@ -45,12 +45,14 @@ function LegendChip({
   );
 }
 
-/** Stakeholder-type filter buckets. Each maps to one company_type enum. */
+/** Stakeholder-type filter buckets. Labels sourced from
+ * COMPANY_TYPE_LABEL so the chip text can never drift from the
+ * canonical name shown elsewhere (companies list, dashboard, reports). */
 const STAKEHOLDER_FILTERS = [
-  { key: 'developer', label: 'Owner' },
-  { key: 'design_consultant', label: 'Design Consultant' },
-  { key: 'main_contractor', label: 'Contractor' },
-  { key: 'authority', label: 'Authority' },
+  { key: 'developer', label: COMPANY_TYPE_LABEL.developer },
+  { key: 'design_consultant', label: COMPANY_TYPE_LABEL.design_consultant },
+  { key: 'main_contractor', label: COMPANY_TYPE_LABEL.main_contractor },
+  { key: 'authority', label: COMPANY_TYPE_LABEL.authority },
 ] as const;
 
 export default async function PipelinePage({
