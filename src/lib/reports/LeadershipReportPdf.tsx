@@ -536,6 +536,12 @@ export function LeadershipReportPdf({ report, payload, previousPayload }: Props)
           <Text style={styles.sectionTitle}>
             Pipeline movements (
             {payload.pipeline_movements?.forward_moves?.length ?? 0} forward
+            {(() => {
+              const fwd = payload.pipeline_movements?.forward_moves ?? [];
+              const credited = fwd.filter((m) => m.is_credited).length;
+              const uncredited = fwd.length - credited;
+              return ` — ${credited} credited${uncredited > 0 ? `, ${uncredited} uncredited` : ''}`;
+            })()}
             {payload.pipeline_movements?.regressions?.length
               ? `, ${payload.pipeline_movements.regressions.length} regressions`
               : ''}
@@ -548,6 +554,7 @@ export function LeadershipReportPdf({ report, payload, previousPayload }: Props)
                 {m.company_name}: {m.from_level} → {m.to_level} ·{' '}
                 {m.date.slice(0, 10)}
                 {m.owner_name ? ` · ${m.owner_name}` : ''}
+                {m.is_credited ? '' : ' · (uncredited)'}
               </Text>
             ))}
           {(payload.pipeline_movements?.forward_moves?.length ?? 0) > 30 && (

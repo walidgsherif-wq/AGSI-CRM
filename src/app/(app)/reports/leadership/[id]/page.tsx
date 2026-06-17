@@ -475,13 +475,18 @@ function EcosystemSection({ payload }: { payload: LeadershipReportPayload }) {
 function PipelineSection({ payload }: { payload: LeadershipReportPayload }) {
   const fwd = payload.pipeline_movements?.forward_moves ?? [];
   const reg = payload.pipeline_movements?.regressions ?? [];
+  const credited = fwd.filter((m) => m.is_credited).length;
+  const uncredited = fwd.length - credited;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Pipeline movements</CardTitle>
         <CardDescription>
-          {fwd.length} forward-credited level changes
-          {reg.length > 0 && `, ${reg.length} regressions`} during the period.
+          {fwd.length} forward moves ({credited} credited
+          {uncredited > 0 ? `, ${uncredited} uncredited` : ''})
+          {reg.length > 0 && `, ${reg.length} regressions`} during the period. Headline
+          counts above (new L3 / L4 / L5) include credited moves only — the full list
+          here also shows uncredited rows for the audit trail.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -504,6 +509,11 @@ function PipelineSection({ payload }: { payload: LeadershipReportPayload }) {
                   {new Date(m.date).toISOString().slice(0, 10)}
                 </span>
                 {m.owner_name && <span className="text-agsi-darkGray">· {m.owner_name}</span>}
+                {!m.is_credited && (
+                  <Badge variant="neutral" className="text-[10px]">
+                    uncredited
+                  </Badge>
+                )}
               </li>
             ))}
             {fwd.length > 30 && (
