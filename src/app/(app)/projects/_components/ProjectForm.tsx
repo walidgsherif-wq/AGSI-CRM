@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   PROJECT_STAGES,
   PROJECT_STAGE_LABEL,
@@ -78,109 +81,78 @@ export function ProjectForm({
 
       <Section title="Identity">
         <Field label="Project name" required full>
-          <input
-            name="name"
-            defaultValue={data.name}
-            required
-            readOnly={ro}
-            className={inputClass(ro)}
-          />
+          <Input name="name" defaultValue={data.name} required readOnly={ro} />
         </Field>
         <Field label="Type">
-          <input
+          <Input
             name="project_type"
             defaultValue={data.project_type ?? ''}
             placeholder="Retail, Mixed-use, …"
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Stage" required>
-          <select
-            name="stage"
-            defaultValue={data.stage}
-            disabled={ro}
-            className={inputClass(ro)}
-          >
+          <Select name="stage" defaultValue={data.stage} disabled={ro}>
             {PROJECT_STAGES.map((s) => (
               <option key={s} value={s}>
                 {PROJECT_STAGE_LABEL[s]}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       </Section>
 
       <Section title="Location">
         <Field label="City">
-          <input
-            name="city"
-            defaultValue={data.city ?? ''}
-            readOnly={ro}
-            className={inputClass(ro)}
-          />
+          <Input name="city" defaultValue={data.city ?? ''} readOnly={ro} />
         </Field>
         <Field label="Location detail">
-          <input
+          <Input
             name="location"
             defaultValue={data.location ?? ''}
             placeholder="Neighbourhood, plot, …"
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Sector">
-          <input
-            name="sector"
-            defaultValue={data.sector ?? ''}
-            readOnly={ro}
-            className={inputClass(ro)}
-          />
+          <Input name="sector" defaultValue={data.sector ?? ''} readOnly={ro} />
         </Field>
         <Field label="Industry">
-          <input
-            name="industry"
-            defaultValue={data.industry ?? ''}
-            readOnly={ro}
-            className={inputClass(ro)}
-          />
+          <Input name="industry" defaultValue={data.industry ?? ''} readOnly={ro} />
         </Field>
       </Section>
 
       <Section title="Value & timing">
         <Field label="Value (AED)">
-          <input
+          <Input
             name="value_aed"
             type="number"
             min={0}
             step="0.01"
             defaultValue={data.value_aed ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Value (USD)">
-          <input
+          <Input
             name="value_usd"
             type="number"
             min={0}
             step="0.01"
             defaultValue={data.value_usd ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Est. completion date">
-          <input
+          <Input
             name="estimated_completion_date"
             type="date"
             defaultValue={data.estimated_completion_date ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
         <Field label="Completion %">
-          <input
+          <Input
             name="completion_percentage"
             type="number"
             min={0}
@@ -188,18 +160,16 @@ export function ProjectForm({
             step="0.01"
             defaultValue={data.completion_percentage ?? ''}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
       </Section>
 
       <Section title="AGSI internal">
         <Field label="Priority">
-          <select
+          <Select
             name="agsi_priority"
             defaultValue={data.agsi_priority ?? ''}
             disabled={ro}
-            className={inputClass(ro)}
           >
             <option value="">— None —</option>
             {PROJECT_PRIORITIES.map((p) => (
@@ -207,15 +177,14 @@ export function ProjectForm({
                 {PROJECT_PRIORITY_LABEL[p]}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label="Internal notes" full>
-          <textarea
+          <Textarea
             name="agsi_internal_notes"
             defaultValue={data.agsi_internal_notes ?? ''}
             rows={4}
             readOnly={ro}
-            className={inputClass(ro)}
           />
         </Field>
       </Section>
@@ -269,14 +238,4 @@ function Field({
       <div className="mt-1">{children}</div>
     </div>
   );
-}
-
-function inputClass(readOnly: boolean) {
-  return [
-    'w-full rounded-lg border bg-white px-3 py-2 text-sm text-agsi-navy',
-    'border-agsi-midGray placeholder:text-agsi-midGray',
-    readOnly
-      ? 'cursor-not-allowed bg-agsi-lightGray/40 text-agsi-darkGray'
-      : 'focus:border-agsi-accent focus:outline-none focus:ring-1 focus:ring-agsi-accent',
-  ].join(' ');
 }
