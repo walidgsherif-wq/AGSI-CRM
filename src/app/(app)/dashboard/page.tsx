@@ -1,3 +1,4 @@
+import React from 'react';
 import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -8,6 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { ROLE_LABEL } from '@/types/domain';
 import { EcosystemPanel } from '@/components/domain/EcosystemPanel';
 import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
+import {
+  fetchFiscalStartMonth,
+  getFiscalContext,
+  quarterStatusLabel,
+  type QuarterInfo,
+} from '@/lib/fiscal';
 import { RebuildButton } from './_components/RebuildButton';
 
 export const dynamic = 'force-dynamic';
@@ -73,25 +80,21 @@ const TIER_LABEL: Record<string, string> = {
   stretch: 'Stretch',
 };
 
-function currentFY(): number {
-  return new Date().getUTCFullYear();
-}
-
-function currentQuarter(): number {
-  const m = new Date().getUTCMonth() + 1;
-  return Math.ceil(m / 3);
-}
-
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const fy = currentFY();
-  const fq = currentQuarter();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
     { cookies: serverComponentCookies(cookies()) },
   );
+
+  // Fiscal year/quarter respect app_settings.fiscal_year_start_month
+  // (mirrors SQL helpers in 0021_functions_triggers.sql:47-73). All
+  // four quarters are derived up-front so the table can render the
+  // explicit Q1..Q4 track with in-progress/completed markers.
+  const startMonth = await fetchFiscalStartMonth(supabase);
+  const { fy, fq, quarters } = getFiscalContext(startMonth, new Date());
 
   const showSelf = user.role !== 'leadership';
 
@@ -270,10 +273,10 @@ export default async function DashboardPage() {
             <CardHeader>
               <CardTitle>{DRIVER_LABEL[d]}</CardTitle>
               <CardDescription>
-                {showSelf ? 'Your actuals vs target' : 'Team rollup vs combined target'} — Q
-                {fq} this quarter & FY total. Counts events logged in the period (level
-                moves, engagements, documents) — not the current state of the pipeline.
-                Credit goes by who logged the action.
+                {showSelf ? 'Your actuals vs target' : 'Team rollup vs combined target'} —
+                FY{fy}, Q1–Q4 explicit. Counts events logged in the period (level moves,
+                engagements, documents) — not the current state of the pipeline. Credit
+                goes by who logged the action.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -282,52 +285,14 @@ export default async function DashboardPage() {
                   No playbook targets seeded for FY{fy} on Driver {d}.
                 </p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                      <th className="px-4 py-2 font-medium">Metric</th>
-                      <th className="px-4 py-2 font-medium tabular">Q{fq} actual</th>
-                      <th className="px-4 py-2 font-medium tabular">Q{fq} target</th>
-                      <th className="px-4 py-2 font-medium">Q{fq} status</th>
-                      <th className="px-4 py-2 font-medium tabular">FY actual</th>
-                      <th className="px-4 py-2 font-medium tabular">FY target</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grouped[d].map((m) => {
-                      const actualQ = actualFor(m.metric_code, fq);
-                      const targetQ = targetFor(m, fq);
-                      const actualFY = actualFor(m.metric_code);
-                      const targetFY = targetFor(m);
-                      const variantQ = ragVariant(actualQ, targetQ);
-                      const override = memberTargetByMetric.has(m.metric_code);
-                      return (
-                        <tr key={m.metric_code} className="border-b border-agsi-lightGray/50">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-agsi-navy">{m.metric_label}</div>
-                            <div className="text-xs text-agsi-darkGray">
-                              {m.metric_code}
-                              {override && (
-                                <Badge variant="purple" className="ml-2">
-                                  override
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 tabular text-agsi-navy">{actualQ}</td>
-                          <td className="px-4 py-3 tabular text-agsi-darkGray">{targetQ}</td>
-                          <td className="px-4 py-3">
-                            <Badge variant={variantQ}>
-                              {targetQ === 0 ? '—' : `${Math.round((actualQ / targetQ) * 100)}%`}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 tabular text-agsi-navy">{actualFY}</td>
-                          <td className="px-4 py-3 tabular text-agsi-darkGray">{targetFY}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <QuarterTrackTable
+                  metrics={grouped[d]}
+                  quarters={quarters}
+                  actualFor={actualFor}
+                  targetFor={targetFor}
+                  ragVariant={ragVariant}
+                  isOverride={(code) => memberTargetByMetric.has(code)}
+                />
               )}
             </CardContent>
           </Card>
@@ -355,6 +320,137 @@ function DriverPill({ label, pct }: { label: string; pct: number | null }) {
       <p className="mt-1 text-xl font-semibold tabular text-agsi-navy">
         {value == null ? '—' : `${value}%`}
       </p>
+    </div>
+  );
+}
+
+function QuarterTrackTable({
+  metrics,
+  quarters,
+  actualFor,
+  targetFor,
+  ragVariant,
+  isOverride,
+}: {
+  metrics: PlaybookTargetRow[];
+  quarters: QuarterInfo[];
+  actualFor: (code: string, q?: number | null) => number;
+  targetFor: (m: PlaybookTargetRow, q?: number | null) => number;
+  ragVariant: (a: number, t: number) => 'neutral' | 'red' | 'amber' | 'blue' | 'green';
+  isOverride: (code: string) => boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-sm">
+        <thead>
+          <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
+            <th className="px-4 py-2 font-medium">Metric</th>
+            {quarters.map((qi) => {
+              const liveLabel = quarterStatusLabel(qi);
+              const isLive = qi.status === 'in_progress';
+              const isDone = qi.status === 'completed';
+              return (
+                <th
+                  key={qi.q}
+                  colSpan={2}
+                  className={`border-l border-agsi-lightGray/50 px-2 py-2 text-center font-medium ${
+                    isLive ? 'bg-agsi-accent/5' : ''
+                  }`}
+                >
+                  <div className="text-agsi-navy">Q{qi.q}</div>
+                  {isLive && (
+                    <div className="text-[10px] font-normal normal-case text-agsi-accent">
+                      {liveLabel}
+                    </div>
+                  )}
+                  {isDone && (
+                    <div className="text-[10px] font-normal normal-case text-agsi-darkGray">
+                      completed
+                    </div>
+                  )}
+                </th>
+              );
+            })}
+            <th className="border-l border-agsi-lightGray/50 px-4 py-2 font-medium">FY</th>
+          </tr>
+          <tr className="border-b border-agsi-lightGray text-left text-xs text-agsi-darkGray">
+            <th></th>
+            {quarters.map((qi) => {
+              const isLive = qi.status === 'in_progress';
+              return (
+                <React.Fragment key={qi.q}>
+                  <th
+                    className={`border-l border-agsi-lightGray/50 px-2 py-1 tabular ${
+                      isLive ? 'bg-agsi-accent/5' : ''
+                    }`}
+                  >
+                    A
+                  </th>
+                  <th className={`px-2 py-1 tabular ${isLive ? 'bg-agsi-accent/5' : ''}`}>T</th>
+                </React.Fragment>
+              );
+            })}
+            <th className="border-l border-agsi-lightGray/50 px-4 py-1 tabular">A / T</th>
+          </tr>
+        </thead>
+        <tbody>
+          {metrics.map((m) => {
+            const actualFY = quarters.reduce((s, qi) => s + actualFor(m.metric_code, qi.q), 0);
+            const targetFY = quarters.reduce((s, qi) => s + targetFor(m, qi.q), 0);
+            const override = isOverride(m.metric_code);
+            return (
+              <tr key={m.metric_code} className="border-b border-agsi-lightGray/50">
+                <td className="px-4 py-3">
+                  <div className="font-medium text-agsi-navy">{m.metric_label}</div>
+                  <div className="text-xs text-agsi-darkGray">
+                    {m.metric_code}
+                    {override && (
+                      <Badge variant="purple" className="ml-2">
+                        override
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                {quarters.map((qi) => {
+                  const a = actualFor(m.metric_code, qi.q);
+                  const t = targetFor(m, qi.q);
+                  const variant = ragVariant(a, t);
+                  const isLive = qi.status === 'in_progress';
+                  const colourClass =
+                    variant === 'red'
+                      ? 'text-rag-red'
+                      : variant === 'amber'
+                        ? 'text-rag-amber'
+                        : variant === 'green'
+                          ? 'text-agsi-green'
+                          : 'text-agsi-navy';
+                  return (
+                    <React.Fragment key={qi.q}>
+                      <td
+                        className={`border-l border-agsi-lightGray/50 px-2 py-3 tabular ${colourClass} ${
+                          isLive ? 'bg-agsi-accent/5' : ''
+                        }`}
+                      >
+                        {a}
+                      </td>
+                      <td
+                        className={`px-2 py-3 tabular text-agsi-darkGray ${
+                          isLive ? 'bg-agsi-accent/5' : ''
+                        }`}
+                      >
+                        {t}
+                      </td>
+                    </React.Fragment>
+                  );
+                })}
+                <td className="border-l border-agsi-lightGray/50 px-4 py-3 tabular text-agsi-darkGray">
+                  <span className="text-agsi-navy">{actualFY}</span> / {targetFY}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

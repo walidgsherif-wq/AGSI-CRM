@@ -1,3 +1,4 @@
+import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
@@ -9,6 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { ROLE_LABEL, type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
+import {
+  fetchFiscalStartMonth,
+  getCurrentFy,
+  buildQuartersForFy,
+  quarterStatusLabel,
+  type QuarterInfo,
+} from '@/lib/fiscal';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,10 +110,6 @@ const TIER_LABEL: Record<string, string> = {
   stretch: 'Stretch',
 };
 
-function currentFY(): number {
-  return new Date().getUTCFullYear();
-}
-
 function ragVariant(actual: number, target: number): 'neutral' | 'red' | 'amber' | 'blue' | 'green' {
   if (target === 0) return 'neutral';
   const pct = actual / target;
@@ -123,7 +127,6 @@ export default async function PerformanceReviewPage({
   searchParams: { fy?: string };
 }) {
   const viewer = await getCurrentUser();
-  const fy = parseInt(searchParams.fy ?? String(currentFY()), 10);
 
   // Permission: bd_manager can view own only; others can view anyone.
   if (viewer.role === 'bd_manager' && viewer.id !== params.userId) {
@@ -140,6 +143,17 @@ export default async function PerformanceReviewPage({
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
     { cookies: serverComponentCookies(cookies()) },
   );
+
+  // Fiscal year respects app_settings.fiscal_year_start_month. The
+  // four quarters of `fy` carry start/end dates + status so the
+  // Q1–Q4 track can mark the live quarter "in progress · week X of Y".
+  // For past FYs requested via ?fy=, every quarter naturally falls
+  // back to "completed" because `now` is past every quarter's end.
+  const startMonth = await fetchFiscalStartMonth(supabase);
+  const now = new Date();
+  const currentFy = getCurrentFy(startMonth, now);
+  const fy = parseInt(searchParams.fy ?? String(currentFy), 10);
+  const quarters: QuarterInfo[] = buildQuartersForFy(startMonth, fy, now);
 
   const { data: subject } = await supabase
     .from('profiles')
@@ -293,11 +307,22 @@ export default async function PerformanceReviewPage({
               </tr>
             </thead>
             <tbody>
-              {[1, 2, 3, 4].map((q) => {
-                const b = beiByQ.get(q);
+              {quarters.map((qi) => {
+                const b = beiByQ.get(qi.q);
+                const isLive = qi.status === 'in_progress';
                 return (
-                  <tr key={q} className="border-b border-agsi-lightGray/50">
-                    <td className="px-4 py-3 font-medium text-agsi-navy">Q{q}</td>
+                  <tr
+                    key={qi.q}
+                    className={`border-b border-agsi-lightGray/50 ${isLive ? 'bg-agsi-accent/5' : ''}`}
+                  >
+                    <td className="px-4 py-3 font-medium text-agsi-navy">
+                      Q{qi.q}
+                      {isLive && (
+                        <span className="ml-2 text-[10px] font-normal text-agsi-accent">
+                          {quarterStatusLabel(qi)}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 tabular text-agsi-darkGray">
                       {b?.driver_a_pct == null ? '—' : `${Math.round(Number(b.driver_a_pct) * 100)}%`}
                     </td>
@@ -344,58 +369,103 @@ export default async function PerformanceReviewPage({
                 <thead>
                   <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
                     <th className="px-4 py-2 font-medium">Metric</th>
-                    {[1, 2, 3, 4].map((q) => (
-                      <th key={q} colSpan={2} className="border-l border-agsi-lightGray/50 px-2 py-2 text-center font-medium">
-                        Q{q}
-                      </th>
-                    ))}
+                    {quarters.map((qi) => {
+                      const isLive = qi.status === 'in_progress';
+                      const isDone = qi.status === 'completed';
+                      return (
+                        <th
+                          key={qi.q}
+                          colSpan={2}
+                          className={`border-l border-agsi-lightGray/50 px-2 py-2 text-center font-medium ${
+                            isLive ? 'bg-agsi-accent/5' : ''
+                          }`}
+                        >
+                          <div className="text-agsi-navy">Q{qi.q}</div>
+                          {isLive && (
+                            <div className="text-[10px] font-normal normal-case text-agsi-accent">
+                              {quarterStatusLabel(qi)}
+                            </div>
+                          )}
+                          {isDone && (
+                            <div className="text-[10px] font-normal normal-case text-agsi-darkGray">
+                              completed
+                            </div>
+                          )}
+                        </th>
+                      );
+                    })}
                     <th className="border-l border-agsi-lightGray/50 px-4 py-2 font-medium">FY</th>
                   </tr>
                   <tr className="border-b border-agsi-lightGray text-left text-xs text-agsi-darkGray">
                     <th></th>
-                    {[1, 2, 3, 4].map((q) => (
-                      <>
-                        <th key={`${q}-actual`} className="border-l border-agsi-lightGray/50 px-2 py-1 tabular">A</th>
-                        <th key={`${q}-target`} className="px-2 py-1 tabular">T</th>
-                      </>
-                    ))}
+                    {quarters.map((qi) => {
+                      const isLive = qi.status === 'in_progress';
+                      return (
+                        <React.Fragment key={qi.q}>
+                          <th
+                            className={`border-l border-agsi-lightGray/50 px-2 py-1 tabular ${
+                              isLive ? 'bg-agsi-accent/5' : ''
+                            }`}
+                          >
+                            A
+                          </th>
+                          <th
+                            className={`px-2 py-1 tabular ${
+                              isLive ? 'bg-agsi-accent/5' : ''
+                            }`}
+                          >
+                            T
+                          </th>
+                        </React.Fragment>
+                      );
+                    })}
                     <th className="border-l border-agsi-lightGray/50 px-4 py-1 tabular">A / T</th>
                   </tr>
                 </thead>
                 <tbody>
                   {grouped[d].map((m) => {
                     const override = overrideByMetric.has(m.metric_code);
-                    const actualFY = [1, 2, 3, 4].reduce((s, q) => s + actualFor(m.metric_code, q), 0);
-                    const targetFY = [1, 2, 3, 4].reduce((s, q) => s + targetFor(m, q), 0);
+                    const actualFY = quarters.reduce(
+                      (s, qi) => s + actualFor(m.metric_code, qi.q),
+                      0,
+                    );
+                    const targetFY = quarters.reduce((s, qi) => s + targetFor(m, qi.q), 0);
                     return (
                       <tr key={m.metric_code} className="border-b border-agsi-lightGray/50">
                         <td className="px-4 py-3">
                           <div className="font-medium text-agsi-navy">{m.metric_label}</div>
                           {override && <Badge variant="purple" className="mt-1">override</Badge>}
                         </td>
-                        {[1, 2, 3, 4].map((q) => {
-                          const a = actualFor(m.metric_code, q);
-                          const t = targetFor(m, q);
+                        {quarters.map((qi) => {
+                          const a = actualFor(m.metric_code, qi.q);
+                          const t = targetFor(m, qi.q);
+                          const variant = ragVariant(a, t);
+                          const isLive = qi.status === 'in_progress';
+                          const colourClass =
+                            variant === 'red'
+                              ? 'text-rag-red'
+                              : variant === 'amber'
+                                ? 'text-rag-amber'
+                                : variant === 'green'
+                                  ? 'text-agsi-green'
+                                  : 'text-agsi-navy';
                           return (
-                            <>
+                            <React.Fragment key={qi.q}>
                               <td
-                                key={`${q}-a`}
-                                className={`border-l border-agsi-lightGray/50 px-2 py-3 tabular ${
-                                  ragVariant(a, t) === 'red'
-                                    ? 'text-rag-red'
-                                    : ragVariant(a, t) === 'amber'
-                                      ? 'text-rag-amber'
-                                      : ragVariant(a, t) === 'green'
-                                        ? 'text-agsi-green'
-                                        : 'text-agsi-navy'
+                                className={`border-l border-agsi-lightGray/50 px-2 py-3 tabular ${colourClass} ${
+                                  isLive ? 'bg-agsi-accent/5' : ''
                                 }`}
                               >
                                 {a}
                               </td>
-                              <td key={`${q}-t`} className="px-2 py-3 tabular text-agsi-darkGray">
+                              <td
+                                className={`px-2 py-3 tabular text-agsi-darkGray ${
+                                  isLive ? 'bg-agsi-accent/5' : ''
+                                }`}
+                              >
                                 {t}
                               </td>
-                            </>
+                            </React.Fragment>
                           );
                         })}
                         <td className="border-l border-agsi-lightGray/50 px-4 py-3 tabular text-agsi-darkGray">
