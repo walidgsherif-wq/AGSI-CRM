@@ -18,12 +18,41 @@ export async function GET(req: NextRequest) {
     { cookies: mutableCookies(cookies()) },
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data: session, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     return NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent(error.message)}`, url.origin),
     );
+  }
+
+  // Invite-only gate. Anyone (Google or magic-link) can complete the
+  // OAuth handshake — Supabase has no way to refuse it without a
+  // pre-existing user row. We bounce them HERE rather than letting
+  // middleware -> getCurrentUser do it later: the middleware's
+  // /login -> /dashboard convenience-redirect plus get-user.ts's
+  // /dashboard -> /login?error=profile_missing produces an infinite
+  // loop for a session that has no profile. Killing the session at
+  // the callback closes the loop and shows the friendly error.
+  const userId = session.user?.id;
+  if (userId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, is_active')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!profile) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(
+        new URL('/login?error=profile_missing', url.origin),
+      );
+    }
+    if (!profile.is_active) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(
+        new URL('/login?error=account_deactivated', url.origin),
+      );
+    }
   }
 
   return NextResponse.redirect(new URL(next, url.origin));

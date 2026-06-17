@@ -6,6 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
+function friendlyError(code?: string): string {
+  if (!code) return '';
+  switch (code) {
+    case 'profile_missing':
+      return 'No AGSI account found for that email. Contact your administrator — access is invite-only.';
+    case 'account_deactivated':
+      return 'This account has been deactivated. Contact your administrator.';
+    case 'missing_code':
+      return 'Sign-in was interrupted. Try again.';
+    default:
+      return decodeURIComponent(code);
+  }
+}
+
 export function LoginForm({ error, next }: { error?: string; next: string }) {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
@@ -122,7 +136,7 @@ export function LoginForm({ error, next }: { error?: string; next: string }) {
 
         {(error || localError) && (
           <p className="mt-3 text-xs text-rag-red">
-            {localError ?? decodeURIComponent(error ?? '')}
+            {localError ?? friendlyError(error)}
           </p>
         )}
 
