@@ -271,7 +271,9 @@ export default async function DashboardPage() {
               <CardTitle>{DRIVER_LABEL[d]}</CardTitle>
               <CardDescription>
                 {showSelf ? 'Your actuals vs target' : 'Team rollup vs combined target'} — Q
-                {fq} this quarter & FY total.
+                {fq} this quarter & FY total. Counts events logged in the period (level
+                moves, engagements, documents) — not the current state of the pipeline.
+                Credit goes by who logged the action.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
