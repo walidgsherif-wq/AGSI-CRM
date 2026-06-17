@@ -417,7 +417,9 @@ export default async function PerformanceReviewPage({
           <CardDescription>
             Per quarter, how the BDM&apos;s forward-credited level changes broke down by
             stakeholder type. Helps spot over- or under-indexing on developers vs
-            consultants vs contractors.
+            consultants vs contractors. Counts <strong>every</strong> forward+credited
+            level move including L1→L2 — broader than Driver B above, which only counts
+            new L3+ wins.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
