@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 type RawRow = Record<string, string | null>;
@@ -228,12 +229,7 @@ export function UploadForm() {
           <label className="block text-xs font-medium text-agsi-darkGray">
             File date <span className="text-rag-red">*</span>
           </label>
-          <input
-            name="file_date"
-            type="date"
-            required
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          />
+          <Input name="file_date" type="date" required className="mt-1" />
           <p className="mt-1 text-xs text-agsi-darkGray">
             The week the BNC export represents. Used to detect duplicates and order uploads.
           </p>

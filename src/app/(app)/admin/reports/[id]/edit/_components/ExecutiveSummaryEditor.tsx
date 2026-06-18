@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { saveExecutiveSummary } from '@/server/actions/leadership-reports';
 
 export function ExecutiveSummaryEditor({
@@ -21,7 +22,7 @@ export function ExecutiveSummaryEditor({
 
   return (
     <div className="space-y-2">
-      <textarea
+      <Textarea
         value={value}
         onChange={(e) => {
           setValue(e.target.value);
@@ -34,7 +35,6 @@ export function ExecutiveSummaryEditor({
             ? '(executive summary locked — finalised report)'
             : 'A few paragraphs of context for leadership: headline numbers, what shifted, what to ask about.'
         }
-        className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm disabled:bg-agsi-offWhite"
       />
       {!disabled && (
         <div className="flex items-center gap-3">

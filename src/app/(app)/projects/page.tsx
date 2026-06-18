@@ -6,6 +6,8 @@ import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import {
   PROJECT_STAGES,
   PROJECT_STAGE_LABEL,
@@ -87,19 +89,19 @@ export default async function ProjectsPage({
           <form className="grid gap-3 sm:grid-cols-4">
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Search</label>
-              <input
+              <Input
                 name="q"
                 defaultValue={searchParams.q ?? ''}
                 placeholder="Name…"
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+                className="mt-1"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Stage</label>
-              <select
+              <Select
                 name="stage"
                 defaultValue={searchParams.stage ?? ''}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+                className="mt-1"
               >
                 <option value="">All</option>
                 {PROJECT_STAGES.map((s) => (
@@ -107,14 +109,14 @@ export default async function ProjectsPage({
                     {PROJECT_STAGE_LABEL[s]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Priority</label>
-              <select
+              <Select
                 name="priority"
                 defaultValue={searchParams.priority ?? ''}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+                className="mt-1"
               >
                 <option value="">All</option>
                 {PROJECT_PRIORITIES.map((p) => (
@@ -122,7 +124,7 @@ export default async function ProjectsPage({
                     {PROJECT_PRIORITY_LABEL[p]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="flex items-end">
               <Button type="submit" variant="secondary" className="w-full">
