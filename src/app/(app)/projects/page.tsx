@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import {
   PROJECT_STAGES,
   PROJECT_STAGE_LABEL,
@@ -149,36 +150,32 @@ export default async function ProjectsPage({
               )}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">Name</th>
-                  <th className="px-4 py-2 font-medium">Stage</th>
-                  <th className="px-4 py-2 font-medium">City</th>
-                  <th className="px-4 py-2 font-medium">Sector</th>
-                  <th className="px-4 py-2 font-medium">Value</th>
-                  <th className="px-4 py-2 font-medium">Priority</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[640px]">
+              <THead>
+                <TR head>
+                  <TH className="px-4">Name</TH>
+                  <TH className="px-4">Stage</TH>
+                  <TH className="px-4">City</TH>
+                  <TH className="px-4">Sector</TH>
+                  <TH className="px-4">Value</TH>
+                  <TH className="px-4">Priority</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {data.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b border-agsi-lightGray/50 hover:bg-agsi-lightGray/20"
-                  >
-                    <td className="px-4 py-3 font-medium">
+                  <TR key={p.id} className="hover:bg-agsi-lightGray/20">
+                    <TD className="px-4 font-medium">
                       <Link href={`/projects/${p.id}`} className="text-agsi-navy hover:underline">
                         {p.name}
                       </Link>
-                    </td>
-                    <td className="px-4 py-3 text-agsi-darkGray">{PROJECT_STAGE_LABEL[p.stage]}</td>
-                    <td className="px-4 py-3 text-agsi-darkGray">{p.city ?? '—'}</td>
-                    <td className="px-4 py-3 text-agsi-darkGray">{p.sector ?? '—'}</td>
-                    <td className="px-4 py-3 text-agsi-darkGray tabular">
+                    </TD>
+                    <TD className="px-4 text-agsi-darkGray">{PROJECT_STAGE_LABEL[p.stage]}</TD>
+                    <TD className="px-4 text-agsi-darkGray">{p.city ?? '—'}</TD>
+                    <TD className="px-4 text-agsi-darkGray">{p.sector ?? '—'}</TD>
+                    <TD className="px-4 text-agsi-darkGray tabular">
                       {p.value_aed ? AED.format(p.value_aed) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {p.agsi_priority ? (
                         <Badge
                           variant={
@@ -196,12 +193,11 @@ export default async function ProjectsPage({
                       ) : (
                         <span className="text-agsi-darkGray">—</span>
                       )}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
-            </div>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>
