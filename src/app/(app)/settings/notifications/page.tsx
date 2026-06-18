@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { getMyPreferences } from '@/server/actions/notifications';
 import { PreferenceToggles } from './_components/PreferenceToggles';
 
@@ -146,48 +147,44 @@ export default async function NotificationSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">Notification type</th>
-                  <th className="px-4 py-2 text-center font-medium">In-app</th>
-                  <th className="px-4 py-2 text-center font-medium">Email</th>
-                  <th className="px-4 py-2 text-center font-medium">WhatsApp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {NOTIFICATION_TYPES.map((n) => {
-                  const pref = prefs[n.key];
-                  return (
-                    <tr key={n.key} className="border-b border-agsi-lightGray/50">
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-agsi-navy">{n.label}</p>
-                        <p className="mt-0.5 text-xs text-agsi-darkGray">
-                          {n.description}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[10px] text-agsi-darkGray">
-                          {n.key} · recipient: {n.whoFires}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <PreferenceToggles
-                          notificationType={n.key}
-                          inApp={pref?.in_app_enabled ?? true}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-agsi-darkGray">
-                        <Badge variant="neutral">v1.1</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-agsi-darkGray">
-                        <Badge variant="neutral">v1.1</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table className="min-w-[640px]">
+            <THead>
+              <TR head>
+                <TH className="px-4">Notification type</TH>
+                <TH className="px-4 text-center">In-app</TH>
+                <TH className="px-4 text-center">Email</TH>
+                <TH className="px-4 text-center">WhatsApp</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {NOTIFICATION_TYPES.map((n) => {
+                const pref = prefs[n.key];
+                return (
+                  <TR key={n.key}>
+                    <TD className="px-4">
+                      <p className="text-sm font-medium text-agsi-navy">{n.label}</p>
+                      <p className="mt-0.5 text-xs text-agsi-darkGray">{n.description}</p>
+                      <p className="mt-0.5 font-mono text-[10px] text-agsi-darkGray">
+                        {n.key} · recipient: {n.whoFires}
+                      </p>
+                    </TD>
+                    <TD className="px-4 text-center">
+                      <PreferenceToggles
+                        notificationType={n.key}
+                        inApp={pref?.in_app_enabled ?? true}
+                      />
+                    </TD>
+                    <TD className="px-4 text-center text-xs text-agsi-darkGray">
+                      <Badge variant="neutral">v1.1</Badge>
+                    </TD>
+                    <TD className="px-4 text-center text-xs text-agsi-darkGray">
+                      <Badge variant="neutral">v1.1</Badge>
+                    </TD>
+                  </TR>
+                );
+              })}
+            </TBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

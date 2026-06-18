@@ -5,6 +5,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import {
   TASK_PRIORITY_LABEL,
   TASK_STATUS_LABEL,
@@ -142,18 +143,18 @@ export default async function CompanyTasksTab({
               No tasks yet. Click &quot;New task&quot; above.
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">Task</th>
-                  <th className="px-4 py-2 font-medium">Owner</th>
-                  <th className="px-4 py-2 font-medium">Due</th>
-                  <th className="px-4 py-2 font-medium">Priority</th>
-                  <th className="px-4 py-2 font-medium">Reminders</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">Task</TH>
+                  <TH className="px-4">Owner</TH>
+                  <TH className="px-4">Due</TH>
+                  <TH className="px-4">Priority</TH>
+                  <TH className="px-4">Reminders</TH>
+                  <TH className="px-4">Status</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {tasks.map((t) => {
                   const overdue =
                     t.due_date &&
@@ -168,15 +169,13 @@ export default async function CompanyTasksTab({
                   const pendingReminders = (t.reminders ?? []).filter((r) => !r.sent_at).length;
                   const sentReminders = (t.reminders ?? []).filter((r) => r.sent_at).length;
                   return (
-                    <tr
+                    <TR
                       key={t.id}
                       className={
-                        t.status === 'done' || t.status === 'cancelled'
-                          ? 'border-b border-agsi-lightGray/50 opacity-60'
-                          : 'border-b border-agsi-lightGray/50'
+                        t.status === 'done' || t.status === 'cancelled' ? 'opacity-60' : ''
                       }
                     >
-                      <td className="px-4 py-3">
+                      <TD className="px-4">
                         <div className="font-medium text-agsi-navy">{t.title}</div>
                         {t.description && (
                           <div className="mt-0.5 text-xs text-agsi-darkGray">{t.description}</div>
@@ -186,27 +185,27 @@ export default async function CompanyTasksTab({
                             {t.source}
                           </Badge>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         <div>{t.owner?.full_name ?? '—'}</div>
                         {t.assigned_by?.full_name && (
                           <div className="text-[11px] italic text-agsi-midGray">
                             assigned by {t.assigned_by.full_name}
                           </div>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD className="px-4">
                         <span className={overdue ? 'text-rag-red' : 'text-agsi-darkGray'}>
                           {t.due_date ?? '—'}
                           {overdue && ' · overdue'}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD className="px-4">
                         <Badge variant={PRIORITY_VARIANT[t.priority]}>
                           {TASK_PRIORITY_LABEL[t.priority]}
                         </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-agsi-darkGray tabular">
+                      </TD>
+                      <TD className="px-4 text-xs text-agsi-darkGray tabular">
                         {pendingReminders + sentReminders === 0 ? (
                           '—'
                         ) : (
@@ -219,8 +218,8 @@ export default async function CompanyTasksTab({
                             )}
                           </>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD className="px-4">
                         <div className="flex items-center gap-3">
                           <TaskRowActions
                             id={t.id}
@@ -237,12 +236,12 @@ export default async function CompanyTasksTab({
                             </Link>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

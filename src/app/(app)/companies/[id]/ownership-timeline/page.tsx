@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { TransferForm } from './_components/TransferForm';
 
 export const dynamic = 'force-dynamic';
@@ -119,48 +120,48 @@ export default async function CompanyOwnershipTimelineTab({
             {auditEvents.length === 0 ? (
               <p className="p-6 text-sm text-agsi-darkGray">No transfers yet.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                    <th className="px-4 py-2 font-medium">When</th>
-                    <th className="px-4 py-2 font-medium">By</th>
-                    <th className="px-4 py-2 font-medium">From</th>
-                    <th className="px-4 py-2 font-medium">To</th>
-                    <th className="px-4 py-2 font-medium">Credit</th>
-                    <th className="px-4 py-2 font-medium">Rows</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <THead>
+                  <TR head>
+                    <TH className="px-4">When</TH>
+                    <TH className="px-4">By</TH>
+                    <TH className="px-4">From</TH>
+                    <TH className="px-4">To</TH>
+                    <TH className="px-4">Credit</TH>
+                    <TH className="px-4">Rows</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {auditEvents.map((a) => (
-                    <tr key={a.id} className="border-b border-agsi-lightGray/50">
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                    <TR key={a.id}>
+                      <TD className="px-4 text-agsi-darkGray">
                         {new Date(a.occurred_at).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         {a.actor?.full_name ?? 'System'}
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         {a.before_json?.old_owner_id
                           ? profilesById.get(a.before_json.old_owner_id) ??
                             a.before_json.old_owner_id.slice(0, 8)
                           : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         {a.before_json?.new_owner_id
                           ? profilesById.get(a.before_json.new_owner_id) ??
                             a.before_json.new_owner_id.slice(0, 8)
                           : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         {a.after_json?.transfer_credit ? 'Transferred' : 'Preserved prior owner'}
-                      </td>
-                      <td className="px-4 py-3 tabular text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 tabular text-agsi-darkGray">
                         {a.after_json?.history_rows_reattributed ?? 0}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             )}
           </CardContent>
         </Card>
