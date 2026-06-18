@@ -5,6 +5,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireRole } from '@/lib/auth/require-role';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH } from '@/components/ui/table';
 import { TargetRow } from './_components/TargetRow';
 
 export const dynamic = 'force-dynamic';
@@ -138,19 +139,19 @@ export default async function AdminTargetsPage({
                 {grouped[d].length === 0 ? (
                   <p className="p-6 text-sm text-agsi-darkGray">No metrics seeded.</p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                        <th className="px-4 py-2 font-medium">Metric</th>
-                        <th className="px-2 py-2 font-medium tabular">Q1</th>
-                        <th className="px-2 py-2 font-medium tabular">Q2</th>
-                        <th className="px-2 py-2 font-medium tabular">Q3</th>
-                        <th className="px-2 py-2 font-medium tabular">Q4</th>
-                        <th className="px-4 py-2 font-medium tabular">Annual</th>
-                        <th className="px-4 py-2 font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <Table>
+                    <THead>
+                      <TR head>
+                        <TH className="px-4">Metric</TH>
+                        <TH className="px-2 tabular">Q1</TH>
+                        <TH className="px-2 tabular">Q2</TH>
+                        <TH className="px-2 tabular">Q3</TH>
+                        <TH className="px-2 tabular">Q4</TH>
+                        <TH className="px-4 tabular">Annual</TH>
+                        <TH className="px-4"></TH>
+                      </TR>
+                    </THead>
+                    <TBody>
                       {grouped[d].map((m) => {
                         const override = overrideByMetric.get(m.metric_code) ?? null;
                         const playbookQ: [number, number, number, number] = [
@@ -179,8 +180,8 @@ export default async function AdminTargetsPage({
                           />
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </TBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>

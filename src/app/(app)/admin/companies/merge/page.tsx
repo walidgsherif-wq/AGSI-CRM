@@ -5,6 +5,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireRole } from '@/lib/auth/require-role';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { MatchQueueActions } from './_components/MatchQueueActions';
 
 export const dynamic = 'force-dynamic';
@@ -86,21 +87,21 @@ export default async function MatchQueuePage({
               {status === 'pending' && 'All caught up — nothing waiting for review.'}
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">Raw BNC name</th>
-                  <th className="px-4 py-2 font-medium">Similarity</th>
-                  <th className="px-4 py-2 font-medium">Suggested match</th>
-                  <th className="px-4 py-2 font-medium">From upload</th>
-                  <th className="px-4 py-2 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">Raw BNC name</TH>
+                  <TH className="px-4">Similarity</TH>
+                  <TH className="px-4">Suggested match</TH>
+                  <TH className="px-4">From upload</TH>
+                  <TH className="px-4">Actions</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {data.map((q) => (
-                  <tr key={q.id} className="border-b border-agsi-lightGray/50">
-                    <td className="px-4 py-3 font-medium">{q.raw_name}</td>
-                    <td className="px-4 py-3">
+                  <TR key={q.id}>
+                    <TD className="px-4 font-medium">{q.raw_name}</TD>
+                    <TD className="px-4">
                       {q.similarity_score !== null ? (
                         <Badge
                           variant={q.similarity_score >= 0.8 ? 'green' : 'amber'}
@@ -110,8 +111,8 @@ export default async function MatchQueuePage({
                       ) : (
                         <span className="text-agsi-darkGray">—</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {q.suggested ? (
                         <Link
                           href={`/companies/${q.suggested.id}`}
@@ -122,8 +123,8 @@ export default async function MatchQueuePage({
                       ) : (
                         <span className="italic text-agsi-darkGray">No suggestion</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 text-agsi-darkGray">
                       <Link
                         href={`/admin/uploads/${q.upload_id}`}
                         className="hover:underline"
@@ -133,8 +134,8 @@ export default async function MatchQueuePage({
                       {q.upload?.file_date && (
                         <span className="ml-2 text-xs">{q.upload.file_date}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {status === 'pending' ? (
                         <MatchQueueActions
                           queueId={q.id}
@@ -143,11 +144,11 @@ export default async function MatchQueuePage({
                       ) : (
                         <Badge variant="neutral">{status}</Badge>
                       )}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

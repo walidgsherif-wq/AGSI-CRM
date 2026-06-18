@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { TR, TD } from '@/components/ui/table';
 import { upsertMemberTarget, clearMemberTarget } from '@/server/actions/kpi';
 
 export function TargetRow({
@@ -62,15 +64,15 @@ export function TargetRow({
   }
 
   return (
-    <tr className="border-b border-agsi-lightGray/50">
-      <td className="px-4 py-2">
+    <TR>
+      <TD className="px-4 py-2">
         <div className="font-medium text-agsi-navy">{metricLabel}</div>
         <div className="text-xs text-agsi-darkGray">{metricCode}</div>
-      </td>
+      </TD>
       {[0, 1, 2, 3].map((i) => (
-        <td key={i} className="px-2 py-2 tabular">
+        <TD key={i} className="px-2 py-2 tabular">
           {editing ? (
-            <input
+            <Input
               type="number"
               min={0}
               step="1"
@@ -83,19 +85,19 @@ export function TargetRow({
                   return next;
                 });
               }}
-              className="w-16 rounded border border-agsi-midGray px-2 py-1 text-xs"
+              className="w-16 px-2 py-1 text-xs"
             />
           ) : (
             <span className={isOverride ? 'text-agsi-purple' : 'text-agsi-darkGray'}>
               {initial[i]}
             </span>
           )}
-        </td>
+        </TD>
       ))}
-      <td className="px-4 py-2 tabular text-xs text-agsi-darkGray">
+      <TD className="px-4 py-2 tabular text-xs text-agsi-darkGray">
         {(editing ? values : initial).reduce((s, v) => s + v, 0)}
-      </td>
-      <td className="px-4 py-2">
+      </TD>
+      <TD className="px-4 py-2">
         {editing ? (
           <div className="flex items-center gap-2">
             <Button size="sm" disabled={pending} onClick={save}>
@@ -136,7 +138,7 @@ export function TargetRow({
             )}
           </div>
         )}
-      </td>
-    </tr>
+      </TD>
+    </TR>
   );
 }

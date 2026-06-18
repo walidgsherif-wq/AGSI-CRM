@@ -7,6 +7,7 @@ import { requireFeature } from '@/lib/auth/features';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import {
   TASK_STATUSES,
@@ -274,91 +275,87 @@ export default async function TaskOversightPage({
               No tasks match these filters.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                    <th className="px-4 py-2 font-medium">Task</th>
-                    <th className="px-4 py-2 font-medium">Assignee</th>
-                    <th className="px-4 py-2 font-medium">Linked to</th>
-                    <th className="px-4 py-2 font-medium">Due</th>
-                    <th className="px-4 py-2 font-medium">Status</th>
-                    <th className="px-4 py-2 font-medium">Assigned by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleTasks.map((t) => {
-                    const isOverdue =
-                      t.status !== 'done' &&
-                      t.status !== 'cancelled' &&
-                      t.due_date !== null &&
-                      t.due_date < today;
-                    const editHref = t.company_id
-                      ? `/companies/${t.company_id}/tasks?edit=${t.id}`
-                      : null;
-                    return (
-                      <tr
-                        key={t.id}
-                        className={cn(
-                          'border-b border-agsi-lightGray/50',
-                          (t.status === 'done' || t.status === 'cancelled') &&
-                            'opacity-60',
-                        )}
-                      >
-                        <td className="px-4 py-3">
-                          {editHref ? (
-                            <Link
-                              href={editHref as never}
-                              className="font-medium text-agsi-navy hover:underline"
-                            >
-                              {t.title}
-                            </Link>
-                          ) : (
-                            <span className="font-medium text-agsi-navy">{t.title}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-agsi-darkGray">
-                          <div className="flex items-center gap-2">
-                            <Avatar name={t.owner?.full_name ?? null} size="xs" />
-                            {t.owner?.full_name ?? '—'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-agsi-darkGray">
-                          {t.company ? (
-                            <Link
-                              href={`/companies/${t.company.id}`}
-                              className="text-agsi-navy hover:underline"
-                            >
-                              {t.company.canonical_name}
-                            </Link>
-                          ) : (
-                            <Badge variant="neutral">Ad-hoc</Badge>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={
-                              isOverdue
-                                ? 'font-semibold text-rag-red'
-                                : 'text-agsi-darkGray'
-                            }
+            <Table className="min-w-[720px]">
+              <THead>
+                <TR head>
+                  <TH className="px-4">Task</TH>
+                  <TH className="px-4">Assignee</TH>
+                  <TH className="px-4">Linked to</TH>
+                  <TH className="px-4">Due</TH>
+                  <TH className="px-4">Status</TH>
+                  <TH className="px-4">Assigned by</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {visibleTasks.map((t) => {
+                  const isOverdue =
+                    t.status !== 'done' &&
+                    t.status !== 'cancelled' &&
+                    t.due_date !== null &&
+                    t.due_date < today;
+                  const editHref = t.company_id
+                    ? `/companies/${t.company_id}/tasks?edit=${t.id}`
+                    : null;
+                  return (
+                    <TR
+                      key={t.id}
+                      className={cn(
+                        (t.status === 'done' || t.status === 'cancelled') && 'opacity-60',
+                      )}
+                    >
+                      <TD className="px-4">
+                        {editHref ? (
+                          <Link
+                            href={editHref as never}
+                            className="font-medium text-agsi-navy hover:underline"
                           >
-                            {t.due_date ?? '—'}
-                            {isOverdue && ' · overdue'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-agsi-darkGray">
-                          {TASK_STATUS_LABEL[t.status]}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-agsi-darkGray">
-                          {t.assigned_by?.full_name ?? '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            {t.title}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-agsi-navy">{t.title}</span>
+                        )}
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={t.owner?.full_name ?? null} size="xs" />
+                          {t.owner?.full_name ?? '—'}
+                        </div>
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
+                        {t.company ? (
+                          <Link
+                            href={`/companies/${t.company.id}`}
+                            className="text-agsi-navy hover:underline"
+                          >
+                            {t.company.canonical_name}
+                          </Link>
+                        ) : (
+                          <Badge variant="neutral">Ad-hoc</Badge>
+                        )}
+                      </TD>
+                      <TD className="px-4">
+                        <span
+                          className={
+                            isOverdue
+                              ? 'font-semibold text-rag-red'
+                              : 'text-agsi-darkGray'
+                          }
+                        >
+                          {t.due_date ?? '—'}
+                          {isOverdue && ' · overdue'}
+                        </span>
+                      </TD>
+                      <TD className="px-4 text-xs text-agsi-darkGray">
+                        {TASK_STATUS_LABEL[t.status]}
+                      </TD>
+                      <TD className="px-4 text-xs text-agsi-darkGray">
+                        {t.assigned_by?.full_name ?? '—'}
+                      </TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

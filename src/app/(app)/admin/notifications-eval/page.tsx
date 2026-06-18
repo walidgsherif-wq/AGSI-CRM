@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { EvalActions } from './_components/EvalActions';
 
 export const dynamic = 'force-dynamic';
@@ -107,26 +108,26 @@ export default async function NotificationsEvalPage() {
           {!rulesData || rulesData.length === 0 ? (
             <p className="text-sm text-agsi-darkGray">No active rules.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-agsi-darkGray">
-                  <th className="py-1">Level</th>
-                  <th className="py-1">Max days</th>
-                  <th className="py-1">Warn at</th>
-                  <th className="py-1">Escalation</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="py-1">Level</TH>
+                  <TH className="py-1">Max days</TH>
+                  <TH className="py-1">Warn at</TH>
+                  <TH className="py-1">Escalation</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {rulesData.map((r) => (
-                  <tr key={r.level} className="border-t border-agsi-lightGray">
-                    <td className="py-1 font-medium text-agsi-navy">{r.level}</td>
-                    <td className="py-1 tabular-nums">{r.max_days_in_level}</td>
-                    <td className="py-1 tabular-nums">{r.warn_at_pct}%</td>
-                    <td className="py-1 text-agsi-darkGray">{r.escalation_role}</td>
-                  </tr>
+                  <TR key={r.level}>
+                    <TD className="py-1 font-medium text-agsi-navy">{r.level}</TD>
+                    <TD className="py-1 tabular-nums">{r.max_days_in_level}</TD>
+                    <TD className="py-1 tabular-nums">{r.warn_at_pct}%</TD>
+                    <TD className="py-1 text-agsi-darkGray">{r.escalation_role}</TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

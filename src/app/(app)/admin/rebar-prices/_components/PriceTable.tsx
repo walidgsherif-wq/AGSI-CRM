@@ -3,6 +3,7 @@
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { deleteRebarPrice, type RebarPriceRow } from '@/server/actions/insights';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 
 export function PriceTable({ rows }: { rows: RebarPriceRow[] }) {
   const router = useRouter();
@@ -17,33 +18,33 @@ export function PriceTable({ rows }: { rows: RebarPriceRow[] }) {
   }
 
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-left text-agsi-darkGray">
-          <th className="px-4 py-2">Month</th>
-          <th className="px-4 py-2">Price (AED/t)</th>
-          <th className="px-4 py-2">Notes</th>
-          <th className="px-4 py-2">Entered</th>
-          <th className="px-4 py-2"></th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <THead>
+        <TR head>
+          <TH className="px-4">Month</TH>
+          <TH className="px-4">Price (AED/t)</TH>
+          <TH className="px-4">Notes</TH>
+          <TH className="px-4">Entered</TH>
+          <TH className="px-4"></TH>
+        </TR>
+      </THead>
+      <TBody>
         {rows.map((r) => (
-          <tr key={r.id} className="border-t border-agsi-lightGray">
-            <td className="px-4 py-2 font-medium text-agsi-navy">
+          <TR key={r.id}>
+            <TD className="px-4 py-2 font-medium text-agsi-navy">
               {r.effective_month.slice(0, 7)}
-            </td>
-            <td className="px-4 py-2 tabular-nums text-agsi-navy">
+            </TD>
+            <TD className="px-4 py-2 tabular-nums text-agsi-navy">
               {new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(
                 r.price_aed_per_tonne,
               )}
-            </td>
-            <td className="px-4 py-2 text-xs text-agsi-darkGray">{r.notes ?? '—'}</td>
-            <td className="px-4 py-2 text-xs text-agsi-darkGray">
+            </TD>
+            <TD className="px-4 py-2 text-xs text-agsi-darkGray">{r.notes ?? '—'}</TD>
+            <TD className="px-4 py-2 text-xs text-agsi-darkGray">
               {new Date(r.entered_at).toISOString().slice(0, 10)}
               {r.entered_by_name ? ` by ${r.entered_by_name}` : ''}
-            </td>
-            <td className="px-4 py-2 text-right">
+            </TD>
+            <TD className="px-4 py-2 text-right">
               <button
                 type="button"
                 disabled={pending}
@@ -58,10 +59,10 @@ export function PriceTable({ rows }: { rows: RebarPriceRow[] }) {
               >
                 Delete
               </button>
-            </td>
-          </tr>
+            </TD>
+          </TR>
         ))}
-      </tbody>
-    </table>
+      </TBody>
+    </Table>
   );
 }
