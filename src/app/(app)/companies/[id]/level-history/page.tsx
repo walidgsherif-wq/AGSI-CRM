@@ -4,6 +4,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import type { Level } from '@/types/domain';
 import { CreditToggle } from './_components/CreditToggle';
@@ -63,41 +64,41 @@ export default async function CompanyLevelHistoryTab({ params }: { params: { id:
             Overview header to start the ledger.
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                <th className="px-4 py-2 font-medium">When</th>
-                <th className="px-4 py-2 font-medium">Move</th>
-                <th className="px-4 py-2 font-medium">By</th>
-                <th className="px-4 py-2 font-medium">Owner credited</th>
-                <th className="px-4 py-2 font-medium">FY</th>
-                <th className="px-4 py-2 font-medium">Evidence</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <THead>
+              <TR head>
+                <TH className="px-4">When</TH>
+                <TH className="px-4">Move</TH>
+                <TH className="px-4">By</TH>
+                <TH className="px-4">Owner credited</TH>
+                <TH className="px-4">FY</TH>
+                <TH className="px-4">Evidence</TH>
+                <TH className="px-4">Status</TH>
+              </TR>
+            </THead>
+            <TBody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-agsi-lightGray/50">
-                  <td className="px-4 py-3 text-agsi-darkGray">
+                <TR key={r.id}>
+                  <TD className="px-4 text-agsi-darkGray">
                     {new Date(r.changed_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TD>
+                  <TD className="px-4">
                     <div className="flex items-center gap-2">
                       <LevelBadge level={r.from_level} />
                       <span className="text-agsi-darkGray">→</span>
                       <LevelBadge level={r.to_level} />
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-agsi-darkGray">
+                  </TD>
+                  <TD className="px-4 text-agsi-darkGray">
                     {r.changed_by_profile?.full_name ?? 'System'}
-                  </td>
-                  <td className="px-4 py-3 text-agsi-darkGray">
+                  </TD>
+                  <TD className="px-4 text-agsi-darkGray">
                     {r.owner_at_time_profile?.full_name ?? 'Unassigned'}
-                  </td>
-                  <td className="px-4 py-3 tabular text-agsi-darkGray">
+                  </TD>
+                  <TD className="px-4 tabular text-agsi-darkGray">
                     {r.fiscal_year} Q{r.fiscal_quarter}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TD>
+                  <TD className="px-4">
                     {r.evidence_note ? (
                       <div className="max-w-xs text-xs text-agsi-darkGray">
                         {r.evidence_note}
@@ -115,8 +116,8 @@ export default async function CompanyLevelHistoryTab({ params }: { params: { id:
                     ) : (
                       <span className="text-xs text-agsi-darkGray">—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TD>
+                  <TD className="px-4">
                     {!r.is_forward && (
                       <Badge variant="amber" className="mr-2">
                         Backward
@@ -129,11 +130,11 @@ export default async function CompanyLevelHistoryTab({ params }: { params: { id:
                     ) : (
                       <Badge variant="neutral">Uncredited</Badge>
                     )}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         )}
       </CardContent>
     </Card>

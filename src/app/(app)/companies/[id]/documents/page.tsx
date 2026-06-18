@@ -4,6 +4,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { DOCUMENT_TYPE_LABEL, type DocumentType } from '@/lib/zod/document';
 import { DocumentUploadForm } from './_components/DocumentUploadForm';
 import { DocumentRowActions } from './_components/DocumentRowActions';
@@ -78,46 +79,46 @@ export default async function CompanyDocumentsTab({
               No {showArchived ? 'archived' : ''} documents.
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">Title</th>
-                  <th className="px-4 py-2 font-medium">Type</th>
-                  <th className="px-4 py-2 font-medium">Signed</th>
-                  <th className="px-4 py-2 font-medium">Expires</th>
-                  <th className="px-4 py-2 font-medium">Uploaded by</th>
-                  <th className="px-4 py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">Title</TH>
+                  <TH className="px-4">Type</TH>
+                  <TH className="px-4">Signed</TH>
+                  <TH className="px-4">Expires</TH>
+                  <TH className="px-4">Uploaded by</TH>
+                  <TH className="px-4"></TH>
+                </TR>
+              </THead>
+              <TBody>
                 {docs.map((d) => {
                   const canDelete =
                     user.role === 'admin' ||
                     (user.role !== 'leadership' && d.uploaded_by === user.id);
                   return (
-                    <tr key={d.id} className="border-b border-agsi-lightGray/50">
-                      <td className="px-4 py-3 font-medium text-agsi-navy">{d.title}</td>
-                      <td className="px-4 py-3">
+                    <TR key={d.id}>
+                      <TD className="px-4 font-medium text-agsi-navy">{d.title}</TD>
+                      <TD className="px-4">
                         <Badge variant="blue">{DOCUMENT_TYPE_LABEL[d.doc_type]}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">{d.signed_date ?? '—'}</td>
-                      <td className="px-4 py-3 text-agsi-darkGray">{d.expiry_date ?? '—'}</td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">{d.signed_date ?? '—'}</TD>
+                      <TD className="px-4 text-agsi-darkGray">{d.expiry_date ?? '—'}</TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         {d.uploader?.full_name ?? '—'}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD className="px-4">
                         <DocumentRowActions
                           id={d.id}
                           companyId={params.id}
                           storagePath={d.storage_path}
                           canDelete={canDelete}
                         />
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

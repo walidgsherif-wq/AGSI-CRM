@@ -6,6 +6,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { ProjectForm, type ProjectInitial } from '../_components/ProjectForm';
 import {
@@ -119,44 +120,44 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           {!linked || linked.length === 0 ? (
             <p className="p-6 text-sm text-agsi-darkGray">No linked companies yet.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">Company</th>
-                  <th className="px-4 py-2 font-medium">Role on project</th>
-                  <th className="px-4 py-2 font-medium">Type</th>
-                  <th className="px-4 py-2 font-medium">Level</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">Company</TH>
+                  <TH className="px-4">Role on project</TH>
+                  <TH className="px-4">Type</TH>
+                  <TH className="px-4">Level</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {linked
                   .filter((l) => l.company)
                   .map((l) => (
-                    <tr
+                    <TR
                       key={`${l.company!.id}-${l.role}`}
-                      className="border-b border-agsi-lightGray/50 hover:bg-agsi-lightGray/20"
+                      className="hover:bg-agsi-lightGray/20"
                     >
-                      <td className="px-4 py-3 font-medium">
+                      <TD className="px-4 font-medium">
                         <Link
                           href={`/companies/${l.company!.id}`}
                           className="text-agsi-navy hover:underline"
                         >
                           {l.company!.canonical_name}
                         </Link>
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray capitalize">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray capitalize">
                         {l.role.replace(/_/g, ' ')}
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
                         {COMPANY_TYPE_LABEL[l.company!.company_type] ?? l.company!.company_type}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TD>
+                      <TD className="px-4">
                         <LevelBadge level={l.company!.current_level} />
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>
