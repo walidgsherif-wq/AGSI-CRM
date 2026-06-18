@@ -13,6 +13,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   ENGAGEMENT_TYPES,
@@ -218,53 +221,37 @@ function EditForm({
       <input type="hidden" name="company_id" value={data.company_id} />
 
       <Field label="Type">
-        <select
-          name="engagement_type"
-          required
-          defaultValue={data.engagement_type}
-          className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        >
+        <Select name="engagement_type" required defaultValue={data.engagement_type}>
           {ENGAGEMENT_TYPES.map((t) => (
             <option key={t} value={t}>
               {ENGAGEMENT_TYPE_LABEL[t]}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
 
       <Field label="Date">
-        <input
+        <Input
           name="engagement_date"
           type="date"
           required
           defaultValue={data.engagement_date}
-          className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
         />
       </Field>
 
       <Field label="Linked project (optional)">
-        <select
-          name="project_id"
-          defaultValue={data.project_id ?? ''}
-          className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        >
+        <Select name="project_id" defaultValue={data.project_id ?? ''}>
           <option value="">— None —</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
 
       <Field label="Summary">
-        <textarea
-          name="summary"
-          required
-          rows={5}
-          defaultValue={data.summary}
-          className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        />
+        <Textarea name="summary" required rows={5} defaultValue={data.summary} />
       </Field>
 
       <p className="text-xs text-agsi-darkGray">

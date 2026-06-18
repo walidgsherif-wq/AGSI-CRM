@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { saveLeadershipFeedback } from '@/server/actions/leadership-reports';
 
 export function LeadershipFeedbackEditor({
@@ -21,7 +22,7 @@ export function LeadershipFeedbackEditor({
 
   return (
     <div className="space-y-2">
-      <textarea
+      <Textarea
         value={value}
         onChange={(e) => {
           setValue(e.target.value);
@@ -29,7 +30,6 @@ export function LeadershipFeedbackEditor({
         }}
         rows={6}
         placeholder="Plain text — markdown is rendered on display. Whatever you write here is visible to admin and bd_head once saved."
-        className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
       />
       <div className="flex items-center gap-3">
         <Button

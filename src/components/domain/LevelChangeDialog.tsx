@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { LEVELS, type Level, type Role } from '@/types/domain';
 import { changeCompanyLevel, requestLevelChange } from '@/server/actions/level';
 import { EvidenceUploader, type UploadedEvidence } from '@/components/domain/EvidenceUploader';
@@ -144,18 +146,18 @@ export function LevelChangeDialog({
         {!lockedTarget && (
           <div>
             <label className="block text-xs font-medium text-agsi-darkGray">Move to</label>
-            <select
+            <Select
               name="to_level"
               required
               defaultValue={targetOptions[0]}
-              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+              className="mt-1"
             >
               {targetOptions.map((l) => (
                 <option key={l} value={l}>
                   {l}
                 </option>
               ))}
-            </select>
+            </Select>
             <p className="mt-1 text-xs text-agsi-darkGray">
               Single-step only. To move multiple levels, make each step its own change with its
               own evidence.
@@ -167,12 +169,12 @@ export function LevelChangeDialog({
           <label className="block text-xs font-medium text-agsi-darkGray">
             Evidence note <span className="text-rag-red">*</span>
           </label>
-          <textarea
+          <Textarea
             name="evidence_note"
             required
             rows={3}
             placeholder="What progressed this stakeholder? (e.g. 'Signed MOU on 25 Mar; copy attached.')"
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           />
         </div>
 

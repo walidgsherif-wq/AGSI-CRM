@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { transferOwnership } from '@/server/actions/level';
 
 type ProfileOption = { id: string; full_name: string; role: string };
@@ -54,18 +55,14 @@ export function TransferForm({
       <input type="hidden" name="company_id" value={companyId} />
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">New owner</label>
-        <select
-          name="new_owner_id"
-          required
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        >
+        <Select name="new_owner_id" required className="mt-1">
           <option value="">— Select a new owner —</option>
           {candidates.map((p) => (
             <option key={p.id} value={p.id}>
               {p.full_name} ({p.role})
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <label className="flex items-start gap-2 rounded-lg border border-agsi-lightGray bg-agsi-lightGray/30 p-3 text-xs text-agsi-navy">
         <input

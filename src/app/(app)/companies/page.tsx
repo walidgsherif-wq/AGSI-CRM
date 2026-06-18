@@ -6,6 +6,8 @@ import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Avatar } from '@/components/ui/avatar';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
@@ -218,84 +220,68 @@ export default async function CompaniesPage({
           <form className="grid gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-agsi-darkGray">Search name</label>
-              <input
+              <Input
                 name="q"
                 defaultValue={qFilter}
                 placeholder="Company name…"
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+                className="mt-1"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Type</label>
-              <select
-                name="type"
-                defaultValue={typeFilter ?? ''}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-              >
+              <Select name="type" defaultValue={typeFilter ?? ''} className="mt-1">
                 <option value="">All</option>
                 {COMPANY_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {COMPANY_TYPE_LABEL[t]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Level</label>
-              <select
-                name="level"
-                defaultValue={levelFilter ?? ''}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-              >
+              <Select name="level" defaultValue={levelFilter ?? ''} className="mt-1">
                 <option value="">All</option>
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>
                     {l}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Owner</label>
-              <select
-                name="owner"
-                defaultValue={ownerFilter}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-              >
+              <Select name="owner" defaultValue={ownerFilter} className="mt-1">
                 <option value="">All</option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.full_name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">
                 Engagement
               </label>
-              <select
-                name="bucket"
-                defaultValue={bucketFilter ?? ''}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-              >
+              <Select name="bucket" defaultValue={bucketFilter ?? ''} className="mt-1">
                 <option value="">All</option>
                 {BUCKETS.map((b) => (
                   <option key={b} value={b}>
                     {b}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">
                 Region / city
               </label>
-              <input
+              <Input
                 name="region"
                 defaultValue={regionFilter}
                 placeholder="Dubai, Abu Dhabi…"
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+                className="mt-1"
               />
             </div>
             <div className="flex items-end">
@@ -327,28 +313,24 @@ export default async function CompaniesPage({
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Sort by</label>
-              <select
-                name="sort"
-                defaultValue={sortKey}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-              >
+              <Select name="sort" defaultValue={sortKey} className="mt-1">
                 {SORT_OPTIONS.map((o) => (
                   <option key={o.key} value={o.key}>
                     {o.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">Direction</label>
-              <select
+              <Select
                 name="dir"
                 defaultValue={sortDir}
-                className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+                className="mt-1"
               >
                 <option value="desc">Desc (biggest / coldest first)</option>
                 <option value="asc">Asc</option>
-              </select>
+              </Select>
             </div>
             <div className="flex items-end">
               <Button type="submit" variant="secondary" className="w-full">
