@@ -13,6 +13,25 @@ export const Card = React.forwardRef<
 ));
 Card.displayName = 'Card';
 
+/**
+ * Tile — flat, smaller container without shadow. Pattern used for KPI
+ * numbers in the leadership report, insight tiles, member chips in
+ * oversight, filter strips, etc. Codifies the
+ * `rounded-lg border border-agsi-lightGray bg-white p-3` repetition
+ * caught by the UI audit. Pass className to override padding/layout.
+ */
+export const Tile = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn('rounded-lg border border-agsi-lightGray bg-white p-3', className)}
+    {...props}
+  />
+));
+Tile.displayName = 'Tile';
+
 export const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>

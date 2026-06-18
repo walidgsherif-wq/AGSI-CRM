@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireFeature } from '@/lib/auth/features';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Tile } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -944,7 +944,7 @@ function Stat({
   prev?: number | null;
 }) {
   return (
-    <div className="rounded-lg border border-agsi-lightGray bg-white p-3">
+    <Tile>
       <p className="text-xs uppercase tracking-wide text-agsi-darkGray">{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums text-agsi-navy">
         {value}
@@ -955,7 +955,7 @@ function Stat({
           <DiffBadge cur={cur} prev={prev} />
         </div>
       )}
-    </div>
+    </Tile>
   );
 }
 

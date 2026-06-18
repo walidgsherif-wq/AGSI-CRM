@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireFeature } from '@/lib/auth/features';
 import { getCurrentUser } from '@/lib/auth/get-user';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Tile } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { type Level } from '@/types/domain';
@@ -300,10 +300,7 @@ function RelationshipHeadline({
               const value = Number(current[key] ?? 0);
               const delta = previous ? value - Number(previous[key] ?? 0) : null;
               return (
-                <div
-                  key={key}
-                  className="rounded-lg border border-agsi-lightGray bg-white p-3"
-                >
+                <Tile key={key}>
                   <p className="text-xs font-medium uppercase tracking-wide text-agsi-darkGray">
                     {label}
                   </p>
@@ -311,7 +308,7 @@ function RelationshipHeadline({
                     {value === 0 ? '—' : fmt(value)}
                   </p>
                   <DeltaPill delta={delta} />
-                </div>
+                </Tile>
               );
             })}
           </div>
@@ -382,10 +379,7 @@ function KPIScorecard({ payload }: { payload: LeadershipReportPayload }) {
             const t = team[d] ?? { actual: 0, target: 0 };
             const pct = t.target > 0 ? (Number(t.actual) / Number(t.target)) * 100 : 0;
             return (
-              <div
-                key={d}
-                className="rounded-lg border border-agsi-lightGray bg-white p-3"
-              >
+              <Tile key={d}>
                 <p className="text-xs font-medium uppercase tracking-wide text-agsi-darkGray">
                   Driver {d}
                 </p>
@@ -394,7 +388,7 @@ function KPIScorecard({ payload }: { payload: LeadershipReportPayload }) {
                 </p>
                 <p className="text-xs text-agsi-darkGray">{fmtPct(pct)}% to target</p>
                 <GapToTargetBar actual={Number(t.actual)} target={Number(t.target)} />
-              </div>
+              </Tile>
             );
           })}
         </div>
@@ -704,7 +698,7 @@ function Stat({
   pct: number;
 }) {
   return (
-    <div className="rounded-lg border border-agsi-lightGray bg-white p-3">
+    <Tile>
       <p className="text-xs font-medium uppercase tracking-wide text-agsi-darkGray">
         {label}
       </p>
@@ -712,7 +706,7 @@ function Stat({
       <p className="text-xs text-agsi-darkGray">
         of {denominator} · {fmtPct(pct)}%
       </p>
-    </div>
+    </Tile>
   );
 }
 
