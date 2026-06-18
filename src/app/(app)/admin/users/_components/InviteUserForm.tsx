@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { inviteUser } from '@/server/actions/users';
 import { ROLES, ROLE_LABEL, type Role } from '@/types/domain';
 
@@ -30,35 +32,26 @@ export function InviteUserForm() {
     <form action={onSubmit} className="grid gap-4 sm:grid-cols-4">
       <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-agsi-darkGray">Full name</label>
-        <input
-          name="full_name"
-          required
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        />
+        <Input name="full_name" required className="mt-1" />
       </div>
       <div className="sm:col-span-2">
         <label className="block text-xs font-medium text-agsi-darkGray">Email</label>
-        <input
-          name="email"
-          type="email"
-          required
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        />
+        <Input name="email" type="email" required className="mt-1" />
       </div>
       <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-agsi-darkGray">Role</label>
-        <select
+        <Select
           name="role"
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>
               {ROLE_LABEL[r]}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <div className="sm:col-span-4 flex items-center gap-3">
         <Button type="submit" disabled={pending}>

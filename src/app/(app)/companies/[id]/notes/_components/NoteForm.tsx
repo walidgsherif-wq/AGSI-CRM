@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { createNote } from '@/server/actions/notes';
 
 export function NoteForm({ companyId }: { companyId: string }) {
@@ -31,14 +32,13 @@ export function NoteForm({ companyId }: { companyId: string }) {
       className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4"
     >
       <input type="hidden" name="company_id" value={companyId} />
-      <textarea
+      <Textarea
         name="body"
         required
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={3}
         placeholder="Internal note about this company…"
-        className="w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
       />
       <div className="flex items-center gap-3">
         <Button type="submit" size="sm" disabled={pending || !body.trim()}>

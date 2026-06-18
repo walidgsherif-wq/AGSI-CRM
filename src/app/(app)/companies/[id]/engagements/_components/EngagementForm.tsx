@@ -3,6 +3,9 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { ENGAGEMENT_TYPES, ENGAGEMENT_TYPE_LABEL } from '@/lib/zod/engagement';
 import { createEngagement } from '@/server/actions/engagements';
 
@@ -48,55 +51,51 @@ export function EngagementForm({
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Type</label>
-          <select
+          <Select
             name="engagement_type"
             required
             defaultValue="meeting"
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           >
             {ENGAGEMENT_TYPES.map((t) => (
               <option key={t} value={t}>
                 {ENGAGEMENT_TYPE_LABEL[t]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Date</label>
-          <input
+          <Input
             name="engagement_date"
             type="date"
             required
             defaultValue={today}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">
             Linked project (optional)
           </label>
-          <select
-            name="project_id"
-            defaultValue=""
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          >
+          <Select name="project_id" defaultValue="" className="mt-1">
             <option value="">— None —</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">Summary</label>
-        <textarea
+        <Textarea
           name="summary"
           required
           rows={3}
           placeholder="What happened? Outcome? Next steps?"
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       <div className="flex items-center gap-3">

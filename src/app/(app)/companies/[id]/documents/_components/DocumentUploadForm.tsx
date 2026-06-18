@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABEL } from '@/lib/zod/document';
 import { createDocument } from '@/server/actions/documents';
@@ -98,42 +100,25 @@ export function DocumentUploadForm({ companyId }: { companyId: string }) {
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Title</label>
-          <input
-            name="title"
-            required
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          />
+          <Input name="title" required className="mt-1" />
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Type</label>
-          <select
-            name="doc_type"
-            required
-            defaultValue="other"
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          >
+          <Select name="doc_type" required defaultValue="other" className="mt-1">
             {DOCUMENT_TYPES.map((t) => (
               <option key={t} value={t}>
                 {DOCUMENT_TYPE_LABEL[t]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Signed date</label>
-          <input
-            name="signed_date"
-            type="date"
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          />
+          <Input name="signed_date" type="date" className="mt-1" />
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Expiry date (optional)</label>
-          <input
-            name="expiry_date"
-            type="date"
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-          />
+          <Input name="expiry_date" type="date" className="mt-1" />
         </div>
       </div>
       <div className="flex items-center gap-3">
