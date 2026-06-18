@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth/get-user';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { InviteUserForm } from './_components/InviteUserForm';
 import { UserRoleActions } from './_components/UserRoleActions';
 import { ROLE_LABEL } from '@/types/domain';
@@ -74,23 +75,22 @@ export default async function AdminUsersPage() {
           ) : !users || users.length === 0 ? (
             <p className="text-sm text-agsi-darkGray">No users yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="py-2 font-medium">Name</th>
-                  <th className="py-2 font-medium">Email</th>
-                  <th className="py-2 font-medium">Role</th>
-                  <th className="py-2 font-medium">Status</th>
-                  <th className="py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[640px]">
+              <THead>
+                <TR head>
+                  <TH>Name</TH>
+                  <TH>Email</TH>
+                  <TH>Role</TH>
+                  <TH>Status</TH>
+                  <TH></TH>
+                </TR>
+              </THead>
+              <TBody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-agsi-lightGray/50">
-                    <td className="py-3 font-medium text-agsi-navy">{u.full_name}</td>
-                    <td className="py-3 text-agsi-darkGray">{u.email}</td>
-                    <td className="py-3">
+                  <TR key={u.id}>
+                    <TD className="font-medium text-agsi-navy">{u.full_name}</TD>
+                    <TD className="text-agsi-darkGray">{u.email}</TD>
+                    <TD>
                       <Badge
                         variant={
                           u.role === 'admin'
@@ -104,15 +104,15 @@ export default async function AdminUsersPage() {
                       >
                         {ROLE_LABEL[u.role]}
                       </Badge>
-                    </td>
-                    <td className="py-3">
+                    </TD>
+                    <TD>
                       {u.is_active ? (
                         <Badge variant="green">Active</Badge>
                       ) : (
                         <Badge variant="red">Deactivated</Badge>
                       )}
-                    </td>
-                    <td className="py-3 text-right">
+                    </TD>
+                    <TD className="text-right">
                       <div className="flex items-center justify-end gap-3">
                         {u.role !== 'admin' && (
                           <Link
@@ -131,12 +131,11 @@ export default async function AdminUsersPage() {
                           fullName={u.full_name}
                         />
                       </div>
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
-            </div>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Avatar } from '@/components/ui/avatar';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
@@ -353,92 +354,85 @@ export default async function CompaniesPage({
               )}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-sm">
-                <thead>
-                  <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                    <th className="px-4 py-2 font-medium">Company</th>
-                    <th className="px-4 py-2 font-medium">Type</th>
-                    <th className="px-4 py-2 font-medium">Level</th>
-                    <th className="px-4 py-2 font-medium">Owner</th>
-                    <th className="px-4 py-2 text-right font-medium"># projects</th>
-                    <th className="px-4 py-2 text-right font-medium">
-                      Project value involved
-                    </th>
-                    <th className="px-4 py-2 text-right font-medium">Est. steel value</th>
-                    <th className="px-4 py-2 font-medium">Engagement</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map(({ stats: s, attrs }) => (
-                    <tr
-                      key={s.company_id}
-                      className="border-b border-agsi-lightGray/50 hover:bg-agsi-lightGray/20"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/companies/${s.company_id}`}
-                          className="font-medium text-agsi-navy hover:underline"
-                        >
-                          {s.canonical_name}
-                        </Link>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {attrs.is_key_stakeholder && <Badge variant="gold">Key</Badge>}
-                          {attrs.has_active_projects && (
-                            <Badge variant="green">Active projects</Badge>
+            <Table className="min-w-[1000px]">
+              <THead>
+                <TR head>
+                  <TH className="px-4">Company</TH>
+                  <TH className="px-4">Type</TH>
+                  <TH className="px-4">Level</TH>
+                  <TH className="px-4">Owner</TH>
+                  <TH className="px-4 text-right"># projects</TH>
+                  <TH className="px-4 text-right">Project value involved</TH>
+                  <TH className="px-4 text-right">Est. steel value</TH>
+                  <TH className="px-4">Engagement</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {rows.map(({ stats: s, attrs }) => (
+                  <TR key={s.company_id} className="hover:bg-agsi-lightGray/20">
+                    <TD className="px-4">
+                      <Link
+                        href={`/companies/${s.company_id}`}
+                        className="font-medium text-agsi-navy hover:underline"
+                      >
+                        {s.canonical_name}
+                      </Link>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {attrs.is_key_stakeholder && <Badge variant="gold">Key</Badge>}
+                        {attrs.has_active_projects && (
+                          <Badge variant="green">Active projects</Badge>
+                        )}
+                      </div>
+                    </TD>
+                    <TD className="px-4 text-agsi-darkGray">
+                      {COMPANY_TYPE_LABEL[attrs.company_type]}
+                    </TD>
+                    <TD className="px-4">
+                      <LevelBadge level={s.level} />
+                    </TD>
+                    <TD className="px-4">
+                      <div className="flex items-center gap-2">
+                        <Avatar
+                          name={attrs.owner?.full_name ?? null}
+                          size="xs"
+                          title={`Owner: ${attrs.owner?.full_name ?? 'Unassigned'}`}
+                        />
+                        <span className="text-agsi-darkGray">
+                          {attrs.owner?.full_name ?? (
+                            <span className="italic">Unassigned</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-agsi-darkGray">
-                        {COMPANY_TYPE_LABEL[attrs.company_type]}
-                      </td>
-                      <td className="px-4 py-3">
-                        <LevelBadge level={s.level} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Avatar
-                            name={attrs.owner?.full_name ?? null}
-                            size="xs"
-                            title={`Owner: ${attrs.owner?.full_name ?? 'Unassigned'}`}
-                          />
-                          <span className="text-agsi-darkGray">
-                            {attrs.owner?.full_name ?? (
-                              <span className="italic">Unassigned</span>
-                            )}
+                        </span>
+                      </div>
+                    </TD>
+                    <TD className="px-4 text-right tabular-nums text-agsi-navy">
+                      {Number(s.project_count).toLocaleString()}
+                    </TD>
+                    <TD className="px-4 text-right tabular-nums text-agsi-navy">
+                      {aedFmt.format(Number(s.project_value_involved))}
+                    </TD>
+                    <TD className="px-4 text-right tabular-nums text-agsi-navy">
+                      {aedFmt.format(Number(s.est_steel_value))}
+                    </TD>
+                    <TD className="px-4">
+                      {s.engagement_bucket ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge variant={BUCKET_BADGE[s.engagement_bucket]}>
+                            {s.engagement_bucket}
+                          </Badge>
+                          <span className="text-[11px] text-agsi-darkGray">
+                            {s.days_since_last_contact === null
+                              ? 'never'
+                              : `${s.days_since_last_contact}d since`}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-agsi-navy">
-                        {Number(s.project_count).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-agsi-navy">
-                        {aedFmt.format(Number(s.project_value_involved))}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-agsi-navy">
-                        {aedFmt.format(Number(s.est_steel_value))}
-                      </td>
-                      <td className="px-4 py-3">
-                        {s.engagement_bucket ? (
-                          <div className="flex flex-col gap-0.5">
-                            <Badge variant={BUCKET_BADGE[s.engagement_bucket]}>
-                              {s.engagement_bucket}
-                            </Badge>
-                            <span className="text-[11px] text-agsi-darkGray">
-                              {s.days_since_last_contact === null
-                                ? 'never'
-                                : `${s.days_since_last_contact}d since`}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs italic text-agsi-darkGray">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ) : (
+                        <span className="text-xs italic text-agsi-darkGray">—</span>
+                      )}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>

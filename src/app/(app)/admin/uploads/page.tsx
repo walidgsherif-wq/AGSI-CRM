@@ -5,6 +5,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireRole } from '@/lib/auth/require-role';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { UploadForm } from './_components/UploadForm';
 
 export const dynamic = 'force-dynamic';
@@ -82,39 +83,36 @@ export default async function AdminUploadsPage() {
           ) : !uploads || uploads.length === 0 ? (
             <p className="p-6 text-sm text-agsi-darkGray">No uploads yet.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">File</th>
-                  <th className="px-4 py-2 font-medium">File date</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">Rows</th>
-                  <th className="px-4 py-2 font-medium">New projects</th>
-                  <th className="px-4 py-2 font-medium">Unmatched</th>
-                  <th className="px-4 py-2 font-medium">Uploaded</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">File</TH>
+                  <TH className="px-4">File date</TH>
+                  <TH className="px-4">Status</TH>
+                  <TH className="px-4">Rows</TH>
+                  <TH className="px-4">New projects</TH>
+                  <TH className="px-4">Unmatched</TH>
+                  <TH className="px-4">Uploaded</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {uploads.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="border-b border-agsi-lightGray/50 hover:bg-agsi-lightGray/20"
-                  >
-                    <td className="px-4 py-3 font-medium">
+                  <TR key={u.id} className="hover:bg-agsi-lightGray/20">
+                    <TD className="px-4 font-medium">
                       <Link
                         href={`/admin/uploads/${u.id}`}
                         className="text-agsi-navy hover:underline"
                       >
                         {u.filename}
                       </Link>
-                    </td>
-                    <td className="px-4 py-3 text-agsi-darkGray">{u.file_date ?? '—'}</td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4 text-agsi-darkGray">{u.file_date ?? '—'}</TD>
+                    <TD className="px-4">
                       <Badge variant={STATUS_VARIANT[u.status]}>{u.status}</Badge>
-                    </td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">{u.row_count}</td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">{u.new_projects}</td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">{u.row_count}</TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">{u.new_projects}</TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">
                       {u.unmatched_companies > 0 ? (
                         <Link
                           href="/admin/companies/merge"
@@ -125,15 +123,15 @@ export default async function AdminUploadsPage() {
                       ) : (
                         u.unmatched_companies
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 text-agsi-darkGray">
                       {u.uploader?.full_name ?? 'Unknown'} ·{' '}
                       {new Date(u.uploaded_at).toLocaleDateString()}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>
