@@ -3,6 +3,9 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABEL,
@@ -109,22 +112,22 @@ export function TaskForm({
 
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">Title</label>
-        <input
+        <Input
           name="title"
           required
           defaultValue={initial?.title ?? ''}
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">
           Description (optional)
         </label>
-        <textarea
+        <Textarea
           name="description"
           rows={2}
           defaultValue={initial?.description ?? ''}
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       <div className="grid gap-3 sm:grid-cols-4">
@@ -133,18 +136,18 @@ export function TaskForm({
             {canAssignToOthers ? 'Assign to' : 'Owner'}
           </label>
           {canAssignToOthers ? (
-            <select
+            <Select
               name="owner_id"
               required
               defaultValue={initial?.owner_id ?? defaultOwnerId}
-              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+              className="mt-1"
             >
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.full_name}
                 </option>
               ))}
-            </select>
+            </Select>
           ) : (
             <>
               <input
@@ -162,41 +165,41 @@ export function TaskForm({
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Due date</label>
-          <input
+          <Input
             name="due_date"
             type="date"
             defaultValue={initial?.due_date ?? ''}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Priority</label>
-          <select
+          <Select
             name="priority"
             defaultValue={initial?.priority ?? 'med'}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           >
             {TASK_PRIORITIES.map((p) => (
               <option key={p} value={p}>
                 {TASK_PRIORITY_LABEL[p]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         {mode === 'edit' && (
           <div>
             <label className="block text-xs font-medium text-agsi-darkGray">Status</label>
-            <select
+            <Select
               name="status"
               defaultValue={initial?.status ?? 'open'}
-              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+              className="mt-1"
             >
               {TASK_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {TASK_STATUS_LABEL[s]}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
       </div>
@@ -224,13 +227,13 @@ export function TaskForm({
             <label className="block text-xs font-medium text-agsi-darkGray">
               Custom reminder time (Asia/Dubai)
             </label>
-            <input
+            <Input
               type="datetime-local"
               name="reminder_custom_at"
               value={customAt}
               onChange={(e) => setCustomAt(e.target.value)}
               required
-              className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+              className="mt-1"
             />
           </div>
         )}

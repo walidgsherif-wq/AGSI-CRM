@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { addRebarPrice } from '@/server/actions/insights';
 
 export function AddPriceForm() {
@@ -31,37 +32,32 @@ export function AddPriceForm() {
         <label className="block text-xs font-medium text-agsi-darkGray">
           Effective month
         </label>
-        <input
-          name="effective_month"
-          type="month"
-          required
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
-        />
+        <Input name="effective_month" type="month" required className="mt-1" />
       </div>
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">
           Price (AED / tonne)
         </label>
-        <input
+        <Input
           name="price_aed_per_tonne"
           type="number"
           required
           min={1}
           step={1}
           placeholder="2400"
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">
           Notes (optional)
         </label>
-        <input
+        <Input
           name="notes"
           type="text"
           maxLength={200}
           placeholder="Source, supplier, etc."
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       <div className="sm:pb-1">

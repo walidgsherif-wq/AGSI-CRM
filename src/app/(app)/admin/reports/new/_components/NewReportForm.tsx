@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { createReport } from '@/server/actions/leadership-reports';
 import {
   REPORT_TYPES,
@@ -51,32 +53,32 @@ export function NewReportForm({
     >
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">Report type</label>
-        <select
+        <Select
           name="report_type"
           required
           value={reportType}
           onChange={(e) => setReportType(e.target.value as ReportType)}
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         >
           {REPORT_TYPES.map((t) => (
             <option key={t} value={t}>
               {REPORT_TYPE_LABEL[t]}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">
           Period label
         </label>
-        <input
+        <Input
           name="period_label"
           required
           maxLength={120}
           defaultValue={isQuarterly ? `Q${fq} ${fy}` : defaultMonthLabel}
           key={reportType}
-          className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+          className="mt-1"
         />
         <p className="mt-1 text-xs text-agsi-darkGray">
           Shown in the report header. Examples: &ldquo;Q1 2026&rdquo;, &ldquo;March 2026&rdquo;.
@@ -86,24 +88,24 @@ export function NewReportForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Period start</label>
-          <input
+          <Input
             name="period_start"
             type="date"
             required
             defaultValue={isQuarterly ? quarterStart : monthStart}
             key={`start-${reportType}`}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Period end</label>
-          <input
+          <Input
             name="period_end"
             type="date"
             required
             defaultValue={isQuarterly ? quarterEnd : monthEnd}
             key={`end-${reportType}`}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           />
         </div>
       </div>
@@ -111,25 +113,25 @@ export function NewReportForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">Fiscal year</label>
-          <input
+          <Input
             name="fiscal_year"
             type="number"
             required
             min={2020}
             max={2100}
             defaultValue={fy}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">
             Fiscal quarter {isQuarterly && <span className="text-rag-red">*</span>}
           </label>
-          <select
+          <Select
             name="fiscal_quarter"
             defaultValue={isQuarterly ? String(fq) : ''}
             key={`fq-${reportType}`}
-            className="mt-1 w-full rounded-lg border border-agsi-midGray bg-white px-3 py-2 text-sm"
+            className="mt-1"
           >
             <option value="">— None —</option>
             {[1, 2, 3, 4].map((q) => (
@@ -137,7 +139,7 @@ export function NewReportForm({
                 Q{q}
               </option>
             ))}
-          </select>
+          </Select>
           {!isQuarterly && (
             <p className="mt-1 text-xs text-agsi-darkGray">Optional for monthly reports.</p>
           )}
