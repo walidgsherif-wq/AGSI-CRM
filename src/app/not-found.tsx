@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
 
 export default function NotFound() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-agsi-offWhite px-6">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 text-center shadow-card">
+      <Card className="w-full max-w-md p-8 text-center">
         <p className="text-sm font-medium uppercase tracking-wider text-agsi-darkGray">404</p>
         <h1 className="mt-2 text-2xl font-semibold text-agsi-navy">Page not found</h1>
         <p className="mt-3 text-sm text-agsi-darkGray">
@@ -15,7 +16,7 @@ export default function NotFound() {
         >
           Back to dashboard
         </Link>
-      </div>
+      </Card>
     </main>
   );
 }

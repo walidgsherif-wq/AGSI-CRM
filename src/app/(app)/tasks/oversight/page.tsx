@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireFeature } from '@/lib/auth/features';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Tile } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
@@ -163,9 +163,9 @@ export default async function TaskOversightPage({
               {members.map((m) => {
                 const c = counts.get(m.id) ?? { open: 0, overdue: 0, completed: 0 };
                 return (
-                  <div
+                  <Tile
                     key={m.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-agsi-lightGray bg-white p-3"
+                    className="flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar name={m.full_name} size="md" />
@@ -186,7 +186,7 @@ export default async function TaskOversightPage({
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </Tile>
                 );
               })}
             </div>
@@ -194,7 +194,7 @@ export default async function TaskOversightPage({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-agsi-lightGray bg-white p-3 text-xs">
+      <Tile className="flex flex-wrap items-center gap-3 text-xs">
         <span className="font-medium uppercase tracking-wide text-agsi-darkGray">
           Filter
         </span>
@@ -259,7 +259,7 @@ export default async function TaskOversightPage({
         <span className="ml-auto text-[11px] text-agsi-darkGray">
           {visibleTasks.length} of {tasks.length}
         </span>
-      </div>
+      </Tile>
 
       <Card>
         <CardHeader>
