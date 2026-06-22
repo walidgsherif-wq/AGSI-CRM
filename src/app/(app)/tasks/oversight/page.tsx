@@ -7,8 +7,10 @@ import { requireFeature } from '@/lib/auth/features';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Tile } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import {
+  OversightTaskTable,
+  type OversightTaskRow,
+} from './_components/OversightTaskTable';
 import {
   TASK_STATUSES,
   TASK_STATUS_LABEL,
@@ -270,93 +272,16 @@ export default async function TaskOversightPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {visibleTasks.length === 0 ? (
-            <p className="p-6 text-sm text-agsi-darkGray">
-              No tasks match these filters.
-            </p>
-          ) : (
-            <Table className="min-w-[720px]">
-              <THead>
-                <TR head>
-                  <TH className="px-4">Task</TH>
-                  <TH className="px-4">Assignee</TH>
-                  <TH className="px-4">Linked to</TH>
-                  <TH className="px-4">Due</TH>
-                  <TH className="px-4">Status</TH>
-                  <TH className="px-4">Assigned by</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {visibleTasks.map((t) => {
-                  const isOverdue =
-                    t.status !== 'done' &&
-                    t.status !== 'cancelled' &&
-                    t.due_date !== null &&
-                    t.due_date < today;
-                  const editHref = t.company_id
-                    ? `/companies/${t.company_id}/tasks?edit=${t.id}`
-                    : null;
-                  return (
-                    <TR
-                      key={t.id}
-                      className={cn(
-                        (t.status === 'done' || t.status === 'cancelled') && 'opacity-60',
-                      )}
-                    >
-                      <TD className="px-4">
-                        {editHref ? (
-                          <Link
-                            href={editHref as never}
-                            className="font-medium text-agsi-navy hover:underline"
-                          >
-                            {t.title}
-                          </Link>
-                        ) : (
-                          <span className="font-medium text-agsi-navy">{t.title}</span>
-                        )}
-                      </TD>
-                      <TD className="px-4 text-agsi-darkGray">
-                        <div className="flex items-center gap-2">
-                          <Avatar name={t.owner?.full_name ?? null} size="xs" />
-                          {t.owner?.full_name ?? '—'}
-                        </div>
-                      </TD>
-                      <TD className="px-4 text-agsi-darkGray">
-                        {t.company ? (
-                          <Link
-                            href={`/companies/${t.company.id}`}
-                            className="text-agsi-navy hover:underline"
-                          >
-                            {t.company.canonical_name}
-                          </Link>
-                        ) : (
-                          <Badge variant="neutral">Ad-hoc</Badge>
-                        )}
-                      </TD>
-                      <TD className="px-4">
-                        <span
-                          className={
-                            isOverdue
-                              ? 'font-semibold text-rag-red'
-                              : 'text-agsi-darkGray'
-                          }
-                        >
-                          {t.due_date ?? '—'}
-                          {isOverdue && ' · overdue'}
-                        </span>
-                      </TD>
-                      <TD className="px-4 text-xs text-agsi-darkGray">
-                        {TASK_STATUS_LABEL[t.status]}
-                      </TD>
-                      <TD className="px-4 text-xs text-agsi-darkGray">
-                        {t.assigned_by?.full_name ?? '—'}
-                      </TD>
-                    </TR>
-                  );
-                })}
-              </TBody>
-            </Table>
-          )}
+          <OversightTaskTable
+            tasks={visibleTasks.map<OversightTaskRow>((t) => ({
+              ...t,
+              is_overdue:
+                t.status !== 'done' &&
+                t.status !== 'cancelled' &&
+                t.due_date !== null &&
+                t.due_date < today,
+            }))}
+          />
         </CardContent>
       </Card>
     </div>
