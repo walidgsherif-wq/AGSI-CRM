@@ -42,7 +42,6 @@ export default async function EngagementFreshnessPage() {
       .from('companies')
       .select('id, canonical_name, company_type, current_level, owner_id, has_active_projects')
       .eq('is_active', true)
-      .eq('is_in_kpi_universe', true)
       .returns<CompanyRow[]>(),
     supabase
       .from('engagements')

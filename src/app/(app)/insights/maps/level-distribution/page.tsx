@@ -37,7 +37,6 @@ export default async function LevelDistributionMapPage() {
       .from('companies')
       .select('id, canonical_name, company_type, current_level, is_key_stakeholder, has_active_projects')
       .eq('is_active', true)
-      .eq('is_in_kpi_universe', true)
       .order('canonical_name')
       .returns<CompanyRow[]>(),
     supabase
