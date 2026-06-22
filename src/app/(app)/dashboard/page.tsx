@@ -6,6 +6,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { ROLE_LABEL } from '@/types/domain';
 import { EcosystemPanel } from '@/components/domain/EcosystemPanel';
 import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
@@ -340,117 +341,115 @@ function QuarterTrackTable({
   isOverride: (code: string) => boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-sm">
-        <thead>
-          <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-            <th className="px-4 py-2 font-medium">Metric</th>
-            {quarters.map((qi) => {
-              const liveLabel = quarterStatusLabel(qi);
-              const isLive = qi.status === 'in_progress';
-              const isDone = qi.status === 'completed';
-              return (
-                <th
-                  key={qi.q}
-                  colSpan={2}
-                  className={`border-l border-agsi-lightGray/50 px-2 py-2 text-center font-medium ${
+    <Table className="min-w-[720px]">
+      <THead>
+        <TR head>
+          <TH className="px-4">Metric</TH>
+          {quarters.map((qi) => {
+            const liveLabel = quarterStatusLabel(qi);
+            const isLive = qi.status === 'in_progress';
+            const isDone = qi.status === 'completed';
+            return (
+              <TH
+                key={qi.q}
+                colSpan={2}
+                className={`border-l border-agsi-lightGray/50 px-2 text-center ${
+                  isLive ? 'bg-agsi-accent/5' : ''
+                }`}
+              >
+                <div className="text-agsi-navy">Q{qi.q}</div>
+                {isLive && (
+                  <div className="text-[10px] font-normal normal-case text-agsi-accent">
+                    {liveLabel}
+                  </div>
+                )}
+                {isDone && (
+                  <div className="text-[10px] font-normal normal-case text-agsi-darkGray">
+                    completed
+                  </div>
+                )}
+              </TH>
+            );
+          })}
+          <TH className="border-l border-agsi-lightGray/50 px-4">FY</TH>
+        </TR>
+        <TR subhead>
+          <TH></TH>
+          {quarters.map((qi) => {
+            const isLive = qi.status === 'in_progress';
+            return (
+              <React.Fragment key={qi.q}>
+                <TH
+                  className={`border-l border-agsi-lightGray/50 px-2 py-1 tabular ${
                     isLive ? 'bg-agsi-accent/5' : ''
                   }`}
                 >
-                  <div className="text-agsi-navy">Q{qi.q}</div>
-                  {isLive && (
-                    <div className="text-[10px] font-normal normal-case text-agsi-accent">
-                      {liveLabel}
-                    </div>
-                  )}
-                  {isDone && (
-                    <div className="text-[10px] font-normal normal-case text-agsi-darkGray">
-                      completed
-                    </div>
-                  )}
-                </th>
-              );
-            })}
-            <th className="border-l border-agsi-lightGray/50 px-4 py-2 font-medium">FY</th>
-          </tr>
-          <tr className="border-b border-agsi-lightGray text-left text-xs text-agsi-darkGray">
-            <th></th>
-            {quarters.map((qi) => {
-              const isLive = qi.status === 'in_progress';
-              return (
-                <React.Fragment key={qi.q}>
-                  <th
-                    className={`border-l border-agsi-lightGray/50 px-2 py-1 tabular ${
-                      isLive ? 'bg-agsi-accent/5' : ''
-                    }`}
-                  >
-                    A
-                  </th>
-                  <th className={`px-2 py-1 tabular ${isLive ? 'bg-agsi-accent/5' : ''}`}>T</th>
-                </React.Fragment>
-              );
-            })}
-            <th className="border-l border-agsi-lightGray/50 px-4 py-1 tabular">A / T</th>
-          </tr>
-        </thead>
-        <tbody>
-          {metrics.map((m) => {
-            const actualFY = quarters.reduce((s, qi) => s + actualFor(m.metric_code, qi.q), 0);
-            const targetFY = quarters.reduce((s, qi) => s + targetFor(m, qi.q), 0);
-            const override = isOverride(m.metric_code);
-            return (
-              <tr key={m.metric_code} className="border-b border-agsi-lightGray/50">
-                <td className="px-4 py-3">
-                  <div className="font-medium text-agsi-navy">{m.metric_label}</div>
-                  <div className="text-xs text-agsi-darkGray">
-                    {m.metric_code}
-                    {override && (
-                      <Badge variant="purple" className="ml-2">
-                        override
-                      </Badge>
-                    )}
-                  </div>
-                </td>
-                {quarters.map((qi) => {
-                  const a = actualFor(m.metric_code, qi.q);
-                  const t = targetFor(m, qi.q);
-                  const variant = ragVariant(a, t);
-                  const isLive = qi.status === 'in_progress';
-                  const colourClass =
-                    variant === 'red'
-                      ? 'text-rag-red'
-                      : variant === 'amber'
-                        ? 'text-rag-amber'
-                        : variant === 'green'
-                          ? 'text-agsi-green'
-                          : 'text-agsi-navy';
-                  return (
-                    <React.Fragment key={qi.q}>
-                      <td
-                        className={`border-l border-agsi-lightGray/50 px-2 py-3 tabular ${colourClass} ${
-                          isLive ? 'bg-agsi-accent/5' : ''
-                        }`}
-                      >
-                        {a}
-                      </td>
-                      <td
-                        className={`px-2 py-3 tabular text-agsi-darkGray ${
-                          isLive ? 'bg-agsi-accent/5' : ''
-                        }`}
-                      >
-                        {t}
-                      </td>
-                    </React.Fragment>
-                  );
-                })}
-                <td className="border-l border-agsi-lightGray/50 px-4 py-3 tabular text-agsi-darkGray">
-                  <span className="text-agsi-navy">{actualFY}</span> / {targetFY}
-                </td>
-              </tr>
+                  A
+                </TH>
+                <TH className={`px-2 py-1 tabular ${isLive ? 'bg-agsi-accent/5' : ''}`}>T</TH>
+              </React.Fragment>
             );
           })}
-        </tbody>
-      </table>
-    </div>
+          <TH className="border-l border-agsi-lightGray/50 px-4 py-1 tabular">A / T</TH>
+        </TR>
+      </THead>
+      <TBody>
+        {metrics.map((m) => {
+          const actualFY = quarters.reduce((s, qi) => s + actualFor(m.metric_code, qi.q), 0);
+          const targetFY = quarters.reduce((s, qi) => s + targetFor(m, qi.q), 0);
+          const override = isOverride(m.metric_code);
+          return (
+            <TR key={m.metric_code}>
+              <TD className="px-4">
+                <div className="font-medium text-agsi-navy">{m.metric_label}</div>
+                <div className="text-xs text-agsi-darkGray">
+                  {m.metric_code}
+                  {override && (
+                    <Badge variant="purple" className="ml-2">
+                      override
+                    </Badge>
+                  )}
+                </div>
+              </TD>
+              {quarters.map((qi) => {
+                const a = actualFor(m.metric_code, qi.q);
+                const t = targetFor(m, qi.q);
+                const variant = ragVariant(a, t);
+                const isLive = qi.status === 'in_progress';
+                const colourClass =
+                  variant === 'red'
+                    ? 'text-rag-red'
+                    : variant === 'amber'
+                      ? 'text-rag-amber'
+                      : variant === 'green'
+                        ? 'text-agsi-green'
+                        : 'text-agsi-navy';
+                return (
+                  <React.Fragment key={qi.q}>
+                    <TD
+                      className={`border-l border-agsi-lightGray/50 px-2 tabular ${colourClass} ${
+                        isLive ? 'bg-agsi-accent/5' : ''
+                      }`}
+                    >
+                      {a}
+                    </TD>
+                    <TD
+                      className={`px-2 tabular text-agsi-darkGray ${
+                        isLive ? 'bg-agsi-accent/5' : ''
+                      }`}
+                    >
+                      {t}
+                    </TD>
+                  </React.Fragment>
+                );
+              })}
+              <TD className="border-l border-agsi-lightGray/50 px-4 tabular text-agsi-darkGray">
+                <span className="text-agsi-navy">{actualFY}</span> / {targetFY}
+              </TD>
+            </TR>
+          );
+        })}
+      </TBody>
+    </Table>
   );
 }

@@ -7,6 +7,7 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { ROLE_LABEL, type Level } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
@@ -294,51 +295,48 @@ export default async function PerformanceReviewPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                <th className="px-4 py-2 font-medium">Quarter</th>
-                <th className="px-4 py-2 font-medium tabular">A</th>
-                <th className="px-4 py-2 font-medium tabular">B</th>
-                <th className="px-4 py-2 font-medium tabular">C</th>
-                <th className="px-4 py-2 font-medium tabular">D</th>
-                <th className="px-4 py-2 font-medium tabular">BEI</th>
-                <th className="px-4 py-2 font-medium">Tier</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <THead>
+              <TR head>
+                <TH className="px-4">Quarter</TH>
+                <TH className="px-4 tabular">A</TH>
+                <TH className="px-4 tabular">B</TH>
+                <TH className="px-4 tabular">C</TH>
+                <TH className="px-4 tabular">D</TH>
+                <TH className="px-4 tabular">BEI</TH>
+                <TH className="px-4">Tier</TH>
+              </TR>
+            </THead>
+            <TBody>
               {quarters.map((qi) => {
                 const b = beiByQ.get(qi.q);
                 const isLive = qi.status === 'in_progress';
                 return (
-                  <tr
-                    key={qi.q}
-                    className={`border-b border-agsi-lightGray/50 ${isLive ? 'bg-agsi-accent/5' : ''}`}
-                  >
-                    <td className="px-4 py-3 font-medium text-agsi-navy">
+                  <TR key={qi.q} className={isLive ? 'bg-agsi-accent/5' : ''}>
+                    <TD className="px-4 font-medium text-agsi-navy">
                       Q{qi.q}
                       {isLive && (
                         <span className="ml-2 text-[10px] font-normal text-agsi-accent">
                           {quarterStatusLabel(qi)}
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">
                       {b?.driver_a_pct == null ? '—' : `${Math.round(Number(b.driver_a_pct) * 100)}%`}
-                    </td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">
                       {b?.driver_b_pct == null ? '—' : `${Math.round(Number(b.driver_b_pct) * 100)}%`}
-                    </td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">
                       {b?.driver_c_pct == null ? '—' : `${Math.round(Number(b.driver_c_pct) * 100)}%`}
-                    </td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">
                       {b?.driver_d_pct == null ? '—' : `${Math.round(Number(b.driver_d_pct) * 100)}%`}
-                    </td>
-                    <td className="px-4 py-3 tabular font-semibold text-agsi-navy">
+                    </TD>
+                    <TD className="px-4 tabular font-semibold text-agsi-navy">
                       {b?.bei == null ? '—' : `${Math.round(Number(b.bei) * 100)}%`}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {b?.bei_tier ? (
                         <Badge variant={TIER_VARIANT[b.bei_tier] ?? 'neutral'}>
                           {TIER_LABEL[b.bei_tier] ?? b.bei_tier}
@@ -346,12 +344,12 @@ export default async function PerformanceReviewPage({
                       ) : (
                         <span className="text-xs text-agsi-darkGray">—</span>
                       )}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 );
               })}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -365,18 +363,18 @@ export default async function PerformanceReviewPage({
             {grouped[d].length === 0 ? (
               <p className="p-6 text-sm text-agsi-darkGray">No metrics seeded.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                    <th className="px-4 py-2 font-medium">Metric</th>
+              <Table>
+                <THead>
+                  <TR head>
+                    <TH className="px-4">Metric</TH>
                     {quarters.map((qi) => {
                       const isLive = qi.status === 'in_progress';
                       const isDone = qi.status === 'completed';
                       return (
-                        <th
+                        <TH
                           key={qi.q}
                           colSpan={2}
-                          className={`border-l border-agsi-lightGray/50 px-2 py-2 text-center font-medium ${
+                          className={`border-l border-agsi-lightGray/50 px-2 text-center ${
                             isLive ? 'bg-agsi-accent/5' : ''
                           }`}
                         >
@@ -391,38 +389,38 @@ export default async function PerformanceReviewPage({
                               completed
                             </div>
                           )}
-                        </th>
+                        </TH>
                       );
                     })}
-                    <th className="border-l border-agsi-lightGray/50 px-4 py-2 font-medium">FY</th>
-                  </tr>
-                  <tr className="border-b border-agsi-lightGray text-left text-xs text-agsi-darkGray">
-                    <th></th>
+                    <TH className="border-l border-agsi-lightGray/50 px-4">FY</TH>
+                  </TR>
+                  <TR subhead>
+                    <TH></TH>
                     {quarters.map((qi) => {
                       const isLive = qi.status === 'in_progress';
                       return (
                         <React.Fragment key={qi.q}>
-                          <th
+                          <TH
                             className={`border-l border-agsi-lightGray/50 px-2 py-1 tabular ${
                               isLive ? 'bg-agsi-accent/5' : ''
                             }`}
                           >
                             A
-                          </th>
-                          <th
+                          </TH>
+                          <TH
                             className={`px-2 py-1 tabular ${
                               isLive ? 'bg-agsi-accent/5' : ''
                             }`}
                           >
                             T
-                          </th>
+                          </TH>
                         </React.Fragment>
                       );
                     })}
-                    <th className="border-l border-agsi-lightGray/50 px-4 py-1 tabular">A / T</th>
-                  </tr>
-                </thead>
-                <tbody>
+                    <TH className="border-l border-agsi-lightGray/50 px-4 py-1 tabular">A / T</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {grouped[d].map((m) => {
                     const override = overrideByMetric.has(m.metric_code);
                     const actualFY = quarters.reduce(
@@ -431,11 +429,11 @@ export default async function PerformanceReviewPage({
                     );
                     const targetFY = quarters.reduce((s, qi) => s + targetFor(m, qi.q), 0);
                     return (
-                      <tr key={m.metric_code} className="border-b border-agsi-lightGray/50">
-                        <td className="px-4 py-3">
+                      <TR key={m.metric_code}>
+                        <TD className="px-4">
                           <div className="font-medium text-agsi-navy">{m.metric_label}</div>
                           {override && <Badge variant="purple" className="mt-1">override</Badge>}
-                        </td>
+                        </TD>
                         {quarters.map((qi) => {
                           const a = actualFor(m.metric_code, qi.q);
                           const t = targetFor(m, qi.q);
@@ -451,31 +449,31 @@ export default async function PerformanceReviewPage({
                                   : 'text-agsi-navy';
                           return (
                             <React.Fragment key={qi.q}>
-                              <td
-                                className={`border-l border-agsi-lightGray/50 px-2 py-3 tabular ${colourClass} ${
+                              <TD
+                                className={`border-l border-agsi-lightGray/50 px-2 tabular ${colourClass} ${
                                   isLive ? 'bg-agsi-accent/5' : ''
                                 }`}
                               >
                                 {a}
-                              </td>
-                              <td
-                                className={`px-2 py-3 tabular text-agsi-darkGray ${
+                              </TD>
+                              <TD
+                                className={`px-2 tabular text-agsi-darkGray ${
                                   isLive ? 'bg-agsi-accent/5' : ''
                                 }`}
                               >
                                 {t}
-                              </td>
+                              </TD>
                             </React.Fragment>
                           );
                         })}
-                        <td className="border-l border-agsi-lightGray/50 px-4 py-3 tabular text-agsi-darkGray">
+                        <TD className="border-l border-agsi-lightGray/50 px-4 tabular text-agsi-darkGray">
                           <span className="text-agsi-navy">{actualFY}</span> / {targetFY}
-                        </td>
-                      </tr>
+                        </TD>
+                      </TR>
                     );
                   })}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -493,34 +491,34 @@ export default async function PerformanceReviewPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                <th className="px-4 py-2 font-medium">Quarter</th>
-                <th className="px-4 py-2 font-medium tabular">Developer</th>
-                <th className="px-4 py-2 font-medium tabular">Design Consultant</th>
-                <th className="px-4 py-2 font-medium tabular">Main Contractor</th>
-                <th className="px-4 py-2 font-medium tabular">Other</th>
-                <th className="px-4 py-2 font-medium tabular">Total</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <THead>
+              <TR head>
+                <TH className="px-4">Quarter</TH>
+                <TH className="px-4 tabular">Developer</TH>
+                <TH className="px-4 tabular">Design Consultant</TH>
+                <TH className="px-4 tabular">Main Contractor</TH>
+                <TH className="px-4 tabular">Other</TH>
+                <TH className="px-4 tabular">Total</TH>
+              </TR>
+            </THead>
+            <TBody>
               {[1, 2, 3, 4].map((q) => {
                 const c = compByQ.get(q)!;
                 const total = c.developer + c.design_consultant + c.main_contractor + c.other;
                 return (
-                  <tr key={q} className="border-b border-agsi-lightGray/50">
-                    <td className="px-4 py-3 font-medium text-agsi-navy">Q{q}</td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">{c.developer}</td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">{c.design_consultant}</td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">{c.main_contractor}</td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">{c.other}</td>
-                    <td className="px-4 py-3 tabular font-semibold text-agsi-navy">{total}</td>
-                  </tr>
+                  <TR key={q}>
+                    <TD className="px-4 font-medium text-agsi-navy">Q{q}</TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">{c.developer}</TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">{c.design_consultant}</TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">{c.main_contractor}</TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">{c.other}</TD>
+                    <TD className="px-4 tabular font-semibold text-agsi-navy">{total}</TD>
+                  </TR>
                 );
               })}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -533,28 +531,28 @@ export default async function PerformanceReviewPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                <th className="px-4 py-2 font-medium">Quarter</th>
-                <th className="px-4 py-2 font-medium tabular">Engagements logged</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <THead>
+              <TR head>
+                <TH className="px-4">Quarter</TH>
+                <TH className="px-4 tabular">Engagements logged</TH>
+              </TR>
+            </THead>
+            <TBody>
               {[1, 2, 3, 4].map((q) => (
-                <tr key={q} className="border-b border-agsi-lightGray/50">
-                  <td className="px-4 py-3 font-medium text-agsi-navy">Q{q}</td>
-                  <td className="px-4 py-3 tabular text-agsi-darkGray">{engByQ.get(q) ?? 0}</td>
-                </tr>
+                <TR key={q}>
+                  <TD className="px-4 font-medium text-agsi-navy">Q{q}</TD>
+                  <TD className="px-4 tabular text-agsi-darkGray">{engByQ.get(q) ?? 0}</TD>
+                </TR>
               ))}
-              <tr>
-                <td className="px-4 py-3 font-medium text-agsi-navy">Total</td>
-                <td className="px-4 py-3 tabular font-semibold text-agsi-navy">
+              <TR className="border-b-0">
+                <TD className="px-4 font-medium text-agsi-navy">Total</TD>
+                <TD className="px-4 tabular font-semibold text-agsi-navy">
                   {engagements.length}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </TD>
+              </TR>
+            </TBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -570,25 +568,25 @@ export default async function PerformanceReviewPage({
           {levelRows.length === 0 ? (
             <p className="p-6 text-sm text-agsi-darkGray">No level changes credited this FY.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray">
-                  <th className="px-4 py-2 font-medium">When</th>
-                  <th className="px-4 py-2 font-medium">Company</th>
-                  <th className="px-4 py-2 font-medium">Type</th>
-                  <th className="px-4 py-2 font-medium">Move</th>
-                  <th className="px-4 py-2 font-medium">FY/Q</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">Evidence</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">When</TH>
+                  <TH className="px-4">Company</TH>
+                  <TH className="px-4">Type</TH>
+                  <TH className="px-4">Move</TH>
+                  <TH className="px-4">FY/Q</TH>
+                  <TH className="px-4">Status</TH>
+                  <TH className="px-4">Evidence</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {levelRows.map((r) => (
-                  <tr key={r.id} className="border-b border-agsi-lightGray/50">
-                    <td className="px-4 py-3 text-agsi-darkGray">
+                  <TR key={r.id}>
+                    <TD className="px-4 text-agsi-darkGray">
                       {new Date(r.changed_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {r.company ? (
                         <Link
                           href={`/companies/${r.company.id}`}
@@ -599,28 +597,28 @@ export default async function PerformanceReviewPage({
                       ) : (
                         <span className="italic text-agsi-darkGray">deleted</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 text-agsi-darkGray">
                       {COMPANY_TYPE_LABEL[r.company_type_at_time] ?? r.company_type_at_time}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       <div className="flex items-center gap-2">
                         <LevelBadge level={r.from_level} />
                         <span className="text-agsi-darkGray">→</span>
                         <LevelBadge level={r.to_level} />
                       </div>
-                    </td>
-                    <td className="px-4 py-3 tabular text-agsi-darkGray">
+                    </TD>
+                    <TD className="px-4 tabular text-agsi-darkGray">
                       {r.fiscal_year} Q{r.fiscal_quarter}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {!r.is_forward && <Badge variant="amber">Backward</Badge>}
                       {r.is_forward && r.is_credited && <Badge variant="green">Credited</Badge>}
                       {r.is_forward && !r.is_credited && (
                         <Badge variant="neutral">Uncredited</Badge>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TD>
+                    <TD className="px-4">
                       {r.evidence_note ? (
                         <span className="line-clamp-2 max-w-xs text-xs text-agsi-darkGray">
                           {r.evidence_note}
@@ -628,11 +626,11 @@ export default async function PerformanceReviewPage({
                       ) : (
                         <span className="text-xs text-agsi-darkGray">—</span>
                       )}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           )}
         </CardContent>
       </Card>
