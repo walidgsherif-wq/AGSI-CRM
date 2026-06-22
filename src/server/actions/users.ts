@@ -38,23 +38,33 @@ function adminClient() {
 }
 
 /**
- * Invite-only signup, Google-OAuth flavour. Two paths:
+ * Invite-only signup, Google-OAuth flavour. H8 fix: lazy provisioning.
  *
- * 1. New email — calls supabase.auth.admin.createUser({email_confirm:
- *    true}) to provision auth.users + profile WITHOUT sending an
- *    email. The teammate then signs in at /login with Google using
- *    that exact address; Supabase links the Google identity to the
- *    pre-created auth.users row by matching email. Role + attribution
- *    live in APP_METADATA (admin-only, not user-editable).
+ * Old flow (PR #60) pre-created an auth.users row + a profile keyed
+ * to that row's UUID. Google OAuth couldn't claim the pre-created
+ * row by email — the invitee either got a 'user already registered'
+ * error or Supabase minted a fresh auth.users row, orphaning the
+ * pre-provisioned profile. The teammate then landed on the
+ * profile_missing screen even though they were "invited".
  *
- * 2. Already-registered email — no-op on auth, just acknowledges and
- *    tells the admin the user is already provisioned.
+ * Now: this action just stashes the invite metadata in invited_users
+ * (0063). No auth.users insert. No profile insert. When the invitee
+ * signs in with Google for the first time, Supabase mints a fresh
+ * auth.users row + Google identity (no collision possible because
+ * nothing pre-existed for that email). /auth/callback then calls
+ * claim_invited_profile(email, oauth_user_id) which atomically
+ * creates the profile with the real OAuth id and deletes the invite
+ * row.
  *
- * The 0055 migration tightened the on_auth_user_created trigger to
- * only bootstrap the initial admin — every other auth.users insert
- * relies on this handler to create the profile. Anyone who manages to
- * OAuth without a matching profile is bounced by get-user.ts
- * (?error=profile_missing).
+ * Two paths:
+ *   1. Already-provisioned (profile exists) — no-op; just remind
+ *      the admin that they can sign in.
+ *   2. New email — INSERT into invited_users.
+ *
+ * Re-invite of an email that already has a pending invited_users row
+ * goes through the ON CONFLICT branch: update role / full_name /
+ * invited_by / invited_at so an admin can correct a mistake before
+ * the invitee first signs in.
  */
 export async function inviteUser(formData: FormData) {
   const callerId = await assertCallerIsAdmin();
@@ -71,8 +81,7 @@ export async function inviteUser(formData: FormData) {
 
   const admin = adminClient();
 
-  // Pre-check: do we already have a profile (and therefore an auth.users
-  // row) for this email? Cheaper than admin.listUsers + email filter.
+  // Pre-check: is this email already an active teammate?
   const { data: existingProfile } = await admin
     .from('profiles')
     .select('id, full_name, role, is_active')
@@ -94,52 +103,28 @@ export async function inviteUser(formData: FormData) {
     };
   }
 
-  const invitedAt = new Date().toISOString();
-
-  // Create the auth.users row pre-confirmed so Google OAuth can link
-  // by email without an email-verification round-trip. No email is
-  // sent. Role + attribution stamped into app_metadata (admin-only;
-  // user sessions cannot mutate this).
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    email_confirm: true,
-    user_metadata: { full_name: fullName },
-    app_metadata: {
-      role,
-      full_name: fullName,
-      invited_by: callerId,
-      invited_at: invitedAt,
-    },
-  });
-  if (createErr || !created?.user) {
-    return { error: createErr?.message ?? 'Provisioning failed' };
-  }
-
-  // Insert the profile directly. The 0055 trigger no longer
-  // auto-creates a default-role profile for non-bootstrap inserts, so
-  // this is now the only path that grants profile + role.
-  const { error: profileErr } = await admin.from('profiles').upsert(
+  // Upsert into invited_users. Re-invites for the same email overwrite
+  // role / full_name / invited_by / invited_at so an admin can correct
+  // a mistake before the invitee first signs in.
+  const { error: inviteErr } = await admin.from('invited_users').upsert(
     {
-      id: created.user.id,
       email,
-      full_name: fullName,
       role,
-      is_active: true,
+      full_name: fullName,
       invited_by: callerId,
-      invited_at: invitedAt,
+      invited_at: new Date().toISOString(),
     },
-    { onConflict: 'id' },
+    { onConflict: 'email' },
   );
-  if (profileErr) {
-    return { error: `Account created, but profile creation failed: ${profileErr.message}` };
+  if (inviteErr) {
+    return { error: `Invite failed: ${inviteErr.message}` };
   }
 
   revalidatePath('/admin/users');
   return {
     ok: true,
     status: 'invited' as const,
-    userId: created.user.id,
-    message: `${fullName} provisioned. Tell them to sign in at /login with Google using ${email}.`,
+    message: `${fullName} added to the invite list. Tell them to sign in at /login with Google using ${email}.`,
   };
 }
 
