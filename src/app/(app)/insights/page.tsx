@@ -5,6 +5,8 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireFeature } from '@/lib/auth/features';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Tile } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList } from '@/components/ui/bar-list';
 import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SnapshotPicker } from './_components/SnapshotPicker';
@@ -144,6 +146,20 @@ export default async function InsightsPage({
     const v = (r.metric_value_json as { value_aed?: number } | null)?.value_aed;
     return acc + Number(v ?? 0);
   }, 0);
+  // Same source, counts: total projects tracked across all stages.
+  const marketTotalProjects = (p.projects_by_stage ?? []).reduce((acc, r) => {
+    const v = (r.metric_value_json as { count?: number } | null)?.count;
+    return acc + Number(v ?? 0);
+  }, 0);
+  // Rebar tonnes in the active consumption window (already aggregated by the SQL).
+  const rebarInWindowTonnes = (() => {
+    const j = (p.rebar_window?.[0]?.metric_value_json ?? null) as
+      | { in_window?: { remaining_rebar_tonnes?: number } }
+      | null;
+    return Number(j?.in_window?.remaining_rebar_tonnes ?? 0);
+  })();
+  // Sparkline series for the project-value StatCard: pre + under
+  // construction summed per snapshot from trendData (built below).
   const aedMarketFmt = new Intl.NumberFormat('en-AE', {
     style: 'currency',
     currency: 'AED',
@@ -221,12 +237,31 @@ export default async function InsightsPage({
         />
       </div>
 
-      <p className="text-sm text-agsi-navy">
-        Market — total project value tracked:{' '}
-        <span className="font-semibold">{aedMarketFmt.format(marketTotalAed)}</span>
-      </p>
-
       <FreshnessRow primary={primaryRef} compare={compareRef} />
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="Market value tracked"
+          value={aedMarketFmt.format(marketTotalAed)}
+          sublabel="Sum across all stages"
+          trend={trendData.map(
+            (t) => t.pre_construction_aed + t.under_construction_aed,
+          )}
+        />
+        <StatCard
+          label="Projects tracked"
+          value={new Intl.NumberFormat().format(marketTotalProjects)}
+          sublabel="From the primary BNC snapshot"
+        />
+        <StatCard
+          label="Rebar in active window"
+          value={`${new Intl.NumberFormat(undefined, {
+            maximumFractionDigits: 0,
+          }).format(rebarInWindowTonnes)} MT`}
+          sublabel="Pre-MEP-stage projects (remaining demand)"
+          trend={trendData.map((t) => t.rebar_tonnes)}
+        />
+      </div>
 
       <TrendCharts trend={trendData} prices={priceData} />
 
@@ -523,7 +558,6 @@ function DimensionCard({
 function TopCompaniesCard({
   title,
   rows,
-  compareRows,
   countKey,
   listHref,
 }: {
@@ -536,26 +570,16 @@ function TopCompaniesCard({
    *  card header that explains the ranking just clicked. */
   listHref?: string;
 }) {
-  const compareLookup = new Map<string, number>();
-  for (const r of compareRows ?? []) {
-    const j = r.metric_value_json as Record<string, unknown> | null;
-    const v = j?.[countKey];
-    if (v != null) compareLookup.set(r.dimension_key, Number(v));
-  }
-
-  const sorted = (rows ?? [])
-    .map((r) => {
-      const j = r.metric_value_json as
-        | { company_name?: string; value_aed?: number }
-        | null;
-      return {
-        id: r.dimension_key,
-        name: String(j?.company_name ?? '(unnamed)'),
-        count: Number((r.metric_value_json as Record<string, unknown> | null)?.[countKey] ?? 0),
-        value: Number(j?.value_aed ?? 0),
-      };
-    })
-    .sort((a, b) => b.count - a.count);
+  const items = (rows ?? []).map((r) => {
+    const j = r.metric_value_json as
+      | { company_name?: string; value_aed?: number }
+      | null;
+    return {
+      name: String(j?.company_name ?? '(unnamed)'),
+      value: Number((r.metric_value_json as Record<string, unknown> | null)?.[countKey] ?? 0),
+      href: `/companies/${r.dimension_key}`,
+    };
+  });
 
   return (
     <Card>
@@ -563,7 +587,7 @@ function TopCompaniesCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>{title}</CardTitle>
-            <CardDescription>By project count and total value.</CardDescription>
+            <CardDescription>Ranked by project count.</CardDescription>
           </div>
           {listHref && (
             <Link
@@ -576,35 +600,7 @@ function TopCompaniesCard({
         </div>
       </CardHeader>
       <CardContent>
-        {sorted.length === 0 ? (
-          <p className="text-sm text-agsi-darkGray">No data.</p>
-        ) : (
-          <ol className="space-y-1 text-sm">
-            {sorted.map((r, i) => (
-              <li
-                key={r.id}
-                className="flex items-center justify-between border-b border-agsi-lightGray py-1 last:border-b-0"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="text-xs text-agsi-darkGray">{i + 1}.</span>
-                  <Link
-                    href={`/companies/${r.id}`}
-                    className="truncate text-agsi-navy hover:underline"
-                    title={r.name}
-                  >
-                    {r.name}
-                  </Link>
-                </span>
-                <span className="ml-2 flex items-center gap-2 tabular-nums">
-                  <span className="font-semibold text-agsi-navy">{r.count}</span>
-                  {compareRows && compareLookup.has(r.id) && (
-                    <DiffBadge cur={r.count} prev={compareLookup.get(r.id) ?? 0} />
-                  )}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+        <BarList items={items} />
       </CardContent>
     </Card>
   );
