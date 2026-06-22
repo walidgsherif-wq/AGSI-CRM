@@ -23,6 +23,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.4",
+    "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "html-to-image": "^1.11.13",
