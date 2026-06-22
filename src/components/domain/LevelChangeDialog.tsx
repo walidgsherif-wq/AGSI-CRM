@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import * as Dialog from '@radix-ui/react-dialog';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -118,91 +119,101 @@ export function LevelChangeDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-agsi-navy/50 p-4">
-      <form
-        action={onSubmit}
-        className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl border border-agsi-lightGray bg-white p-5 shadow-xl"
-      >
-        <input type="hidden" name="company_id" value={companyId} />
-        <input type="hidden" name="from_level" value={currentLevel} />
-        {lockedTarget && <input type="hidden" name="to_level" value={lockedTarget} />}
-
-        <div>
-          <h3 className="text-lg font-semibold text-agsi-navy">
-            {isAdmin ? 'Change level' : 'Request level change'}
-          </h3>
-          <p className="mt-1 text-sm text-agsi-darkGray">
-            <strong>{companyName}</strong> is currently at <strong>{currentLevel}</strong>.
-            {lockedTarget && (
-              <>
-                {' '}
-                Move to <strong>{lockedTarget}</strong>.
-              </>
-            )}
-            {!isAdmin && ' An admin will review your request before the level moves.'}
-          </p>
-        </div>
-
-        {!lockedTarget && (
-          <div>
-            <label className="block text-xs font-medium text-agsi-darkGray">Move to</label>
-            <Select
-              name="to_level"
-              required
-              defaultValue={targetOptions[0]}
-              className="mt-1"
-            >
-              {targetOptions.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-1 text-xs text-agsi-darkGray">
-              Single-step only. To move multiple levels, make each step its own change with its
-              own evidence.
-            </p>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-xs font-medium text-agsi-darkGray">
-            Evidence note <span className="text-rag-red">*</span>
-          </label>
-          <Textarea
-            name="evidence_note"
-            required
-            rows={3}
-            placeholder="What progressed this stakeholder? (e.g. 'Signed MOU on 25 Mar; copy attached.')"
-            className="mt-1"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-medium text-agsi-darkGray">
-            Evidence files {isAdmin ? '(optional)' : '— add at least one screenshot/PDF'}
-          </label>
-          <EvidenceUploader companyId={companyId} onChange={setEvidenceFiles} disabled={pending} />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button type="submit" size="sm" disabled={pending}>
-            {pending ? 'Saving…' : isAdmin ? 'Confirm change' : 'Submit for approval'}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setEvidenceFiles([]);
-              onClose();
-            }}
+    <Dialog.Root
+      open
+      onOpenChange={(next) => {
+        if (!next) {
+          setEvidenceFiles([]);
+          onClose();
+        }
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-agsi-navy/50 data-[state=open]:animate-in data-[state=closed]:animate-out" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 p-4 focus:outline-none"
+          aria-describedby={undefined}
+        >
+          <form
+            action={onSubmit}
+            className="max-h-[90vh] space-y-4 overflow-y-auto rounded-xl border border-agsi-lightGray bg-white p-5 shadow-xl"
           >
-            Cancel
-          </Button>
-          {error && <p className="text-xs text-rag-red">{error}</p>}
-        </div>
-      </form>
-    </div>
+            <input type="hidden" name="company_id" value={companyId} />
+            <input type="hidden" name="from_level" value={currentLevel} />
+            {lockedTarget && <input type="hidden" name="to_level" value={lockedTarget} />}
+
+            <div>
+              <Dialog.Title className="text-lg font-semibold text-agsi-navy">
+                {isAdmin ? 'Change level' : 'Request level change'}
+              </Dialog.Title>
+              <p className="mt-1 text-sm text-agsi-darkGray">
+                <strong>{companyName}</strong> is currently at <strong>{currentLevel}</strong>.
+                {lockedTarget && (
+                  <>
+                    {' '}
+                    Move to <strong>{lockedTarget}</strong>.
+                  </>
+                )}
+                {!isAdmin && ' An admin will review your request before the level moves.'}
+              </p>
+            </div>
+
+            {!lockedTarget && (
+              <div>
+                <label className="block text-xs font-medium text-agsi-darkGray">Move to</label>
+                <Select
+                  name="to_level"
+                  required
+                  defaultValue={targetOptions[0]}
+                  className="mt-1"
+                >
+                  {targetOptions.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-1 text-xs text-agsi-darkGray">
+                  Single-step only. To move multiple levels, make each step its own change with its
+                  own evidence.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-agsi-darkGray">
+                Evidence note <span className="text-rag-red">*</span>
+              </label>
+              <Textarea
+                name="evidence_note"
+                required
+                rows={3}
+                placeholder="What progressed this stakeholder? (e.g. 'Signed MOU on 25 Mar; copy attached.')"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-agsi-darkGray">
+                Evidence files {isAdmin ? '(optional)' : '— add at least one screenshot/PDF'}
+              </label>
+              <EvidenceUploader companyId={companyId} onChange={setEvidenceFiles} disabled={pending} />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button type="submit" size="sm" disabled={pending}>
+                {pending ? 'Saving…' : isAdmin ? 'Confirm change' : 'Submit for approval'}
+              </Button>
+              <Dialog.Close asChild>
+                <Button type="button" variant="ghost" size="sm">
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              {error && <p className="text-xs text-rag-red">{error}</p>}
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
