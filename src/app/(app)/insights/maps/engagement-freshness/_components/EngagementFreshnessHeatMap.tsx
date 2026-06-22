@@ -14,7 +14,7 @@ import { LevelBadge } from '@/components/domain/LevelBadge';
 import { HeatMapExportButton } from '@/components/domain/HeatMapExportButton';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
-import { AGSI, RAG } from '@/lib/brand-colors';
+import { AGSI, RAG } from '@/lib/design/colors';
 
 type CompanyType = (typeof COMPANY_TYPES)[number];
 

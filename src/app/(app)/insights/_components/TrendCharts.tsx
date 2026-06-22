@@ -10,7 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AGSI } from '@/lib/brand-colors';
+import { AGSI } from '@/lib/design/colors';
 
 export type TrendPoint = {
   snapshot_date: string;

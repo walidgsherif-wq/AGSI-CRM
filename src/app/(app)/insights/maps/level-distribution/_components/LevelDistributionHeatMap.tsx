@@ -12,7 +12,7 @@ import {
 import { HeatMapExportButton } from '@/components/domain/HeatMapExportButton';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
-import { LEVEL_COLOURS } from '@/lib/brand-colors';
+import { LEVEL_COLOURS } from '@/lib/design/colors';
 
 type CompanyType = (typeof COMPANY_TYPES)[number];
 

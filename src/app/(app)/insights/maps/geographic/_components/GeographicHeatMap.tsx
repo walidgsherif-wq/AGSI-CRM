@@ -15,7 +15,7 @@ import {
   COMPANY_TYPES,
 } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
-import { AGSI } from '@/lib/brand-colors';
+import { AGSI } from '@/lib/design/colors';
 
 type CompanyType = (typeof COMPANY_TYPES)[number];
 
