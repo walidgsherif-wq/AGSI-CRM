@@ -134,6 +134,29 @@ function ROLE_LABEL_INTERNAL(r: Role): string {
   return r.replace(/_/g, ' ');
 }
 
+/**
+ * Revoke a pending invitation from the invited_users allowlist.
+ * Admin-only (matches the /admin/users page gate). The row in
+ * invited_users is the only artefact; no auth.users / profiles
+ * exists yet, so this is a single-table delete with no orphan
+ * cleanup. After first sign-in, the row is gone — revoking after
+ * that is a no-op.
+ */
+export async function revokeInvite(email: string) {
+  await assertCallerIsAdmin();
+  const normalised = email.trim().toLowerCase();
+  if (!normalised) return { error: 'Email required.' };
+
+  const { error } = await adminClient()
+    .from('invited_users')
+    .delete()
+    .eq('email', normalised);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/users');
+  return { ok: true as const };
+}
+
 export async function setUserRole(userId: string, role: Role) {
   await assertCallerIsAdmin();
   if (!(ROLES as readonly string[]).includes(role)) {

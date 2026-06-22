@@ -9,6 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { InviteUserForm } from './_components/InviteUserForm';
 import { UserRoleActions } from './_components/UserRoleActions';
+import {
+  PendingInvitationsList,
+  type PendingInvite,
+} from './_components/PendingInvitationsList';
 import { ROLE_LABEL } from '@/types/domain';
 
 export const dynamic = 'force-dynamic';
@@ -33,11 +37,19 @@ export default async function AdminUsersPage() {
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  const { data: users, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, email, role, is_active, created_at, invited_at')
-    .order('created_at', { ascending: false })
-    .returns<ProfileRow[]>();
+  const [{ data: users, error }, { data: invites }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, role, is_active, created_at, invited_at')
+      .order('created_at', { ascending: false })
+      .returns<ProfileRow[]>(),
+    supabase
+      .from('invited_users')
+      .select('email, role, full_name, invited_at')
+      .order('invited_at', { ascending: false })
+      .returns<PendingInvite[]>(),
+  ]);
+  const pendingInvites = invites ?? [];
 
   return (
     <div className="space-y-6">
@@ -61,6 +73,20 @@ export default async function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           <InviteUserForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pending invitations</CardTitle>
+          <CardDescription>
+            Invited via the form above. Each row clears automatically when the
+            invitee signs in with Google for the first time. Revoke to remove an
+            invite that should no longer stand.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PendingInvitationsList invites={pendingInvites} />
         </CardContent>
       </Card>
 
