@@ -320,16 +320,16 @@ function RelationshipHeadline({
 
 function DeltaPill({ delta }: { delta: number | null }) {
   if (delta === null) {
-    return <p className="mt-0.5 text-[11px] text-agsi-darkGray">first report</p>;
+    return <p className="mt-0.5 text-xs2 text-agsi-darkGray">first report</p>;
   }
   if (delta === 0) {
-    return <p className="mt-0.5 text-[11px] text-agsi-darkGray">— no change</p>;
+    return <p className="mt-0.5 text-xs2 text-agsi-darkGray">— no change</p>;
   }
   const positive = delta > 0;
   return (
     <p
       className={cn(
-        'mt-0.5 text-[11px] font-medium',
+        'mt-0.5 text-xs2 font-medium',
         positive ? 'text-rag-green' : 'text-rag-red',
       )}
     >
@@ -340,7 +340,7 @@ function DeltaPill({ delta }: { delta: number | null }) {
 
 function GapToTargetBar({ actual, target }: { actual: number; target: number }) {
   if (!(target > 0)) {
-    return <p className="mt-1.5 text-[11px] italic text-agsi-darkGray">no target set</p>;
+    return <p className="mt-1.5 text-xs2 italic text-agsi-darkGray">no target set</p>;
   }
   const ratio = actual / target;
   const fillPct = Math.min(100, Math.max(0, ratio * 100));
@@ -504,7 +504,7 @@ function PipelineSection({ payload }: { payload: LeadershipReportPayload }) {
                 </span>
                 {m.owner_name && <span className="text-agsi-darkGray">· {m.owner_name}</span>}
                 {!m.is_credited && (
-                  <Badge variant="neutral" className="text-[10px]">
+                  <Badge variant="neutral" className="text-xxs">
                     uncredited
                   </Badge>
                 )}
@@ -662,7 +662,7 @@ function MarketContext({ payload }: { payload: LeadershipReportPayload }) {
           <p className="mt-1 text-xl font-semibold tabular-nums text-agsi-navy">
             AED {fmt(m.total_market_value_aed)}
           </p>
-          <p className="text-[11px] text-agsi-darkGray">
+          <p className="text-xs2 text-agsi-darkGray">
             from BNC upload dated {m.source_upload_date}
           </p>
         </div>
@@ -728,7 +728,7 @@ function FreshnessTile({
   };
   return (
     <div className={`rounded p-2 text-center ${bg[tone]}`}>
-      <p className="text-[10px] font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-xxs font-medium uppercase tracking-wide">{label}</p>
       <p className="text-base font-semibold tabular-nums">{value}</p>
     </div>
   );

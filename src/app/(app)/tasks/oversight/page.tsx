@@ -256,7 +256,7 @@ export default async function TaskOversightPage({
         >
           {overdueOnly ? '✓ Overdue only' : 'Overdue only'}
         </Link>
-        <span className="ml-auto text-[11px] text-agsi-darkGray">
+        <span className="ml-auto text-xs2 text-agsi-darkGray">
           {visibleTasks.length} of {tasks.length}
         </span>
       </Tile>

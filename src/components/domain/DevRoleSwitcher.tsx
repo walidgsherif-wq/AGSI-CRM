@@ -22,7 +22,7 @@ export function DevRoleSwitcher({ currentRole }: { currentRole: Role }) {
     <div className="mt-4 rounded-lg border border-dashed border-agsi-midGray/60 bg-agsi-offWhite p-3">
       <label
         htmlFor="dev-role-switcher"
-        className="block text-[10px] font-semibold uppercase tracking-wider text-agsi-darkGray"
+        className="block text-xxs font-semibold uppercase tracking-wider text-agsi-darkGray"
       >
         Dev role (M1 only)
       </label>

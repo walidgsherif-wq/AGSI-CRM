@@ -52,7 +52,7 @@ export function TrendCharts({
           </CardHeader>
           <CardContent>
             <PipelineChart points={trend} />
-            <p className="mt-2 text-[11px] italic text-agsi-darkGray">
+            <p className="mt-2 text-xs2 italic text-agsi-darkGray">
               Data note: BNC began publishing values for pre-construction
               projects (concept / design / tender) from the 2026-06-05 export
               onward. Earlier snapshots show $0 for those stages because
@@ -179,7 +179,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-agsi-darkGray">
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs2 text-agsi-darkGray">
         <Legend color={AGSI.accent} label="Pre-construction value (AED)" />
         <Legend color={AGSI.navy} label="Under-construction value (AED)" />
         <Legend color={AGSI.green} label="Rebar in active window (MT)" />

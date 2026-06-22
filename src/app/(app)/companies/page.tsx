@@ -418,7 +418,7 @@ export default async function CompaniesPage({
                           <Badge variant={BUCKET_BADGE[s.engagement_bucket]}>
                             {s.engagement_bucket}
                           </Badge>
-                          <span className="text-[11px] text-agsi-darkGray">
+                          <span className="text-xs2 text-agsi-darkGray">
                             {s.days_since_last_contact === null
                               ? 'never'
                               : `${s.days_since_last_contact}d since`}

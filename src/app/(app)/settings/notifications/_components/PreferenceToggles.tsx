@@ -48,7 +48,7 @@ export function PreferenceToggles({
           aria-hidden
         />
       </button>
-      {error && <span className="text-[10px] text-rag-red">{error}</span>}
+      {error && <span className="text-xxs text-rag-red">{error}</span>}
     </div>
   );
 }

@@ -241,7 +241,7 @@ function TaskCard({
                 size="xs"
                 title={`Delegated by ${card.assigned_by_name}`}
               />
-              <span className="text-[10px] text-agsi-darkGray" aria-hidden>
+              <span className="text-xxs text-agsi-darkGray" aria-hidden>
                 →
               </span>
             </>

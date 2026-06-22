@@ -42,7 +42,7 @@ export default function AppError({
         the problem persists share the digest with the admin.
       </p>
       {error.digest && (
-        <p className="font-mono text-[11px] text-agsi-darkGray">
+        <p className="font-mono text-xs2 text-agsi-darkGray">
           digest: {error.digest}
         </p>
       )}

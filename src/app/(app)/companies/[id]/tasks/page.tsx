@@ -189,7 +189,7 @@ export default async function CompanyTasksTab({
                       <TD className="px-4 text-agsi-darkGray">
                         <div>{t.owner?.full_name ?? '—'}</div>
                         {t.assigned_by?.full_name && (
-                          <div className="text-[11px] italic text-agsi-midGray">
+                          <div className="text-xs2 italic text-agsi-midGray">
                             assigned by {t.assigned_by.full_name}
                           </div>
                         )}

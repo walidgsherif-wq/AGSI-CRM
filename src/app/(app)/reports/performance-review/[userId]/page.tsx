@@ -322,7 +322,7 @@ export default async function PerformanceReviewPage({
                     <TD className="px-4 font-medium text-agsi-navy">
                       Q{qi.q}
                       {isLive && (
-                        <span className="ml-2 text-[10px] font-normal text-agsi-accent">
+                        <span className="ml-2 text-xxs font-normal text-agsi-accent">
                           {quarterStatusLabel(qi)}
                         </span>
                       )}
@@ -386,12 +386,12 @@ export default async function PerformanceReviewPage({
                         >
                           <div className="text-agsi-navy">Q{qi.q}</div>
                           {isLive && (
-                            <div className="text-[10px] font-normal normal-case text-agsi-accent">
+                            <div className="text-xxs font-normal normal-case text-agsi-accent">
                               {quarterStatusLabel(qi)}
                             </div>
                           )}
                           {isDone && (
-                            <div className="text-[10px] font-normal normal-case text-agsi-darkGray">
+                            <div className="text-xxs font-normal normal-case text-agsi-darkGray">
                               completed
                             </div>
                           )}

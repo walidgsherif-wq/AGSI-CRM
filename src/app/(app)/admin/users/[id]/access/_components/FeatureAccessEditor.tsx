@@ -76,7 +76,7 @@ function FeatureRowControl({ userId, row }: { userId: string; row: FeatureRow })
           {row.override !== null && <Badge variant="amber">override</Badge>}
         </div>
         <p className="mt-0.5 text-xs text-agsi-darkGray">{row.description}</p>
-        <p className="mt-0.5 text-[11px] text-agsi-midGray">
+        <p className="mt-0.5 text-xs2 text-agsi-midGray">
           Role default: {row.defaultAllowed ? 'visible' : 'hidden'}
         </p>
       </div>

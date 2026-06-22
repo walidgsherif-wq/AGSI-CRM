@@ -101,8 +101,8 @@ function PointRow({ initial }: { initial: Row }) {
         >
           {pending ? '…' : 'Save'}
         </button>
-        {status?.error && <p className="mt-1 text-[10px] text-rag-red">{status.error}</p>}
-        {status?.ok && <p className="mt-1 text-[10px] text-agsi-green">Saved</p>}
+        {status?.error && <p className="mt-1 text-xxs text-rag-red">{status.error}</p>}
+        {status?.ok && <p className="mt-1 text-xxs text-agsi-green">Saved</p>}
       </td>
     </tr>
   );

@@ -162,7 +162,7 @@ function Row({
             })}
           </span>
           {!n.is_read && (
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-rag-red">
+            <span className="text-xxs font-semibold uppercase tracking-wide text-rag-red">
               new
             </span>
           )}
@@ -187,7 +187,7 @@ function Row({
         <button
           type="button"
           onClick={onMarkRead}
-          className="text-[11px] text-agsi-darkGray hover:underline"
+          className="text-xs2 text-agsi-darkGray hover:underline"
         >
           Mark read
         </button>

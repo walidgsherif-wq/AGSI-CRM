@@ -52,7 +52,7 @@ export function AuditEventRow({ row }: { row: AuditRow }) {
           <span className="text-xs text-agsi-navy">{actorName ?? '(system / unknown)'}</span>
         </div>
         <p className="mt-1 text-sm text-agsi-navy">{summary}</p>
-        <p className="mt-0.5 font-mono text-[10px] text-agsi-darkGray">
+        <p className="mt-0.5 font-mono text-xxs text-agsi-darkGray">
           {row.entity_type}
           {row.entity_id ? ` · ${row.entity_id}` : ''}
         </p>
@@ -89,10 +89,10 @@ function JsonBlock({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-agsi-darkGray">
+      <p className="mb-1 text-xxs font-semibold uppercase tracking-wide text-agsi-darkGray">
         {label}
       </p>
-      <pre className="max-h-64 overflow-auto rounded border border-agsi-lightGray bg-white p-2 text-[11px] text-agsi-navy">
+      <pre className="max-h-64 overflow-auto rounded border border-agsi-lightGray bg-white p-2 text-xs2 text-agsi-navy">
         {data ? JSON.stringify(data, null, 2) : '(none)'}
       </pre>
     </div>
