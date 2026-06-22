@@ -558,6 +558,7 @@ function DimensionCard({
 function TopCompaniesCard({
   title,
   rows,
+  compareRows,
   countKey,
   listHref,
 }: {
@@ -570,14 +571,46 @@ function TopCompaniesCard({
    *  card header that explains the ranking just clicked. */
   listHref?: string;
 }) {
+  // Snapshot-vs-compare delta — same source the StageFunnel + Awarded
+  // breakdown cards still use. We only attach a delta to rows that
+  // exist in the compare snapshot too; companies new to the primary
+  // snapshot get no badge (matching pre-UI-2 behaviour).
+  const compareLookup = new Map<string, number>();
+  for (const r of compareRows ?? []) {
+    const j = r.metric_value_json as Record<string, unknown> | null;
+    const v = j?.[countKey];
+    if (v != null) compareLookup.set(r.dimension_key, Number(v));
+  }
+
   const items = (rows ?? []).map((r) => {
     const j = r.metric_value_json as
       | { company_name?: string; value_aed?: number }
       | null;
+    const value = Number(
+      (r.metric_value_json as Record<string, unknown> | null)?.[countKey] ?? 0,
+    );
+    const prev = compareRows ? compareLookup.get(r.dimension_key) : undefined;
+    let delta: string | undefined;
+    let deltaDirection: 'up' | 'down' | 'neutral' | undefined;
+    if (prev != null) {
+      const diff = value - prev;
+      if (diff === 0) {
+        delta = '±0';
+        deltaDirection = 'neutral';
+      } else if (diff > 0) {
+        delta = `+${diff}`;
+        deltaDirection = 'up';
+      } else {
+        delta = String(diff);
+        deltaDirection = 'down';
+      }
+    }
     return {
       name: String(j?.company_name ?? '(unnamed)'),
-      value: Number((r.metric_value_json as Record<string, unknown> | null)?.[countKey] ?? 0),
+      value,
       href: `/companies/${r.dimension_key}`,
+      delta,
+      deltaDirection,
     };
   });
 
@@ -587,7 +620,10 @@ function TopCompaniesCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>{title}</CardTitle>
-            <CardDescription>Ranked by project count.</CardDescription>
+            <CardDescription>
+              Ranked by project count
+              {compareRows ? ' · diff vs compare snapshot' : ''}.
+            </CardDescription>
           </div>
           {listHref && (
             <Link
