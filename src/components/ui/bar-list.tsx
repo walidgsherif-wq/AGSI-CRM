@@ -2,7 +2,9 @@ import * as React from 'react';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { cn } from '@/lib/utils';
-import { AGSI } from '@/lib/design/colors';
+import { AGSI, STATUS_COLOUR } from '@/lib/design/colors';
+
+type Direction = 'up' | 'down' | 'neutral';
 
 export interface BarListItem {
   name: string;
@@ -11,6 +13,15 @@ export interface BarListItem {
   secondary?: string;
   /** Optional row link. Becomes a keyboard-accessible <Link>. */
   href?: string;
+  /**
+   * Optional pre-formatted period-over-period delta string (e.g.
+   * "+3", "−2", "±0"). When supplied, renders a compact badge to
+   * the right of the value, coloured via `deltaDirection`. Omit on
+   * rows where no diff exists; no layout shift either way.
+   */
+  delta?: string;
+  /** Direction tone for `delta`. Default: `neutral`. */
+  deltaDirection?: Direction;
 }
 
 export interface BarListProps {
@@ -19,12 +30,17 @@ export interface BarListProps {
   valueFormatter?: (n: number) => string;
   /** Bar fill colour. Default: AGSI accent. */
   barColour?: string;
-  /** Max bar height multiplier for visual scale. Default: 1.0 (proportional). */
   className?: string;
 }
 
 const defaultFmt = (n: number) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
+
+const DIRECTION_COLOUR: Record<Direction, string> = {
+  up: STATUS_COLOUR.green,
+  down: STATUS_COLOUR.red,
+  neutral: AGSI.darkGray,
+};
 
 export function BarList({
   items,
@@ -43,6 +59,7 @@ export function BarList({
     <ol className={cn('space-y-1 text-sm', className)}>
       {sorted.map((item, i) => {
         const pct = max > 0 ? Math.max(2, (item.value / max) * 100) : 0;
+        const direction: Direction = item.deltaDirection ?? 'neutral';
         const inner = (
           <div className="relative flex items-center justify-between gap-3 px-2 py-1.5">
             <div
@@ -64,6 +81,14 @@ export function BarList({
               <span className="font-semibold text-agsi-navy">
                 {valueFormatter(item.value)}
               </span>
+              {item.delta && (
+                <span
+                  className="text-xxs font-medium tabular-nums"
+                  style={{ color: DIRECTION_COLOUR[direction] }}
+                >
+                  {item.delta}
+                </span>
+              )}
               {item.secondary && (
                 <span className="text-xs2 text-agsi-darkGray">{item.secondary}</span>
               )}
