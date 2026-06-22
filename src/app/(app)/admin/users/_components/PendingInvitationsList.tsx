@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { revokeInvite } from '@/server/actions/users';
 import { ROLE_LABEL, type Role } from '@/types/domain';
+import { CopyLoginLinkButton } from './CopyLoginLinkButton';
 
 export type PendingInvite = {
   email: string;
@@ -55,6 +56,7 @@ function PendingInviteRow({ invite }: { invite: PendingInvite }) {
       </div>
       <div className="flex items-center gap-3">
         <Badge variant="neutral">{ROLE_LABEL[invite.role]}</Badge>
+        <CopyLoginLinkButton variant="inline" />
         <button
           type="button"
           disabled={pending}
