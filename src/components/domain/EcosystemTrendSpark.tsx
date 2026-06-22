@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { AGSI } from '@/lib/design/colors';
 
 type TrendPoint = {
   snapshot_date: string;
@@ -22,8 +23,8 @@ export function EcosystemTrendSpark({ trend }: { trend: TrendPoint[] }) {
         <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="ecosystem-spark-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2E7D52" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#2E7D52" stopOpacity={0.05} />
+              <stop offset="0%" stopColor={AGSI.green} stopOpacity={0.4} />
+              <stop offset="100%" stopColor={AGSI.green} stopOpacity={0.05} />
             </linearGradient>
           </defs>
           <XAxis dataKey="snapshot_date" hide />
@@ -32,7 +33,7 @@ export function EcosystemTrendSpark({ trend }: { trend: TrendPoint[] }) {
             contentStyle={{
               fontSize: '11px',
               borderRadius: '6px',
-              border: '1px solid #E8EDF4',
+              border: `1px solid ${AGSI.lightGray}`,
             }}
             formatter={(value) => [fmt(Number(value)), 'Active']}
             labelFormatter={(label) => String(label ?? '')}
@@ -40,7 +41,7 @@ export function EcosystemTrendSpark({ trend }: { trend: TrendPoint[] }) {
           <Area
             type="monotone"
             dataKey="active_score"
-            stroke="#2E7D52"
+            stroke={AGSI.green}
             fill="url(#ecosystem-spark-fill)"
             strokeWidth={1.5}
           />

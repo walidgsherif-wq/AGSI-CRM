@@ -6,7 +6,7 @@ import {
   StyleSheet,
 } from '@react-pdf/renderer';
 import type { LeadershipReportPayload } from '@/lib/zod/leadership-report';
-import { AGSI, RAG } from '@/lib/brand-colors';
+import { AGSI, RAG } from '@/lib/design/colors';
 
 const COLORS = {
   navy: AGSI.navy,

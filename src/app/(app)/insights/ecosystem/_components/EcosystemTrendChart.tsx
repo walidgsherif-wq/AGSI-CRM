@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AGSI } from '@/lib/brand-colors';
+import { AGSI } from '@/lib/design/colors';
 
 type TrendPoint = {
   snapshot_date: string;

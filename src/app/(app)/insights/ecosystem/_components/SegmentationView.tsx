@@ -12,7 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
-import { AGSI } from '@/lib/brand-colors';
+import { AGSI } from '@/lib/design/colors';
 
 type Bucket = { lifetime: number; active: number };
 type Snapshot = {
