@@ -52,18 +52,27 @@ export const TBody = React.forwardRef<
 TBody.displayName = 'TBody';
 
 export interface TRProps extends React.HTMLAttributes<HTMLTableRowElement> {
-  /** Header row styling: uppercase, darker bottom border, smaller text. */
+  /** Primary header row: uppercase, darker bottom border, smaller text. */
   head?: boolean;
+  /**
+   * Secondary header row for multi-row headers (e.g. dashboard
+   * QuarterTrackTable). Same small text as `head` but no uppercase
+   * and lighter bottom border — the row sits BELOW the primary
+   * header and labels sub-columns (A / T).
+   */
+  subhead?: boolean;
 }
 
 export const TR = React.forwardRef<HTMLTableRowElement, TRProps>(
-  ({ className, head, ...props }, ref) => (
+  ({ className, head, subhead, ...props }, ref) => (
     <tr
       ref={ref}
       className={cn(
         head
           ? 'border-b border-agsi-lightGray text-left text-xs uppercase tracking-wider text-agsi-darkGray'
-          : 'border-b border-agsi-lightGray/50',
+          : subhead
+            ? 'border-b border-agsi-lightGray text-left text-xs text-agsi-darkGray'
+            : 'border-b border-agsi-lightGray/50',
         className,
       )}
       {...props}
