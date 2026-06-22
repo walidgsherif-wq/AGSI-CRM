@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { TabNav, TabNavLink } from '@/components/ui/tab-nav';
 
 const TABS = [
   { label: 'Overview', segment: '' },
@@ -19,7 +18,7 @@ export function CompanyTabs({ companyId }: { companyId: string }) {
   const base = `/companies/${companyId}`;
 
   return (
-    <nav className="flex gap-1 border-b border-agsi-lightGray">
+    <TabNav variant="underline">
       {TABS.map((tab) => {
         const href = tab.segment ? `${base}/${tab.segment}` : base;
         const active =
@@ -27,20 +26,16 @@ export function CompanyTabs({ companyId }: { companyId: string }) {
             ? pathname === base
             : pathname === href || pathname.startsWith(`${href}/`);
         return (
-          <Link
+          <TabNavLink
             key={tab.segment}
             href={href as never}
-            className={cn(
-              '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              active
-                ? 'border-agsi-navy text-agsi-navy'
-                : 'border-transparent text-agsi-darkGray hover:text-agsi-navy',
-            )}
+            active={active}
+            variant="underline"
           >
             {tab.label}
-          </Link>
+          </TabNavLink>
         );
       })}
-    </nav>
+    </TabNav>
   );
 }

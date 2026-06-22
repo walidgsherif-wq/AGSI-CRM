@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { TabNav, TabNavLink } from '@/components/ui/tab-nav';
 import { navMatchScore } from '@/components/domain/Sidebar';
 
 // Admin section sub-nav. Active-state logic mirrors the sidebar
@@ -33,25 +32,17 @@ export function AdminSubNav() {
   const activeIndex = maxScore > 0 ? scores.indexOf(maxScore) : -1;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-agsi-lightGray pb-3">
-      {ITEMS.map((i, idx) => {
-        const isActive = idx === activeIndex;
-        return (
-          <Link
-            key={i.href}
-            href={i.href as never}
-            aria-current={isActive ? 'page' : undefined}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-agsi-navy text-white'
-                : 'text-agsi-darkGray hover:bg-agsi-lightGray hover:text-agsi-navy',
-            )}
-          >
-            {i.label}
-          </Link>
-        );
-      })}
-    </div>
+    <TabNav variant="pill">
+      {ITEMS.map((i, idx) => (
+        <TabNavLink
+          key={i.href}
+          href={i.href as never}
+          active={idx === activeIndex}
+          variant="pill"
+        >
+          {i.label}
+        </TabNavLink>
+      ))}
+    </TabNav>
   );
 }
