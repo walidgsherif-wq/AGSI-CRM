@@ -199,7 +199,13 @@ export default async function PerformanceReviewPage({
       .eq('owner_at_time', params.userId)
       .eq('fiscal_year', fy)
       .order('changed_at', { ascending: false })
-      .limit(200)
+      // F5 (Apr 2026): cap raised from 200 to 2000. The Stakeholder
+      // composition tally iterates this set to count per-type
+      // forward+credited moves per quarter; the old 200 ceiling would
+      // silently under-count for any BDM with >200 moves in a FY.
+      // 2000 is well above any realistic single-FY caseload and PostgREST
+      // returns this in one round-trip.
+      .limit(2000)
       .returns<LevelHistoryRow[]>(),
     supabase
       .from('engagements')

@@ -15,6 +15,7 @@ import {
   COMPANY_TYPES,
 } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
+import { AGSI } from '@/lib/brand-colors';
 
 type CompanyType = (typeof COMPANY_TYPES)[number];
 
@@ -73,14 +74,14 @@ const UAE_OUTLINE: Array<{ lat: number; lon: number }> = [
 ];
 
 const TYPE_COLOR: Record<CompanyType, string> = {
-  developer: '#6B4F9E',
-  design_consultant: '#2B6CB0',
-  main_contractor: '#2E7D52',
-  mep_consultant: '#D4AF37',
-  mep_contractor: '#1F3C6E',
-  authority: '#4A5568',
-  society: '#9CAF44',
-  other: '#C5CDD8',
+  developer: AGSI.purple,
+  design_consultant: AGSI.accent,
+  main_contractor: AGSI.green,
+  mep_consultant: AGSI.gold,
+  mep_contractor: AGSI.blue,
+  authority: AGSI.darkGray,
+  society: '#9CAF44', // lime — heat-map only
+  other: AGSI.midGray,
 };
 
 export function GeographicHeatMap({
@@ -213,12 +214,12 @@ export function GeographicHeatMap({
                 y={0}
                 width={SVG_W}
                 height={SVG_H}
-                fill="#F7F9FC"
+                fill={AGSI.offWhite}
               />
               <path
                 d={outlinePath}
-                fill="#E8EDF4"
-                stroke="#C5CDD8"
+                fill={AGSI.lightGray}
+                stroke={AGSI.midGray}
                 strokeWidth={1}
               />
               {/* Emirate labels */}
@@ -242,7 +243,7 @@ export function GeographicHeatMap({
                 const { x, y } = project(city.latitude, city.longitude);
                 const r = 6 + Math.sqrt(total / maxCount) * 28;
                 const dominant = mostCommonType(byType);
-                const fill = dominant ? TYPE_COLOR[dominant] : '#1A2A4A';
+                const fill = dominant ? TYPE_COLOR[dominant] : AGSI.navy;
                 const isHover = hoverCity === city.city_name;
                 return (
                   <g key={city.city_name}>

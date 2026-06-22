@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AGSI } from '@/lib/brand-colors';
 
 export type TrendPoint = {
   snapshot_date: string;
@@ -90,26 +91,26 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
-          <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke={AGSI.lightGray} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="snapshot_date"
             tickFormatter={fmtMonthYear}
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
           />
           <YAxis
             yAxisId="aed"
             orientation="left"
             domain={aedDomain}
             allowDecimals={false}
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
             tickFormatter={fmtAedAxis}
             label={{
               value: 'AED (left)',
               angle: -90,
               position: 'insideLeft',
-              style: { fontSize: 11, fill: '#4A5568' },
+              style: { fontSize: 11, fill: AGSI.darkGray },
             }}
           />
           <YAxis
@@ -117,21 +118,21 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
             orientation="right"
             domain={tonnesDomain}
             allowDecimals={false}
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
             tickFormatter={fmtTonnesAxis}
             label={{
               value: 'MT (right)',
               angle: 90,
               position: 'insideRight',
-              style: { fontSize: 11, fill: '#4A5568' },
+              style: { fontSize: 11, fill: AGSI.darkGray },
             }}
           />
           <Tooltip
             contentStyle={{
               fontSize: '11px',
               borderRadius: '6px',
-              border: '1px solid #E8EDF4',
+              border: `1px solid ${AGSI.lightGray}`,
             }}
             formatter={(value, name) => {
               const v = Number(value);
@@ -154,7 +155,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
             type="monotone"
             dataKey="pre_construction_aed"
             name="pre_construction_aed"
-            stroke="#2B6CB0"
+            stroke={AGSI.accent}
             strokeWidth={2}
             dot={{ r: 3 }}
           />
@@ -163,7 +164,7 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
             type="monotone"
             dataKey="under_construction_aed"
             name="under_construction_aed"
-            stroke="#1A2A4A"
+            stroke={AGSI.navy}
             strokeWidth={2}
             dot={{ r: 3 }}
           />
@@ -172,16 +173,16 @@ function PipelineChart({ points }: { points: TrendPoint[] }) {
             type="monotone"
             dataKey="rebar_tonnes"
             name="rebar_tonnes"
-            stroke="#2E7D52"
+            stroke={AGSI.green}
             strokeWidth={2}
             dot={{ r: 3 }}
           />
         </LineChart>
       </ResponsiveContainer>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-agsi-darkGray">
-        <Legend color="#2B6CB0" label="Pre-construction value (AED)" />
-        <Legend color="#1A2A4A" label="Under-construction value (AED)" />
-        <Legend color="#2E7D52" label="Rebar in active window (MT)" />
+        <Legend color={AGSI.accent} label="Pre-construction value (AED)" />
+        <Legend color={AGSI.navy} label="Under-construction value (AED)" />
+        <Legend color={AGSI.green} label="Rebar in active window (MT)" />
       </div>
     </div>
   );
@@ -194,31 +195,31 @@ function PriceChart({ points }: { points: PricePoint[] }) {
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
-          <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke={AGSI.lightGray} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="effective_month"
             tickFormatter={fmtMonthYear}
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
           />
           <YAxis
             domain={priceDomain}
             allowDecimals={false}
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
             tickFormatter={(v: number) => new Intl.NumberFormat().format(v)}
             label={{
               value: 'AED / tonne',
               angle: -90,
               position: 'insideLeft',
-              style: { fontSize: 11, fill: '#4A5568' },
+              style: { fontSize: 11, fill: AGSI.darkGray },
             }}
           />
           <Tooltip
             contentStyle={{
               fontSize: '11px',
               borderRadius: '6px',
-              border: '1px solid #E8EDF4',
+              border: `1px solid ${AGSI.lightGray}`,
             }}
             formatter={(value) => [
               `${new Intl.NumberFormat().format(Number(value))} AED/t`,
@@ -229,7 +230,7 @@ function PriceChart({ points }: { points: PricePoint[] }) {
           <Line
             type="monotone"
             dataKey="price_aed_per_tonne"
-            stroke="#D4AF37"
+            stroke={AGSI.gold}
             strokeWidth={2}
             dot={{ r: 3 }}
           />

@@ -14,6 +14,7 @@ import { LevelBadge } from '@/components/domain/LevelBadge';
 import { HeatMapExportButton } from '@/components/domain/HeatMapExportButton';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
+import { AGSI, RAG } from '@/lib/brand-colors';
 
 type CompanyType = (typeof COMPANY_TYPES)[number];
 
@@ -34,11 +35,11 @@ type Engagement = {
 type Bucket = 'hot' | 'warm' | 'cooling' | 'cold' | 'none';
 
 const BUCKET_COLOR: Record<Bucket, string> = {
-  hot: '#2E7D52',     // green
-  warm: '#9CAF44',    // lime
-  cooling: '#DD8E2A', // amber
-  cold: '#C53030',    // red
-  none: '#E8EDF4',    // lightGray (no engagement)
+  hot: AGSI.green,
+  warm: '#9CAF44',          // lime — not in brand tokens (heat-map gradient only)
+  cooling: RAG.amber,
+  cold: RAG.red,
+  none: AGSI.lightGray,
 };
 
 const BUCKET_LABEL: Record<Bucket, string> = {

@@ -12,6 +12,7 @@ import {
 import { HeatMapExportButton } from '@/components/domain/HeatMapExportButton';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { LEVELS, type Level } from '@/types/domain';
+import { LEVEL_COLOURS } from '@/lib/brand-colors';
 
 type CompanyType = (typeof COMPANY_TYPES)[number];
 
@@ -32,14 +33,14 @@ type UniverseSizes = {
   total: number;
 };
 
-// L-level palette from §15.
+// L-level palette from §15 (sourced from brand-colors).
 const LEVEL_BG: Record<Level, string> = {
-  L0: '#C5CDD8',
-  L1: '#2B6CB0',
-  L2: '#1F3C6E',
-  L3: '#2E7D52',
-  L4: '#6B4F9E',
-  L5: '#D4AF37',
+  L0: LEVEL_COLOURS.L0,
+  L1: LEVEL_COLOURS.L1,
+  L2: LEVEL_COLOURS.L2,
+  L3: LEVEL_COLOURS.L3,
+  L4: LEVEL_COLOURS.L4,
+  L5: LEVEL_COLOURS.L5,
 };
 
 const LEVEL_COUNT: Record<Level, number> = {
