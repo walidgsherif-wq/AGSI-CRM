@@ -17,8 +17,23 @@ export type DataTableColumn<T> = ColumnDef<T, unknown>;
 export interface DataTableProps<T> {
   data: T[];
   columns: DataTableColumn<T>[];
-  /** Initial client-side sort. TanStack format. */
+  /** Initial client-side sort. Ignored when `sort` (controlled mode) is supplied. */
   initialSort?: SortingState;
+  /**
+   * Controlled-mode sort. When supplied, header clicks call
+   * `onSortChange` instead of updating internal state — the caller
+   * owns where the sort comes from (e.g. URL params). Pair with
+   * `manualSorting=true` so TanStack doesn't double-sort.
+   */
+  sort?: SortingState;
+  onSortChange?: (next: SortingState) => void;
+  /**
+   * When true, TanStack does NOT sort the data — the caller is
+   * responsible (e.g. server-side ORDER BY). The sort-header
+   * affordance still toggles asc/desc via the controlled `sort`
+   * state so the visual cue stays in sync.
+   */
+  manualSorting?: boolean;
   /** Shown when `data` is empty. Override with a custom EmptyState if needed. */
   empty?: {
     title: string;
@@ -46,21 +61,43 @@ export function DataTable<T>({
   data,
   columns,
   initialSort = [],
+  sort,
+  onSortChange,
+  manualSorting = false,
   empty = { title: 'No rows', description: 'Nothing matches the current filters.' },
   minWidth,
   stickyHeader = true,
   ariaLabel,
   className,
 }: DataTableProps<T>) {
-  const [sorting, setSorting] = React.useState<SortingState>(initialSort);
+  const controlled = sort !== undefined;
+  const [uncontrolledSorting, setUncontrolledSorting] =
+    React.useState<SortingState>(initialSort);
+  const sorting = controlled ? sort! : uncontrolledSorting;
+
+  const handleSortingChange = React.useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const next =
+        typeof updater === 'function'
+          ? (updater as (old: SortingState) => SortingState)(sorting)
+          : updater;
+      if (controlled) {
+        onSortChange?.(next);
+      } else {
+        setUncontrolledSorting(next);
+      }
+    },
+    [controlled, onSortChange, sorting],
+  );
 
   const table = useReactTable({
     data,
     columns,
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
+    manualSorting,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    ...(manualSorting ? {} : { getSortedRowModel: getSortedRowModel() }),
   });
 
   if (data.length === 0) {
