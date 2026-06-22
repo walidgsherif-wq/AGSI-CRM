@@ -55,7 +55,7 @@ export function InviteUserForm() {
       </div>
       <div className="sm:col-span-4 flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Sending…' : 'Send invite'}
+          {pending ? 'Adding…' : 'Add user'}
         </Button>
         {message && (
           <p

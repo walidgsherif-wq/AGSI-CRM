@@ -13,6 +13,7 @@ import {
   PendingInvitationsList,
   type PendingInvite,
 } from './_components/PendingInvitationsList';
+import { CopyLoginLinkButton } from './_components/CopyLoginLinkButton';
 import { ROLE_LABEL } from '@/types/domain';
 
 export const dynamic = 'force-dynamic';
@@ -53,22 +54,24 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-agsi-navy">Users</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
-            Invite teammates, promote to admin/lead, deactivate when they leave.
+            Add teammates, promote to admin/lead, deactivate when they leave.
+            No email is sent — copy the login link and share it directly.
           </p>
         </div>
+        <CopyLoginLinkButton />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Invite a new user</CardTitle>
+          <CardTitle>Add a new user</CardTitle>
           <CardDescription>
-            Provisions an account at the selected role. Tell the teammate to sign in at
-            /login with their Google account using this exact email — no invite email is
-            sent.
+            Adds them to the allow-list at the selected role. No email is sent — share
+            the login link (button top-right) and tell them to sign in with their Google
+            account using this exact email.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -80,9 +83,9 @@ export default async function AdminUsersPage() {
         <CardHeader>
           <CardTitle>Pending invitations</CardTitle>
           <CardDescription>
-            Invited via the form above. Each row clears automatically when the
+            Added via the form above. Each row clears automatically when the
             invitee signs in with Google for the first time. Revoke to remove an
-            invite that should no longer stand.
+            entry that should no longer stand.
           </CardDescription>
         </CardHeader>
         <CardContent>
