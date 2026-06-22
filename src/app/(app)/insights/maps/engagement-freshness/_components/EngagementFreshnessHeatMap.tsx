@@ -278,7 +278,7 @@ export function EngagementFreshnessHeatMap({
               {sorted.length === 0 ? (
                 <p className="p-4 text-sm text-agsi-darkGray">No stakeholders match.</p>
               ) : (
-                <table className="w-full border-collapse text-[11px]">
+                <table className="w-full border-collapse text-xs2">
                   <thead>
                     <tr>
                       <th className="sticky left-0 z-10 bg-white px-2 py-1 text-left font-medium text-agsi-darkGray">

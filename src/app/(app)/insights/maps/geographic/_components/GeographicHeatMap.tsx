@@ -323,7 +323,7 @@ export function GeographicHeatMap({
                       <Badge variant="neutral">{total}</Badge>
                     </div>
                     <p className="mt-0.5 text-xs text-agsi-darkGray">{city.emirate}</p>
-                    <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
+                    <div className="mt-1 flex flex-wrap gap-1 text-xs2">
                       {Array.from(byType.entries())
                         .sort((a, b) => b[1] - a[1])
                         .map(([t, n]) => (

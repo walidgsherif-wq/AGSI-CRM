@@ -131,7 +131,7 @@ export function LevelDistributionHeatMap({
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className="inline-flex h-5 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                      className="inline-flex h-5 w-7 items-center justify-center rounded-full text-xs2 font-bold text-white"
                       style={{ backgroundColor: LEVEL_BG[lvl] }}
                     >
                       {lvl}
@@ -223,12 +223,12 @@ function Tile({
       title={`${company.canonical_name} · ${COMPANY_TYPE_LABEL[company.company_type]} · ${company.current_level}`}
     >
       <p
-        className="truncate text-[11px] font-semibold leading-tight text-white"
+        className="truncate text-xs2 font-semibold leading-tight text-white"
         style={{ textShadow: '0 1px 1px rgba(0,0,0,0.25)' }}
       >
         {company.canonical_name}
       </p>
-      <p className="text-[10px] text-white/85">
+      <p className="text-xxs text-white/85">
         {COMPANY_TYPE_LABEL[company.company_type]}
         {company.is_key_stakeholder ? ' · key' : ''}
       </p>

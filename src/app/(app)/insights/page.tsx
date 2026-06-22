@@ -568,7 +568,7 @@ function TopCompaniesCard({
           {listHref && (
             <Link
               href={listHref as never}
-              className="shrink-0 rounded border border-agsi-midGray bg-white px-2 py-1 text-[11px] font-medium text-agsi-navy hover:bg-agsi-lightGray/40"
+              className="shrink-0 rounded border border-agsi-midGray bg-white px-2 py-1 text-xs2 font-medium text-agsi-navy hover:bg-agsi-lightGray/40"
             >
               View all →
             </Link>
@@ -961,11 +961,11 @@ function Stat({
 
 function DiffBadge({ cur, prev }: { cur: number; prev: number }) {
   const diff = cur - prev;
-  if (diff === 0) return <span className="text-[10px] text-agsi-darkGray">±0</span>;
+  if (diff === 0) return <span className="text-xxs text-agsi-darkGray">±0</span>;
   const tone = diff > 0 ? 'text-agsi-green' : 'text-rag-red';
   const sign = diff > 0 ? '+' : '';
   return (
-    <span className={`text-[10px] font-medium tabular-nums ${tone}`}>
+    <span className={`text-xxs font-medium tabular-nums ${tone}`}>
       {sign}
       {diff}
     </span>

@@ -164,7 +164,7 @@ export default async function NotificationSettingsPage() {
                     <TD className="px-4">
                       <p className="text-sm font-medium text-agsi-navy">{n.label}</p>
                       <p className="mt-0.5 text-xs text-agsi-darkGray">{n.description}</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-agsi-darkGray">
+                      <p className="mt-0.5 font-mono text-xxs text-agsi-darkGray">
                         {n.key} · recipient: {n.whoFires}
                       </p>
                     </TD>

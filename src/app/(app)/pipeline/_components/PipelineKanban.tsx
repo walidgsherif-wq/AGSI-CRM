@@ -255,7 +255,7 @@ export function PipelineKanban({
                                   : `${c.engagement_days_since} days since last engagement`
                               }
                               className={cn(
-                                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
+                                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xxs font-semibold tabular-nums',
                                 CHIP_CLASSES[c.engagement_bucket],
                               )}
                             >
@@ -290,7 +290,7 @@ export function PipelineKanban({
                             >
                               {userRole === 'admin' ? 'Change level →' : 'Request level change →'}
                             </button>
-                            <span className="text-[10px] text-agsi-darkGray">drag ↔</span>
+                            <span className="text-xxs text-agsi-darkGray">drag ↔</span>
                           </div>
                         )}
                       </div>

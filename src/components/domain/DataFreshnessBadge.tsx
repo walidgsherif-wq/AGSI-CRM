@@ -39,7 +39,7 @@ export function DataFreshnessBadge({ asOf, refreshedAt, compact }: Props) {
         Data as of {fmt(asOf)}
       </Badge>
       {refreshedAt && (
-        <span className="text-[11px]">
+        <span className="text-xs2">
           last refresh {fmt(refreshedAt)}
         </span>
       )}

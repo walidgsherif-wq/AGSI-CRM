@@ -108,8 +108,8 @@ export function UserRoleActions({
         <p
           className={
             message.kind === 'ok'
-              ? 'text-[11px] text-agsi-green'
-              : 'text-[11px] text-rag-red'
+              ? 'text-xs2 text-agsi-green'
+              : 'text-xs2 text-rag-red'
           }
         >
           {message.text}

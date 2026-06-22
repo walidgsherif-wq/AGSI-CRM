@@ -359,12 +359,12 @@ function QuarterTrackTable({
               >
                 <div className="text-agsi-navy">Q{qi.q}</div>
                 {isLive && (
-                  <div className="text-[10px] font-normal normal-case text-agsi-accent">
+                  <div className="text-xxs font-normal normal-case text-agsi-accent">
                     {liveLabel}
                   </div>
                 )}
                 {isDone && (
-                  <div className="text-[10px] font-normal normal-case text-agsi-darkGray">
+                  <div className="text-xxs font-normal normal-case text-agsi-darkGray">
                     completed
                   </div>
                 )}

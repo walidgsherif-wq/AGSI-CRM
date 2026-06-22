@@ -316,7 +316,7 @@ function EmailView({
                   ) : (
                     <span className="text-agsi-darkGray">{a.filename}</span>
                   )}
-                  <span className="text-[10px] text-agsi-darkGray">
+                  <span className="text-xxs text-agsi-darkGray">
                     {formatBytes(a.size_bytes)}
                   </span>
                 </li>
@@ -393,7 +393,7 @@ function EmailView({
           <summary className="cursor-pointer font-medium text-agsi-navy">
             Raw email data (admin)
           </summary>
-          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-[11px] text-agsi-darkGray">
+          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs2 text-agsi-darkGray">
             {e.raw_payload
               ? JSON.stringify(e.raw_payload, null, 2)
               : '(raw payload not stored)'}

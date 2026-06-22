@@ -32,6 +32,15 @@ const config: Config = {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
+      // Two extra sizes below text-xs (12px). The 50+ inline `text-[11px]`
+      // and `text-[10px]` arbitraries across kanban cards, leadership
+      // report tiles, and pipeline metadata are codified here.
+      //   text-xxs = 10px / 14px line
+      //   text-xs2 = 11px / 16px line
+      fontSize: {
+        xxs: ['0.625rem', { lineHeight: '0.875rem' }],
+        'xs2': ['0.6875rem', { lineHeight: '1rem' }],
+      },
       fontVariantNumeric: {
         'tabular-nums': 'tabular-nums',
       },

@@ -222,7 +222,7 @@ export default async function PipelinePage({
         <LegendChip color="blue" label="Warm · ≤60d" />
         <LegendChip color="amber" label="Cooling · ≤90d" />
         <LegendChip color="red" label="Cold · 90d+" />
-        <span className="ml-auto text-[11px] text-agsi-midGray">
+        <span className="ml-auto text-xs2 text-agsi-midGray">
           Log a call, meeting, or Cc client emails to keep cards green.
         </span>
       </div>

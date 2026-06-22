@@ -80,7 +80,7 @@ export function NotificationBell() {
         <Bell className="h-3.5 w-3.5" aria-hidden />
         Notifications
         {unread > 0 && (
-          <span className="ml-auto inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rag-red px-1 text-[10px] font-semibold text-white">
+          <span className="ml-auto inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rag-red px-1 text-xxs font-semibold text-white">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
@@ -101,7 +101,7 @@ export function NotificationBell() {
                     await refresh();
                   });
                 }}
-                className="text-[11px] font-medium text-agsi-accent hover:underline"
+                className="text-xs2 font-medium text-agsi-accent hover:underline"
               >
                 Mark all read
               </button>
@@ -138,7 +138,7 @@ export function NotificationBell() {
             <Link
               href={'/notifications' as never}
               onClick={() => setOpen(false)}
-              className="text-[11px] font-medium text-agsi-accent hover:underline"
+              className="text-xs2 font-medium text-agsi-accent hover:underline"
             >
               View all notifications →
             </Link>
@@ -163,17 +163,17 @@ function NotificationItem({
   const inner = (
     <div className="block px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-agsi-darkGray">
+        <span className="truncate text-xxs font-semibold uppercase tracking-wide text-agsi-darkGray">
           {typeLabel}
         </span>
-        <span className="text-[10px] text-agsi-darkGray">
+        <span className="text-xxs text-agsi-darkGray">
           {timeAgo(n.created_at)}
         </span>
       </div>
       <p className="mt-1 truncate text-xs font-medium text-agsi-navy">
         {n.subject}
       </p>
-      <p className="mt-0.5 line-clamp-2 text-[11px] text-agsi-darkGray">
+      <p className="mt-0.5 line-clamp-2 text-xs2 text-agsi-darkGray">
         {n.body}
       </p>
     </div>
