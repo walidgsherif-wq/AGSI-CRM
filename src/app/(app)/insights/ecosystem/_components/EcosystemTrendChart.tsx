@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { AGSI } from '@/lib/brand-colors';
 
 type TrendPoint = {
   snapshot_date: string;
@@ -24,24 +25,24 @@ export function EcosystemTrendChart({ trend }: { trend: TrendPoint[] }) {
         <AreaChart data={trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="active-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2E7D52" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#2E7D52" stopOpacity={0.04} />
+              <stop offset="0%" stopColor={AGSI.green} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={AGSI.green} stopOpacity={0.04} />
             </linearGradient>
             <linearGradient id="lifetime-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1A2A4A" stopOpacity={0.18} />
-              <stop offset="100%" stopColor="#1A2A4A" stopOpacity={0.02} />
+              <stop offset="0%" stopColor={AGSI.navy} stopOpacity={0.18} />
+              <stop offset="100%" stopColor={AGSI.navy} stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke={AGSI.lightGray} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="snapshot_date"
             tickFormatter={(v: string) => v.slice(5)}
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: '#4A5568' }}
-            stroke="#C5CDD8"
+            tick={{ fontSize: 11, fill: AGSI.darkGray }}
+            stroke={AGSI.midGray}
             tickFormatter={(v: number) =>
               new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(v)
             }
@@ -50,7 +51,7 @@ export function EcosystemTrendChart({ trend }: { trend: TrendPoint[] }) {
             contentStyle={{
               fontSize: '12px',
               borderRadius: '6px',
-              border: '1px solid #E8EDF4',
+              border: `1px solid ${AGSI.lightGray}`,
             }}
             formatter={(value, name) => [
               new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(value)),
@@ -69,14 +70,14 @@ export function EcosystemTrendChart({ trend }: { trend: TrendPoint[] }) {
           <Area
             type="monotone"
             dataKey="lifetime_score"
-            stroke="#1A2A4A"
+            stroke={AGSI.navy}
             fill="url(#lifetime-fill)"
             strokeWidth={1.5}
           />
           <Area
             type="monotone"
             dataKey="active_score"
-            stroke="#2E7D52"
+            stroke={AGSI.green}
             fill="url(#active-fill)"
             strokeWidth={2}
           />

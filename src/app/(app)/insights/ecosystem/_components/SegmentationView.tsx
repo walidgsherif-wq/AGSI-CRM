@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
+import { AGSI } from '@/lib/brand-colors';
 
 type Bucket = { lifetime: number; active: number };
 type Snapshot = {
@@ -56,24 +57,24 @@ export function SegmentationView({ snapshot }: { snapshot: Snapshot }) {
                 layout="vertical"
                 margin={{ top: 4, right: 12, bottom: 0, left: 12 }}
               >
-                <CartesianGrid stroke="#E8EDF4" strokeDasharray="3 3" horizontal={false} />
+                <CartesianGrid stroke={AGSI.lightGray} strokeDasharray="3 3" horizontal={false} />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 11, fill: '#4A5568' }}
-                  stroke="#C5CDD8"
+                  tick={{ fontSize: 11, fill: AGSI.darkGray }}
+                  stroke={AGSI.midGray}
                 />
                 <YAxis
                   type="category"
                   dataKey="label"
-                  tick={{ fontSize: 11, fill: '#4A5568' }}
-                  stroke="#C5CDD8"
+                  tick={{ fontSize: 11, fill: AGSI.darkGray }}
+                  stroke={AGSI.midGray}
                   width={140}
                 />
                 <Tooltip
                   contentStyle={{
                     fontSize: '12px',
                     borderRadius: '6px',
-                    border: '1px solid #E8EDF4',
+                    border: `1px solid ${AGSI.lightGray}`,
                   }}
                   formatter={(value, name) => [
                     new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(
@@ -82,8 +83,8 @@ export function SegmentationView({ snapshot }: { snapshot: Snapshot }) {
                     String(name) === 'lifetime' ? 'Lifetime' : 'Active (90d)',
                   ]}
                 />
-                <Bar dataKey="lifetime" fill="#1A2A4A" name="lifetime" />
-                <Bar dataKey="active" fill="#2E7D52" name="active" />
+                <Bar dataKey="lifetime" fill={AGSI.navy} name="lifetime" />
+                <Bar dataKey="active" fill={AGSI.green} name="active" />
               </BarChart>
             </ResponsiveContainer>
           </div>

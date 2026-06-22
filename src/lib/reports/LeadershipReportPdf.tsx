@@ -6,20 +6,20 @@ import {
   StyleSheet,
 } from '@react-pdf/renderer';
 import type { LeadershipReportPayload } from '@/lib/zod/leadership-report';
+import { AGSI, RAG } from '@/lib/brand-colors';
 
-// AGSI brand tokens (mirroring tailwind.config.ts §15).
 const COLORS = {
-  navy: '#1A2A4A',
-  blue: '#1F3C6E',
-  accent: '#2B6CB0',
-  green: '#2E7D52',
-  amber: '#DD8E2A',
-  red: '#C53030',
-  gold: '#D4AF37',
-  darkGray: '#4A5568',
-  midGray: '#C5CDD8',
-  lightGray: '#E8EDF4',
-  offWhite: '#F7F9FC',
+  navy: AGSI.navy,
+  blue: AGSI.blue,
+  accent: AGSI.accent,
+  green: AGSI.green,
+  amber: RAG.amber,
+  red: RAG.red,
+  gold: AGSI.gold,
+  darkGray: AGSI.darkGray,
+  midGray: AGSI.midGray,
+  lightGray: AGSI.lightGray,
+  offWhite: AGSI.offWhite,
 };
 
 const styles = StyleSheet.create({
