@@ -31,6 +31,7 @@ type LinkedCompanyRow = {
     canonical_name: string;
     company_type: keyof typeof COMPANY_TYPE_LABEL;
     current_level: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+    owner_id: string | null;
   } | null;
 };
 
@@ -55,13 +56,23 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const { data: linked } = await supabase
     .from('project_companies')
     .select(
-      'role, company:companies(id, canonical_name, company_type, current_level)',
+      'role, company:companies(id, canonical_name, company_type, current_level, owner_id)',
     )
     .eq('project_id', params.id)
     .eq('is_current', true)
     .returns<LinkedCompanyRow[]>();
 
-  const editable = user.role !== 'leadership';
+  // Mirror the RLS predicate so the Save button only renders when the
+  // server will actually accept the UPDATE:
+  //   - admin / bd_head → always
+  //   - bd_manager → only if at least one linked company is theirs
+  //     (matches 0054 projects_update_manager_owned)
+  //   - leadership → never
+  const editable =
+    user.role === 'admin' ||
+    user.role === 'bd_head' ||
+    (user.role === 'bd_manager' &&
+      (linked ?? []).some((l) => l.company?.owner_id === user.id));
 
   return (
     <div className="space-y-6">
@@ -101,7 +112,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           <CardDescription>
             {editable
               ? 'BNC fields will be read-only once linked to an upload (M5).'
-              : 'Read-only — leadership view.'}
+              : user.role === 'leadership'
+                ? 'Read-only — leadership view.'
+                : 'Read-only — you don’t own any of the linked stakeholders.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
