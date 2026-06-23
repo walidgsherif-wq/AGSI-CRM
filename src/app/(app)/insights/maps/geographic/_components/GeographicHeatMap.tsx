@@ -22,13 +22,14 @@ type CompanyType = (typeof COMPANY_TYPES)[number];
 type Company = {
   id: string;
   canonical_name: string;
-  city: string | null;
+  location_id: string | null;
   company_type: CompanyType;
   current_level: Level;
   has_active_projects: boolean;
 };
 
-type City = {
+type Location = {
+  id: string;
   city_name: string;
   emirate: string;
   latitude: number;
@@ -86,10 +87,10 @@ const TYPE_COLOR: Record<CompanyType, string> = {
 
 export function GeographicHeatMap({
   companies,
-  cities,
+  locations,
 }: {
   companies: Company[];
-  cities: City[];
+  locations: Location[];
 }) {
   const [typeFilter, setTypeFilter] = useState<CompanyType | 'all'>('all');
   const [levelFilter, setLevelFilter] = useState<Level | 'all' | 'l3plus'>('all');
@@ -112,19 +113,22 @@ export function GeographicHeatMap({
     });
   }, [companies, typeFilter, levelFilter, activeFilter]);
 
-  const cityIndex = useMemo(() => {
-    const map = new Map<string, City>();
-    for (const c of cities) map.set(c.city_name.toLowerCase(), c);
+  const locationIndex = useMemo(() => {
+    const map = new Map<string, Location>();
+    for (const l of locations) map.set(l.id, l);
     return map;
-  }, [cities]);
+  }, [locations]);
 
   const cityAggregates = useMemo(() => {
-    const counts = new Map<string, { city: City; total: number; byType: Map<CompanyType, number> }>();
+    const counts = new Map<
+      string,
+      { city: Location; total: number; byType: Map<CompanyType, number> }
+    >();
     for (const c of filteredCompanies) {
-      if (!c.city) continue;
-      const lookup = cityIndex.get(c.city.toLowerCase());
+      if (!c.location_id) continue;
+      const lookup = locationIndex.get(c.location_id);
       if (!lookup) continue;
-      const key = lookup.city_name;
+      const key = lookup.id;
       const existing = counts.get(key) ?? {
         city: lookup,
         total: 0,
@@ -135,11 +139,11 @@ export function GeographicHeatMap({
       counts.set(key, existing);
     }
     return Array.from(counts.values()).sort((a, b) => b.total - a.total);
-  }, [filteredCompanies, cityIndex]);
+  }, [filteredCompanies, locationIndex]);
 
   const maxCount = cityAggregates[0]?.total ?? 1;
   const unmatched = filteredCompanies.filter(
-    (c) => !c.city || !cityIndex.has(c.city.toLowerCase()),
+    (c) => !c.location_id || !locationIndex.has(c.location_id),
   ).length;
 
   const outlinePath = UAE_OUTLINE.map((p, i) => {
@@ -153,7 +157,7 @@ export function GeographicHeatMap({
         <div>
           <h1 className="text-2xl font-semibold text-agsi-navy">Geographic heat map</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
-            UAE stakeholder density by city. Dot area scales with company count.
+            UAE stakeholder density by emirate. Dot area scales with company count.
           </p>
         </div>
         <HeatMapExportButton filename="agsi-geographic-heatmap" targetRef={captureRef} />
@@ -164,8 +168,8 @@ export function GeographicHeatMap({
           <CardTitle>Filters</CardTitle>
           <CardDescription>
             Showing <strong>{filteredCompanies.length}</strong> of {companies.length} stakeholders
-            across <strong>{cityAggregates.length}</strong> cities.
-            {unmatched > 0 && ` (${unmatched} not placed — missing or unrecognised city.)`}
+            across <strong>{cityAggregates.length}</strong> emirates.
+            {unmatched > 0 && ` (${unmatched} not placed — emirate not set on the company.)`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,9 +248,9 @@ export function GeographicHeatMap({
                 const r = 6 + Math.sqrt(total / maxCount) * 28;
                 const dominant = mostCommonType(byType);
                 const fill = dominant ? TYPE_COLOR[dominant] : AGSI.navy;
-                const isHover = hoverCity === city.city_name;
+                const isHover = hoverCity === city.id;
                 return (
-                  <g key={city.city_name}>
+                  <g key={city.id}>
                     <circle
                       cx={x}
                       cy={y}
@@ -255,7 +259,7 @@ export function GeographicHeatMap({
                       fillOpacity={isHover ? 0.55 : 0.32}
                       stroke={fill}
                       strokeWidth={1.5}
-                      onMouseEnter={() => setHoverCity(city.city_name)}
+                      onMouseEnter={() => setHoverCity(city.id)}
                       onMouseLeave={() => setHoverCity(null)}
                       style={{ cursor: 'pointer' }}
                     />
@@ -301,19 +305,19 @@ export function GeographicHeatMap({
 
         <Card>
           <CardHeader>
-            <CardTitle>Cities</CardTitle>
+            <CardTitle>Emirates</CardTitle>
             <CardDescription>Ranked by matching stakeholder count.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {cityAggregates.length === 0 ? (
-              <p className="p-4 text-sm text-agsi-darkGray">No cities match these filters.</p>
+              <p className="p-4 text-sm text-agsi-darkGray">No emirates match these filters.</p>
             ) : (
               <ul className="max-h-[460px] divide-y divide-agsi-lightGray overflow-y-auto">
                 {cityAggregates.map(({ city, total, byType }) => (
                   <li
-                    key={city.city_name}
-                    className={`px-3 py-2 ${hoverCity === city.city_name ? 'bg-agsi-offWhite' : ''}`}
-                    onMouseEnter={() => setHoverCity(city.city_name)}
+                    key={city.id}
+                    className={`px-3 py-2 ${hoverCity === city.id ? 'bg-agsi-offWhite' : ''}`}
+                    onMouseEnter={() => setHoverCity(city.id)}
                     onMouseLeave={() => setHoverCity(null)}
                   >
                     <div className="flex items-center justify-between gap-2">

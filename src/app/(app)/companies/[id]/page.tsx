@@ -6,7 +6,12 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
-import { CompanyForm, type ProfileOption, type CompanyInitial } from '../_components/CompanyForm';
+import {
+  CompanyForm,
+  type CompanyInitial,
+  type LocationOption,
+  type ProfileOption,
+} from '../_components/CompanyForm';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
 export const dynamic = 'force-dynamic';
@@ -41,19 +46,30 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, canonical_name, company_type, country, city, phone, email, website, key_contact_name, key_contact_role, key_contact_email, key_contact_phone, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at',
+      'id, canonical_name, company_type, country, location_id, city, phone, email, website, key_contact_name, key_contact_role, key_contact_email, key_contact_phone, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at',
     )
     .eq('id', params.id)
     .single<DetailRow>();
 
   if (!company) notFound();
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, role')
-    .eq('is_active', true)
-    .order('full_name')
-    .returns<ProfileOption[]>();
+  const [profilesRes, locationsRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('is_active', true)
+      .order('full_name')
+      .returns<ProfileOption[]>(),
+    supabase
+      .from('city_lookup')
+      .select('id, country, emirate, city_name')
+      .eq('is_active', true)
+      .returns<Array<LocationOption & { city_name: string }>>(),
+  ]);
+  const profiles = profilesRes.data;
+  const locations: LocationOption[] = (locationsRes.data ?? [])
+    .filter((l) => l.city_name === l.emirate)
+    .map(({ id, country, emirate }) => ({ id, country, emirate }));
 
   const { data: linked } = await supabase
     .from('project_companies')
@@ -105,6 +121,7 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
             mode="edit"
             initial={company}
             profiles={profiles ?? []}
+            locations={locations}
             editable={editable}
           />
         </CardContent>
