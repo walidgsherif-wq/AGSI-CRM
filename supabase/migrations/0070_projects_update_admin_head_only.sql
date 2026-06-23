@@ -1,0 +1,37 @@
+-- 0070_projects_update_admin_head_only.sql
+-- Reverse the bd_manager project-edit policy. Projects are BNC-owned
+-- records; the locked write model says structural project mutation
+-- belongs to admin + bd_head only.
+--
+-- Background:
+--   0022 originally permitted bd_manager UPDATE via projects_update_ops
+--   (any BD role).
+--   0054 narrowed bd_manager UPDATE to "owns ≥1 linked company"
+--   (projects_update_manager_owned), keeping bd_head/admin via
+--   projects_update_admin_head.
+--   PR #99 mirrored the manager-owned predicate at the UI to stop the
+--   silent-reject Save-button bug.
+--   This migration completes the reversal: bd_manager loses UPDATE on
+--   projects entirely. UI Save button is hidden in the same PR.
+--
+-- Untouched:
+--   - projects_select_all (transparent reads remain)
+--   - projects_insert_ops (bd_manager keeps INSERT — they can create a
+--     project record; once created, only bd_head/admin edit it)
+--   - projects_delete_admin_head (admin/bd_head delete)
+--   - project_companies write policies (linking RLS unchanged per
+--     brief — bd_manager still links companies they own)
+--   - projects_update_admin_head (still admin+bd_head; this migration
+--     does NOT recreate it because it's already in place from 0054)
+--
+-- Idempotent: DROP IF EXISTS.
+
+DROP POLICY IF EXISTS projects_update_manager_owned ON projects;
+
+-- After this migration the only UPDATE policy on projects is
+-- projects_update_admin_head from 0054:
+--   USING       (auth_role() IN ('admin','bd_head'))
+--   WITH CHECK  (auth_role() IN ('admin','bd_head'))
+-- bd_manager / leadership UPDATE attempts now return 0 rows under RLS
+-- (and the server action src/server/actions/projects.ts adds a clean
+-- pre-check so they get a clear error instead of a silent no-op).

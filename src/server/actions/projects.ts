@@ -66,8 +66,12 @@ export async function createProject(formData: FormData) {
 
 export async function updateProject(formData: FormData) {
   const user = await getCurrentUser();
-  if (user.role === 'leadership') {
-    return { error: 'Leadership cannot edit projects.' };
+  // Projects are BNC-owned records; structural edits restricted to
+  // admin/bd_head (matches 0070's projects_update_admin_head policy).
+  // bd_manager / leadership get a clear pre-check error instead of a
+  // silent 0-row UPDATE from RLS.
+  if (user.role !== 'admin' && user.role !== 'bd_head') {
+    return { error: 'Projects can only be edited by an admin or BD head.' };
   }
 
   const id = String(formData.get('id') ?? '');
