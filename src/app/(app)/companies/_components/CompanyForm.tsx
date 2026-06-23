@@ -15,6 +15,7 @@ export type CompanyInitial = {
   canonical_name: string;
   company_type: (typeof COMPANY_TYPES)[number];
   country: string | null;
+  location_id: string | null;
   city: string | null;
   phone: string | null;
   email: string | null;
@@ -30,10 +31,20 @@ export type CompanyInitial = {
 
 export type ProfileOption = { id: string; full_name: string; role: string };
 
+// Single source of truth for the Country → Emirate cascade. Sourced
+// from city_lookup at request time and passed in here. Only the
+// canonical emirate-level rows (one per emirate) populate the dropdown.
+export type LocationOption = {
+  id: string;
+  country: string;
+  emirate: string;
+};
+
 const EMPTY: CompanyInitial = {
   canonical_name: '',
   company_type: 'developer',
   country: 'United Arab Emirates',
+  location_id: null,
   city: null,
   phone: null,
   email: null,
@@ -51,17 +62,30 @@ export function CompanyForm({
   mode,
   initial,
   profiles,
+  locations,
   editable,
 }: {
   mode: Mode;
   initial?: CompanyInitial;
   profiles: ProfileOption[];
+  locations: LocationOption[];
   editable: boolean;
 }) {
   const data = initial ?? EMPTY;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Country → Emirate cascade. Emirate options re-derive when country
+  // changes; selecting a new country clears the stale emirate so we
+  // never persist a mismatched FK.
+  const initialCountry = data.country ?? 'United Arab Emirates';
+  const [country, setCountry] = useState<string>(initialCountry);
+  const [locationId, setLocationId] = useState<string>(data.location_id ?? '');
+  const countries = Array.from(new Set(locations.map((l) => l.country))).sort();
+  const emiratesForCountry = locations
+    .filter((l) => l.country === country)
+    .sort((a, b) => a.emirate.localeCompare(b.emirate));
 
   async function onSubmit(formData: FormData) {
     setError(null);
@@ -102,14 +126,46 @@ export function CompanyForm({
           </Select>
         </Field>
         <Field label="Country">
-          <Input
+          <Select
             name="country"
-            defaultValue={data.country ?? 'United Arab Emirates'}
-            readOnly={ro}
-          />
+            value={country}
+            disabled={ro}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              // Clear emirate when country changes — never persist a
+              // (country, emirate) pair from different rows.
+              setLocationId('');
+            }}
+          >
+            {countries.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
         </Field>
-        <Field label="City">
-          <Input name="city" defaultValue={data.city ?? ''} readOnly={ro} />
+        <Field label="Emirate">
+          <Select
+            name="location_id"
+            value={locationId}
+            disabled={ro || emiratesForCountry.length === 0}
+            onChange={(e) => setLocationId(e.target.value)}
+          >
+            <option value="">— Select emirate —</option>
+            {emiratesForCountry.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.emirate}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Area / community (optional)" full>
+          <Input
+            name="city"
+            defaultValue={data.city ?? ''}
+            readOnly={ro}
+            placeholder="Free-text detail — analysis groups by emirate above."
+          />
         </Field>
       </Section>
 

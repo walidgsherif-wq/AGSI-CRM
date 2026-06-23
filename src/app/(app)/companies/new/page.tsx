@@ -5,7 +5,11 @@ import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CompanyForm, type ProfileOption } from '../_components/CompanyForm';
+import {
+  CompanyForm,
+  type LocationOption,
+  type ProfileOption,
+} from '../_components/CompanyForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +23,25 @@ export default async function NewCompanyPage() {
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, role')
-    .eq('is_active', true)
-    .order('full_name')
-    .returns<ProfileOption[]>();
+  const [profilesRes, locationsRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('is_active', true)
+      .order('full_name')
+      .returns<ProfileOption[]>(),
+    // Country → Emirate cascade source. Only the canonical emirate-
+    // level rows (city_name = emirate) — sub-zones aren't form options.
+    supabase
+      .from('city_lookup')
+      .select('id, country, emirate, city_name')
+      .eq('is_active', true)
+      .returns<Array<LocationOption & { city_name: string }>>(),
+  ]);
+  const profiles = profilesRes.data;
+  const locations: LocationOption[] = (locationsRes.data ?? [])
+    .filter((l) => l.city_name === l.emirate)
+    .map(({ id, country, emirate }) => ({ id, country, emirate }));
 
   return (
     <div className="space-y-6">
@@ -46,7 +63,12 @@ export default async function NewCompanyPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CompanyForm mode="create" profiles={profiles ?? []} editable />
+          <CompanyForm
+            mode="create"
+            profiles={profiles ?? []}
+            locations={locations}
+            editable
+          />
         </CardContent>
       </Card>
     </div>

@@ -36,6 +36,15 @@ export const companyCreateSchema = z.object({
   canonical_name: z.string().trim().min(1, 'Name is required').max(200),
   company_type: z.enum(COMPANY_TYPES),
   country: z.string().trim().max(100).default('United Arab Emirates'),
+  // Controlled emirate FK (city_lookup.id). Optional — unmatched rows
+  // simply don't place on the map. Free-text city below is the optional
+  // area/community detail; analysis keys on location_id.
+  location_id: z
+    .string()
+    .uuid()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v ?? null)),
   city: trimmedString(100),
   phone: trimmedString(50),
   email: optionalEmail,

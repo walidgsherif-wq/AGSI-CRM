@@ -10,13 +10,14 @@ export const dynamic = 'force-dynamic';
 type CompanyRow = {
   id: string;
   canonical_name: string;
-  city: string | null;
+  location_id: string | null;
   company_type: keyof typeof COMPANY_TYPE_LABEL;
   current_level: Level;
   has_active_projects: boolean;
 };
 
-type CityRow = {
+type LocationRow = {
+  id: string;
   city_name: string;
   emirate: string;
   latitude: number;
@@ -31,25 +32,30 @@ export default async function GeographicMapPage() {
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  const [companiesRes, citiesRes] = await Promise.all([
+  // Map now resolves coords only via the controlled FK — companies.city
+  // (free text) is no longer in the pipeline. Unmatched companies
+  // (location_id IS NULL) surface as the "not placed" count.
+  const [companiesRes, locationsRes] = await Promise.all([
     supabase
       .from('companies')
-      .select('id, canonical_name, city, company_type, current_level, has_active_projects')
+      .select(
+        'id, canonical_name, location_id, company_type, current_level, has_active_projects',
+      )
       .eq('is_active', true)
       .returns<CompanyRow[]>(),
     supabase
       .from('city_lookup')
-      .select('city_name, emirate, latitude, longitude')
+      .select('id, city_name, emirate, latitude, longitude')
       .eq('is_active', true)
-      .returns<CityRow[]>(),
+      .returns<LocationRow[]>(),
   ]);
 
   const companies = companiesRes.data ?? [];
-  const cities = (citiesRes.data ?? []).map((c) => ({
-    ...c,
-    latitude: Number(c.latitude),
-    longitude: Number(c.longitude),
+  const locations = (locationsRes.data ?? []).map((l) => ({
+    ...l,
+    latitude: Number(l.latitude),
+    longitude: Number(l.longitude),
   }));
 
-  return <GeographicHeatMap companies={companies} cities={cities} />;
+  return <GeographicHeatMap companies={companies} locations={locations} />;
 }

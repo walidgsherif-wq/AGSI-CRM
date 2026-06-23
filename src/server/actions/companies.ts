@@ -25,6 +25,7 @@ function rawFromForm(formData: FormData) {
     canonical_name: get('canonical_name'),
     company_type: get('company_type'),
     country: get('country') || 'United Arab Emirates',
+    location_id: get('location_id'),
     city: get('city'),
     phone: get('phone'),
     email: get('email'),
