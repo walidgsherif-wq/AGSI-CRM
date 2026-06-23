@@ -123,6 +123,7 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
             profiles={profiles ?? []}
             locations={locations}
             editable={editable}
+            userRole={user.role}
           />
         </CardContent>
       </Card>

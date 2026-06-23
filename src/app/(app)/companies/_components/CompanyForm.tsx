@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
+import type { Role } from '@/types/domain';
 import { createCompany, updateCompany } from '@/server/actions/companies';
 
 type Mode = 'create' | 'edit';
@@ -64,12 +65,18 @@ export function CompanyForm({
   profiles,
   locations,
   editable,
+  userRole,
 }: {
   mode: Mode;
   initial?: CompanyInitial;
   profiles: ProfileOption[];
   locations: LocationOption[];
   editable: boolean;
+  /** Caller's role. bd_manager loses the Owner Select (the only
+   *  owner_id they can persist is themselves — RLS WITH CHECK pins
+   *  it) and the is_key_stakeholder checkbox (locked to admin /
+   *  bd_head by trigger 0069). */
+  userRole: Role;
 }) {
   const data = initial ?? EMPTY;
   const [pending, startTransition] = useTransition();
@@ -102,6 +109,9 @@ export function CompanyForm({
   }
 
   const ro = !editable;
+  const isManager = userRole === 'bd_manager';
+  const ownerLabel =
+    profiles.find((p) => p.id === (data.owner_id ?? ''))?.full_name ?? 'You';
 
   return (
     <form action={onSubmit} className="space-y-6">
@@ -227,27 +237,53 @@ export function CompanyForm({
 
       <Section title="Ownership & flags">
         <Field label="Owner (BDM)">
-          <Select name="owner_id" defaultValue={data.owner_id ?? ''} disabled={ro}>
-            <option value="">— Unassigned —</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name} ({p.role})
-              </option>
-            ))}
-          </Select>
+          {isManager ? (
+            <>
+              {/* Owner is read-only for bd_manager. RLS WITH CHECK pins
+                  owner_id = self on any UPDATE; persisting a different
+                  value would silently reject. Hidden input preserves
+                  the current value through the round-trip. */}
+              <input
+                type="hidden"
+                name="owner_id"
+                value={data.owner_id ?? ''}
+              />
+              <p className="mt-1 rounded-lg border border-agsi-lightGray bg-agsi-offWhite px-3 py-2 text-sm text-agsi-darkGray">
+                {ownerLabel}
+              </p>
+            </>
+          ) : (
+            <Select name="owner_id" defaultValue={data.owner_id ?? ''} disabled={ro}>
+              <option value="">— Unassigned —</option>
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name} ({p.role})
+                </option>
+              ))}
+            </Select>
+          )}
         </Field>
-        <Field label="Key stakeholder">
-          <label className="mt-2 inline-flex items-center gap-2 text-sm text-agsi-navy">
-            <input
-              type="checkbox"
-              name="is_key_stakeholder"
-              defaultChecked={data.is_key_stakeholder}
-              disabled={ro}
-              className="h-4 w-4 rounded border-agsi-midGray"
-            />
-            Surfaces in leadership reports
-          </label>
-        </Field>
+        {!isManager && (
+          <Field label="Key stakeholder">
+            <label className="mt-2 inline-flex items-center gap-2 text-sm text-agsi-navy">
+              <input
+                type="checkbox"
+                name="is_key_stakeholder"
+                defaultChecked={data.is_key_stakeholder}
+                disabled={ro}
+                className="h-4 w-4 rounded border-agsi-midGray"
+              />
+              Surfaces in leadership reports
+            </label>
+          </Field>
+        )}
+        {isManager && data.is_key_stakeholder && (
+          // Preserve the existing flag so a bd_manager edit doesn't
+          // silently un-flag a stakeholder an admin marked. The 0069
+          // trigger blocks any change attempt; this just keeps the
+          // current value true on round-trip.
+          <input type="hidden" name="is_key_stakeholder" value="on" />
+        )}
       </Section>
 
       <Section title="Internal notes">

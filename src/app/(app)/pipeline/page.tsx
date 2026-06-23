@@ -68,13 +68,14 @@ export default async function PipelinePage({
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  // Owner filter is only rendered for roles that can SEE multiple
-  // owners. bd_manager's RLS already constrains their pipeline to
-  // companies they own, so the filter would be a no-op for them and
-  // we hide it. leadership is included because they may receive
-  // pipeline feature access via the per-user override (PR #26).
+  // Owner filter is a view convenience — every authenticated role can
+  // SELECT all companies (companies_select_all in 0022), so this is
+  // not an RLS scope. Leadership/admin/bd_head/bd_manager all get it.
   const canFilterByOwner =
-    user.role === 'admin' || user.role === 'bd_head' || user.role === 'leadership';
+    user.role === 'admin' ||
+    user.role === 'bd_head' ||
+    user.role === 'bd_manager' ||
+    user.role === 'leadership';
   const ownerOptions = canFilterByOwner ? await fetchOwnerOptions(supabase) : [];
 
   // Paginated fetch: a single .limit(2000) silently truncated the

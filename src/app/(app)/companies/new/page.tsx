@@ -68,6 +68,7 @@ export default async function NewCompanyPage() {
             profiles={profiles ?? []}
             locations={locations}
             editable
+            userRole={user.role}
           />
         </CardContent>
       </Card>
