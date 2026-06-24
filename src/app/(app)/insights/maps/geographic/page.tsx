@@ -32,26 +32,37 @@ export default async function GeographicMapPage() {
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  // Map now resolves coords only via the controlled FK — companies.city
-  // (free text) is no longer in the pipeline. Unmatched companies
-  // (location_id IS NULL) surface as the "not placed" count.
-  const [companiesRes, locationsRes] = await Promise.all([
-    supabase
+  // Scope: companies we're actually pursuing — L2+ only. L0/L1 are
+  // either market dossier (BNC) or first-touch leads that don't yet
+  // belong on a relationship map. Paginated fetch because Supabase
+  // silently caps a single request at 1000 rows; mirrors the pattern
+  // in /pipeline.
+  const PAGE_SIZE = 1000;
+  const HARD_CAP = 20_000;
+  const companies: CompanyRow[] = [];
+  for (let offset = 0; offset < HARD_CAP; offset += PAGE_SIZE) {
+    const { data: batch } = await supabase
       .from('companies')
       .select(
         'id, canonical_name, location_id, company_type, current_level, has_active_projects',
       )
       .eq('is_active', true)
-      .returns<CompanyRow[]>(),
-    supabase
-      .from('city_lookup')
-      .select('id, city_name, emirate, latitude, longitude')
-      .eq('is_active', true)
-      .returns<LocationRow[]>(),
-  ]);
+      .in('current_level', ['L2', 'L3', 'L4', 'L5'])
+      .order('canonical_name', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1)
+      .returns<CompanyRow[]>();
+    const rows = batch ?? [];
+    companies.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
 
-  const companies = companiesRes.data ?? [];
-  const locations = (locationsRes.data ?? []).map((l) => ({
+  const { data: locationsRaw } = await supabase
+    .from('city_lookup')
+    .select('id, city_name, emirate, latitude, longitude')
+    .eq('is_active', true)
+    .returns<LocationRow[]>();
+
+  const locations = (locationsRaw ?? []).map((l) => ({
     ...l,
     latitude: Number(l.latitude),
     longitude: Number(l.longitude),
