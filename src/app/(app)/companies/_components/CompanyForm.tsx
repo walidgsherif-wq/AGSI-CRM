@@ -21,10 +21,6 @@ export type CompanyInitial = {
   phone: string | null;
   email: string | null;
   website: string | null;
-  key_contact_name: string | null;
-  key_contact_role: string | null;
-  key_contact_email: string | null;
-  key_contact_phone: string | null;
   notes_internal: string | null;
   is_key_stakeholder: boolean;
   owner_id: string | null;
@@ -50,10 +46,6 @@ const EMPTY: CompanyInitial = {
   phone: null,
   email: null,
   website: null,
-  key_contact_name: null,
-  key_contact_role: null,
-  key_contact_email: null,
-  key_contact_phone: null,
   notes_internal: null,
   is_key_stakeholder: false,
   owner_id: null,
@@ -197,39 +189,6 @@ export function CompanyForm({
             type="url"
             defaultValue={data.website ?? ''}
             placeholder="https://"
-            readOnly={ro}
-          />
-        </Field>
-      </Section>
-
-      <Section title="Key contact">
-        <Field label="Name">
-          <Input
-            name="key_contact_name"
-            defaultValue={data.key_contact_name ?? ''}
-            readOnly={ro}
-          />
-        </Field>
-        <Field label="Role">
-          <Input
-            name="key_contact_role"
-            defaultValue={data.key_contact_role ?? ''}
-            readOnly={ro}
-          />
-        </Field>
-        <Field label="Email">
-          <Input
-            name="key_contact_email"
-            type="email"
-            defaultValue={data.key_contact_email ?? ''}
-            readOnly={ro}
-          />
-        </Field>
-        <Field label="Phone">
-          <Input
-            name="key_contact_phone"
-            type="tel"
-            defaultValue={data.key_contact_phone ?? ''}
             readOnly={ro}
           />
         </Field>
