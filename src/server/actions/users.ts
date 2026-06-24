@@ -167,6 +167,46 @@ export async function setUserRole(userId: string, role: Role) {
   revalidatePath('/admin/users');
 }
 
+/**
+ * Set or clear a user's corporate / work email. The inbound-email
+ * resolver matches BD users against either profiles.email or
+ * profiles.work_email, so populating this lets the resolver attribute
+ * mail sent/received under a corporate alias correctly.
+ *
+ * Admin-only. Passing empty string / null clears the column.
+ * Validation: basic email shape + uniqueness (DB enforces both).
+ */
+export async function setUserWorkEmail(userId: string, workEmail: string | null) {
+  await assertCallerIsAdmin();
+
+  const normalised = (workEmail ?? '').trim().toLowerCase();
+  let payload: string | null;
+  if (normalised === '') {
+    payload = null;
+  } else {
+    // Loose shape check — matches the DB CHECK constraint. Stricter
+    // RFC-5322 validation isn't worth the false-negative rate here.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalised)) {
+      return { error: 'That doesn’t look like an email address.' };
+    }
+    payload = normalised;
+  }
+
+  const { error } = await adminClient()
+    .from('profiles')
+    .update({ work_email: payload })
+    .eq('id', userId);
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'Another user already has that work email.' };
+    }
+    return { error: error.message };
+  }
+  revalidatePath('/admin/users');
+  revalidatePath(`/admin/users/${userId}/access`);
+  return { ok: true as const };
+}
+
 export async function setUserActive(userId: string, isActive: boolean) {
   await assertCallerIsAdmin();
   const { error } = await adminClient()

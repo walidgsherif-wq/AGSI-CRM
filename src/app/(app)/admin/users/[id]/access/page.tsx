@@ -12,6 +12,7 @@ import {
   FeatureAccessEditor,
   type FeatureRow,
 } from './_components/FeatureAccessEditor';
+import { WorkEmailEditor } from './_components/WorkEmailEditor';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ type ProfileRow = {
   email: string;
   role: Role;
   is_active: boolean;
+  work_email: string | null;
 };
 
 export default async function UserAccessPage({ params }: { params: { id: string } }) {
@@ -34,7 +36,7 @@ export default async function UserAccessPage({ params }: { params: { id: string 
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, is_active')
+    .select('id, full_name, email, role, is_active, work_email')
     .eq('id', params.id)
     .maybeSingle<ProfileRow>();
 
@@ -76,6 +78,23 @@ export default async function UserAccessPage({ params }: { params: { id: string 
         </div>
         <p className="mt-1 text-sm text-agsi-darkGray">{profile.email}</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Work email</CardTitle>
+          <CardDescription>
+            Corporate / Outlook alias for this user. Used by the inbound-email
+            matcher alongside their sign-in address to attribute mail
+            correctly. Leave blank if they only use {profile.email}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WorkEmailEditor
+            userId={profile.id}
+            currentValue={profile.work_email}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
