@@ -165,7 +165,12 @@ export default async function InboundEmailPage({
                   </div>
                   <div>
                     {r.status === 'pending' ? (
-                      <ResolveActions unmatchedId={r.id} companies={companies} />
+                      <ResolveActions
+                        unmatchedId={r.id}
+                        companies={companies}
+                        fromEmail={r.from_email}
+                        fromName={r.from_name}
+                      />
                     ) : (
                       <p className="text-xs italic text-agsi-darkGray">No further action.</p>
                     )}
