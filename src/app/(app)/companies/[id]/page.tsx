@@ -12,6 +12,7 @@ import {
   type LocationOption,
   type ProfileOption,
 } from '../_components/CompanyForm';
+import { CompanyClaimButton } from './_components/CompanyClaimButton';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
 export const dynamic = 'force-dynamic';
@@ -105,8 +106,11 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
     user.role === 'bd_head' ||
     (user.role === 'bd_manager' && company.owner_id === user.id);
 
+  const canClaim = company.owner_id === null && user.role !== 'leadership';
+
   return (
     <div className="space-y-6">
+      {canClaim && <CompanyClaimButton companyId={company.id} />}
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>

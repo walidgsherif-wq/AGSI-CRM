@@ -116,3 +116,32 @@ export async function updateCompany(formData: FormData) {
   revalidatePath(`/companies/${id}`);
   return { ok: true };
 }
+
+/**
+ * Self-serve claim: set owner_id = self on an unowned company.
+ *
+ * RLS for bd_manager UPDATE pins owner_id = self on both USING and
+ * WITH CHECK, so claiming an unowned row from a non-owner is
+ * impossible through the regular UPDATE path. The claim_company
+ * RPC (migration 0071) is SECURITY DEFINER and bypasses RLS with
+ * its own role gate + atomic single-UPDATE race guard.
+ *
+ * Returns { ok: true } or { error: '…' } — never throws.
+ */
+export async function claimCompany(companyId: string) {
+  const user = await getCurrentUser();
+  // Echoed server-side so the UI fail-closed before any RPC round-trip
+  // if a leadership session somehow reaches this action.
+  if (user.role === 'leadership') {
+    return { error: 'Leadership cannot claim companies.' };
+  }
+
+  const { error } = await supabaseFromRequest().rpc('claim_company', {
+    p_company_id: companyId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath('/companies');
+  revalidatePath(`/companies/${companyId}`);
+  return { ok: true as const };
+}
