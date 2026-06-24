@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -88,9 +89,11 @@ const TYPE_COLOR: Record<CompanyType, string> = {
 export function GeographicHeatMap({
   companies,
   locations,
+  minLevel,
 }: {
   companies: Company[];
   locations: Location[];
+  minLevel: Level;
 }) {
   const [typeFilter, setTypeFilter] = useState<CompanyType | 'all'>('all');
   const [levelFilter, setLevelFilter] = useState<Level | 'all' | 'l3plus'>('all');
@@ -151,17 +154,45 @@ export function GeographicHeatMap({
     return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  function onMinLevelChange(next: Level) {
+    const qs = new URLSearchParams(searchParams.toString());
+    if (next === 'L0') qs.delete('min_level');
+    else qs.set('min_level', next);
+    const s = qs.toString();
+    router.push((s ? `/insights/maps/geographic?${s}` : '/insights/maps/geographic') as never);
+  }
+  const scopeLabel = minLevel === 'L0' ? 'All stakeholders (L0+)' : `${minLevel}+ stakeholders`;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-agsi-navy">Geographic heat map</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
-            L2+ stakeholders only — companies we&apos;re actively pursuing.
-            Dot area scales with company count per emirate.
+            {scopeLabel} — companies we&apos;re actively pursuing. Dot area
+            scales with company count per emirate.
           </p>
         </div>
-        <HeatMapExportButton filename="agsi-geographic-heatmap" targetRef={captureRef} />
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs font-medium text-agsi-darkGray">
+            Footprint scope
+            <select
+              value={minLevel}
+              onChange={(e) => onMinLevelChange(e.target.value as Level)}
+              aria-label="Minimum stakeholder level to include on the map"
+              className="rounded border border-agsi-midGray bg-white px-2 py-1 text-xs font-medium text-agsi-navy"
+            >
+              {LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l === 'L0' ? 'All (L0+)' : `${l}+`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <HeatMapExportButton filename="agsi-geographic-heatmap" targetRef={captureRef} />
+        </div>
       </div>
 
       <Card>

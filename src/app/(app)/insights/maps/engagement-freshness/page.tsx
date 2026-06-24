@@ -37,23 +37,39 @@ export default async function EngagementFreshnessPage() {
     .toISOString()
     .slice(0, 10);
 
-  const [companiesRes, engagementsRes] = await Promise.all([
-    supabase
+  // Freshness on unclaimed BNC records is noise — nobody logs
+  // engagement on dossier rows. Scope to owned/claimed stakeholders;
+  // the matrix then answers "of the work we've taken on, what's
+  // gone cold". Paginated because Supabase silently caps at 1000.
+  const PAGE_SIZE = 1000;
+  const HARD_CAP = 20_000;
+  const companies: CompanyRow[] = [];
+  for (let offset = 0; offset < HARD_CAP; offset += PAGE_SIZE) {
+    const { data: batch } = await supabase
       .from('companies')
-      .select('id, canonical_name, company_type, current_level, owner_id, has_active_projects')
+      .select(
+        'id, canonical_name, company_type, current_level, owner_id, has_active_projects',
+      )
       .eq('is_active', true)
-      .returns<CompanyRow[]>(),
-    supabase
-      .from('engagements')
-      .select('company_id, engagement_date')
-      .gte('engagement_date', sinceIso)
-      .returns<EngagementRow[]>(),
-  ]);
+      .not('owner_id', 'is', null)
+      .order('canonical_name', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1)
+      .returns<CompanyRow[]>();
+    const rows = batch ?? [];
+    companies.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+
+  const { data: engagementsRaw } = await supabase
+    .from('engagements')
+    .select('company_id, engagement_date')
+    .gte('engagement_date', sinceIso)
+    .returns<EngagementRow[]>();
 
   return (
     <EngagementFreshnessHeatMap
-      companies={companiesRes.data ?? []}
-      engagements={engagementsRes.data ?? []}
+      companies={companies}
+      engagements={engagementsRaw ?? []}
       weeksBack={WEEKS_BACK}
       currentUserId={user.id}
     />
