@@ -157,7 +157,8 @@ export function GeographicHeatMap({
         <div>
           <h1 className="text-2xl font-semibold text-agsi-navy">Geographic heat map</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
-            UAE stakeholder density by emirate. Dot area scales with company count.
+            L2+ stakeholders only — companies we&apos;re actively pursuing.
+            Dot area scales with company count per emirate.
           </p>
         </div>
         <HeatMapExportButton filename="agsi-geographic-heatmap" targetRef={captureRef} />
