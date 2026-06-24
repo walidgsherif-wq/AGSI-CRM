@@ -49,10 +49,10 @@ export const companyCreateSchema = z.object({
   phone: trimmedString(50),
   email: optionalEmail,
   website: optionalUrl,
-  key_contact_name: trimmedString(150),
-  key_contact_role: trimmedString(150),
-  key_contact_email: optionalEmail,
-  key_contact_phone: trimmedString(50),
+  // key_contact_* columns are deprecated — the form no longer writes
+  // them. BNC ingest + inbound-email still touch them on the DB; a
+  // follow-up will repoint those to the contacts table and drop the
+  // columns.
   notes_internal: trimmedString(4000),
   is_key_stakeholder: z.boolean().default(false),
   owner_id: z

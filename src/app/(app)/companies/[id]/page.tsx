@@ -13,6 +13,7 @@ import {
   type ProfileOption,
 } from '../_components/CompanyForm';
 import { CompanyClaimButton } from './_components/CompanyClaimButton';
+import { ContactsSection, type ContactRow } from './_components/ContactsSection';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
 export const dynamic = 'force-dynamic';
@@ -47,26 +48,56 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, canonical_name, company_type, country, location_id, city, phone, email, website, key_contact_name, key_contact_role, key_contact_email, key_contact_phone, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at',
+      'id, canonical_name, company_type, country, location_id, city, phone, email, website, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at',
     )
     .eq('id', params.id)
     .single<DetailRow>();
 
   if (!company) notFound();
 
-  const [profilesRes, locationsRes] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, full_name, role')
-      .eq('is_active', true)
-      .order('full_name')
-      .returns<ProfileOption[]>(),
-    supabase
-      .from('city_lookup')
-      .select('id, country, emirate, city_name')
-      .eq('is_active', true)
-      .returns<Array<LocationOption & { city_name: string }>>(),
-  ]);
+  const isHeadOrAdmin = user.role === 'admin' || user.role === 'bd_head';
+
+  // Contacts query: live + (for admin/bd_head) archived. RLS already
+  // gates archived visibility, but a leadership/bd_manager session
+  // wouldn't get any rows back here anyway — the filter on the second
+  // query just avoids a wasted round-trip.
+  const [profilesRes, locationsRes, liveContactsRes, archivedContactsRes] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('is_active', true)
+        .order('full_name')
+        .returns<ProfileOption[]>(),
+      supabase
+        .from('city_lookup')
+        .select('id, country, emirate, city_name')
+        .eq('is_active', true)
+        .returns<Array<LocationOption & { city_name: string }>>(),
+      supabase
+        .from('contacts')
+        .select(
+          'id, company_id, full_name, position, email, phone, is_primary, created_by, created_at, deleted_at, deleted_by',
+        )
+        .eq('company_id', params.id)
+        .is('deleted_at', null)
+        .order('is_primary', { ascending: false })
+        .order('full_name', { ascending: true })
+        .returns<ContactRow[]>(),
+      isHeadOrAdmin
+        ? supabase
+            .from('contacts')
+            .select(
+              'id, company_id, full_name, position, email, phone, is_primary, created_by, created_at, deleted_at, deleted_by',
+            )
+            .eq('company_id', params.id)
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false })
+            .returns<ContactRow[]>()
+        : Promise.resolve({ data: [] as ContactRow[] }),
+    ]);
+  const liveContacts = liveContactsRes.data ?? [];
+  const archivedContacts = archivedContactsRes.data ?? [];
   const profiles = profilesRes.data;
   const locations: LocationOption[] = (locationsRes.data ?? [])
     .filter((l) => l.city_name === l.emirate)
@@ -127,6 +158,26 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
             profiles={profiles ?? []}
             locations={locations}
             editable={editable}
+            userRole={user.role}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Contacts</CardTitle>
+          <CardDescription>
+            The people you work with at this stakeholder. One contact can be
+            flagged Primary. Deletes are soft — recoverable from the archive
+            by an admin / BD head.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ContactsSection
+            companyId={company.id}
+            live={liveContacts}
+            archived={archivedContacts}
+            currentUserId={user.id}
             userRole={user.role}
           />
         </CardContent>
