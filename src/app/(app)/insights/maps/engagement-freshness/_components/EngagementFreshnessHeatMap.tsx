@@ -187,8 +187,9 @@ export function EngagementFreshnessHeatMap({
         <div>
           <h1 className="text-2xl font-semibold text-agsi-navy">Engagement freshness</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
-            Stakeholder × week matrix, last {weeksBack} weeks. Cells coloured by recency
-            of the engagement that fell in that week.
+            Owned stakeholders × week, last {weeksBack} weeks. Cells coloured by
+            recency of the engagement that fell in that week. Unclaimed
+            companies are excluded — freshness on dossier rows is noise.
           </p>
         </div>
         <HeatMapExportButton filename="agsi-engagement-freshness" targetRef={captureRef} />
