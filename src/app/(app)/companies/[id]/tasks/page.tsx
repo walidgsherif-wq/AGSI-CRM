@@ -13,7 +13,11 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from '@/lib/zod/task';
-import { TaskForm, type TaskFormInitial } from './_components/TaskForm';
+import {
+  TaskForm,
+  type EngagementContext,
+  type TaskFormInitial,
+} from './_components/TaskForm';
 import { TaskRowActions } from './_components/TaskRowActions';
 
 export const dynamic = 'force-dynamic';
@@ -28,10 +32,24 @@ type TaskRow = {
   owner_id: string;
   assigned_by_id: string | null;
   source: string;
+  engagement_id: string | null;
+  engagement: {
+    id: string;
+    summary: string;
+    engagement_date: string;
+  } | {
+    id: string;
+    summary: string;
+    engagement_date: string;
+  }[] | null;
   owner: { full_name: string } | null;
   assigned_by: { full_name: string } | null;
   reminders: { reminder_kind: ReminderKind; reminder_at: string; sent_at: string | null }[];
 };
+
+function pickOne<T>(v: T | T[] | null | undefined): T | null {
+  return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+}
 
 const PRIORITY_VARIANT: Record<TaskPriority, 'neutral' | 'blue' | 'amber' | 'red'> = {
   low: 'neutral',
@@ -45,7 +63,7 @@ export default async function CompanyTasksTab({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { edit?: string };
+  searchParams: { edit?: string; from_engagement?: string };
 }) {
   const user = await getCurrentUser();
   if (user.role === 'leadership') {
@@ -64,11 +82,11 @@ export default async function CompanyTasksTab({
     { cookies: serverComponentCookies(cookies()) },
   );
 
-  const [tasksRes, profilesRes] = await Promise.all([
+  const [tasksRes, profilesRes, companyRes] = await Promise.all([
     supabase
       .from('tasks')
       .select(
-        'id, title, description, due_date, priority, status, owner_id, assigned_by_id, source, owner:profiles!tasks_owner_id_fkey(full_name), assigned_by:profiles!tasks_assigned_by_id_fkey(full_name), reminders:task_reminders(reminder_kind, reminder_at, sent_at)',
+        'id, title, description, due_date, priority, status, owner_id, assigned_by_id, source, engagement_id, engagement:engagements(id, summary, engagement_date), owner:profiles!tasks_owner_id_fkey(full_name), assigned_by:profiles!tasks_assigned_by_id_fkey(full_name), reminders:task_reminders(reminder_kind, reminder_at, sent_at)',
       )
       .eq('company_id', params.id)
       .order('status', { ascending: true })
@@ -81,7 +99,47 @@ export default async function CompanyTasksTab({
       .eq('is_active', true)
       .in('role', ['admin', 'bd_head', 'bd_manager'])
       .order('full_name'),
+    supabase
+      .from('companies')
+      .select('canonical_name')
+      .eq('id', params.id)
+      .maybeSingle<{ canonical_name: string }>(),
   ]);
+
+  // Follow-up entry path: TaskForm opens pre-filled with engagement
+  // context + a "Follow up: {company}" default title.
+  let engagementContext: EngagementContext | null = null;
+  let followUpTitleDefault: string | null = null;
+  if (searchParams.from_engagement) {
+    const { data: eng } = await supabase
+      .from('engagements')
+      .select(
+        'id, summary, engagement_date, author:profiles!engagements_created_by_fkey(full_name)',
+      )
+      .eq('id', searchParams.from_engagement)
+      .eq('company_id', params.id)
+      .maybeSingle<{
+        id: string;
+        summary: string;
+        engagement_date: string;
+        author:
+          | { full_name: string }
+          | { full_name: string }[]
+          | null;
+      }>();
+    if (eng) {
+      const author = pickOne(eng.author);
+      engagementContext = {
+        id: eng.id,
+        summary: eng.summary,
+        engagement_date: eng.engagement_date,
+        author_name: author?.full_name ?? null,
+        href: `/companies/${params.id}/engagements`,
+      };
+      const companyName = companyRes.data?.canonical_name ?? 'this stakeholder';
+      followUpTitleDefault = `Follow up: ${companyName}`;
+    }
+  }
 
   const canAssignToOthers = user.role === 'admin' || user.role === 'bd_head';
 
@@ -129,6 +187,9 @@ export default async function CompanyTasksTab({
           profiles={profiles}
           defaultOwnerId={user.id}
           canAssignToOthers={canAssignToOthers}
+          engagementContext={engagementContext ?? undefined}
+          titleDefault={followUpTitleDefault ?? undefined}
+          defaultOpen={engagementContext !== null}
         />
       )}
 
@@ -180,6 +241,22 @@ export default async function CompanyTasksTab({
                         {t.description && (
                           <div className="mt-0.5 text-xs text-agsi-darkGray">{t.description}</div>
                         )}
+                        {(() => {
+                          const eng = pickOne(t.engagement);
+                          if (!eng) return null;
+                          const truncated =
+                            eng.summary.length > 80
+                              ? eng.summary.slice(0, 80) + '…'
+                              : eng.summary;
+                          return (
+                            <Link
+                              href={`/companies/${params.id}/engagements`}
+                              className="mt-1 inline-block text-xxs text-agsi-accent hover:underline"
+                            >
+                              From engagement: “{truncated}” · {eng.engagement_date}
+                            </Link>
+                          );
+                        })()}
                         {t.source !== 'manual' && (
                           <Badge variant="amber" className="mt-1">
                             {t.source}
