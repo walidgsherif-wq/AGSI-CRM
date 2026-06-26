@@ -288,7 +288,7 @@ export default async function CompaniesPage({
             <input type="hidden" name="dir" value={sortDir} />
             <div className="flex items-end sm:col-span-2">
               <Button type="submit" variant="secondary" className="w-full sm:w-auto">
-                Apply filters
+                Search
               </Button>
             </div>
           </form>
