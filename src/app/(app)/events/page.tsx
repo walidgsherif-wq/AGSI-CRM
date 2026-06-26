@@ -14,17 +14,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Select } from '@/components/ui/select';
-import { EVENT_TYPE_LABEL, type EventType } from '@/lib/zod/event';
+import {
+  EVENT_TYPE_LABEL,
+  type EventStatus,
+  type EventType,
+} from '@/lib/zod/event';
 import {
   fetchFiscalStartMonth,
   getFiscalContext,
 } from '@/lib/fiscal';
 import { EventLogForm } from '@/components/domain/EventLogForm';
+import { PlanEventDialog } from '@/components/domain/PlanEventDialog';
+import { EventProofLink } from '@/components/domain/EventProofLink';
 import { EventRowActions } from './_components/EventRowActions';
 
 export const dynamic = 'force-dynamic';
 
 type Period = 'quarter' | 'fy' | 'all';
+type StatusFilter = 'all' | 'planned' | 'attended';
 
 type EventRow = {
   id: string;
@@ -35,6 +42,9 @@ type EventRow = {
   website: string | null;
   value_note: string | null;
   feedback: string | null;
+  status: EventStatus;
+  proof_path: string | null;
+  confirmed_at: string | null;
   member: { full_name: string } | { full_name: string }[] | null;
 };
 
@@ -45,9 +55,10 @@ function pickOne<T>(v: T | T[] | null | undefined): T | null {
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams: { period?: string; member?: string };
+  searchParams: { period?: string; member?: string; status?: string };
 }) {
   const user = await getCurrentUser();
+  const canReviewProofs = user.role === 'admin' || user.role === 'leadership';
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
@@ -63,6 +74,10 @@ export default async function EventsPage({
       ? searchParams.period
       : 'quarter';
   const memberFilter = searchParams.member ?? 'all';
+  const statusFilter: StatusFilter =
+    searchParams.status === 'planned' || searchParams.status === 'attended'
+      ? searchParams.status
+      : 'all';
 
   let fromDate: string | null = null;
   let toDate: string | null = null;
@@ -75,21 +90,20 @@ export default async function EventsPage({
     toDate = quarters[3].endExclusive.toISOString().slice(0, 10);
   }
 
-  // Build filtered query.
   let q = supabase
     .from('event_attendance')
     .select(
-      'id, member_id, event_name, event_date, event_type, website, value_note, feedback, member:profiles!event_attendance_member_id_fkey(full_name)',
+      'id, member_id, event_name, event_date, event_type, website, value_note, feedback, status, proof_path, confirmed_at, member:profiles!event_attendance_member_id_fkey(full_name)',
     )
     .order('event_date', { ascending: false })
     .limit(500);
   if (fromDate) q = q.gte('event_date', fromDate);
   if (toDate) q = q.lt('event_date', toDate);
   if (memberFilter !== 'all') q = q.eq('member_id', memberFilter);
+  if (statusFilter !== 'all') q = q.eq('status', statusFilter);
   const { data: rowsRaw } = await q.returns<EventRow[]>();
   const rows = rowsRaw ?? [];
 
-  // Members list for the filter dropdown.
   const { data: profilesData } = await supabase
     .from('profiles')
     .select('id, full_name')
@@ -100,18 +114,10 @@ export default async function EventsPage({
     full_name: string;
   }>;
 
-  // Per-member counts for the rollup strip.
-  const perMember = new Map<string, number>();
-  for (const r of rows) {
-    perMember.set(r.member_id, (perMember.get(r.member_id) ?? 0) + 1);
-  }
-  const perMemberSorted = Array.from(perMember.entries())
-    .map(([id, count]) => ({
-      id,
-      name: profiles.find((p) => p.id === id)?.full_name ?? 'Unknown',
-      count,
-    }))
-    .sort((a, b) => b.count - a.count);
+  // Rollup strip — counts attended / verified / planned in the filtered set.
+  const attended = rows.filter((r) => r.status === 'attended');
+  const verified = attended.filter((r) => !!r.proof_path);
+  const planned = rows.filter((r) => r.status === 'planned');
 
   const periodLabel =
     period === 'quarter'
@@ -126,26 +132,38 @@ export default async function EventsPage({
         <div>
           <h1 className="text-2xl font-semibold text-agsi-navy">Team events</h1>
           <p className="mt-1 text-sm text-agsi-darkGray">
-            Conferences, exhibitions, and CPD the BD team has attended. Each
-            member logs their own.
+            Conferences, exhibitions, and CPD the BD team is planning or has
+            attended. Each member logs their own; a badge photo marks an
+            attended row <strong>Verified</strong>.
           </p>
         </div>
-        <EventLogForm
-          mode="create"
-          trigger={<Button size="sm">+ Log event</Button>}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <PlanEventDialog
+            trigger={
+              <Button size="sm" variant="outline">
+                + Plan event
+              </Button>
+            }
+          />
+          <EventLogForm
+            mode="create"
+            memberId={user.id}
+            trigger={<Button size="sm">+ Log past event</Button>}
+          />
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Filter</CardTitle>
           <CardDescription>
-            Period and member. Showing <strong>{rows.length}</strong> events
-            in {periodLabel}.
+            Showing <strong>{rows.length}</strong> events in {periodLabel} —{' '}
+            {attended.length} attended ({verified.length} verified),{' '}
+            {planned.length} planned.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 sm:grid-cols-4">
+          <form className="grid gap-3 sm:grid-cols-5">
             <div>
               <label className="block text-xs font-medium text-agsi-darkGray">
                 Period
@@ -154,6 +172,16 @@ export default async function EventsPage({
                 <option value="quarter">This quarter (FY{fy} Q{fq})</option>
                 <option value="fy">This fiscal year (FY{fy})</option>
                 <option value="all">All time</option>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-agsi-darkGray">
+                Status
+              </label>
+              <Select name="status" defaultValue={statusFilter} className="mt-1">
+                <option value="all">All</option>
+                <option value="planned">Upcoming</option>
+                <option value="attended">Attended</option>
               </Select>
             </div>
             <div>
@@ -186,33 +214,6 @@ export default async function EventsPage({
         </CardContent>
       </Card>
 
-      {perMemberSorted.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>By member · {periodLabel}</CardTitle>
-            <CardDescription>
-              {perMemberSorted.length} members logged at least one event.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-wrap gap-2 text-xs">
-              {perMemberSorted.map((m) => (
-                <li
-                  key={m.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-agsi-lightGray bg-white px-3 py-1"
-                >
-                  <span className="font-medium text-agsi-navy">{m.name}</span>
-                  <span className="text-agsi-darkGray">·</span>
-                  <span className="tabular-nums text-agsi-darkGray">
-                    {m.count}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardContent className="p-0">
           {rows.length === 0 ? (
@@ -220,13 +221,14 @@ export default async function EventsPage({
               No events match these filters.
             </p>
           ) : (
-            <Table className="min-w-[720px]">
+            <Table className="min-w-[820px]">
               <THead>
                 <TR head>
                   <TH className="px-4">Member</TH>
                   <TH className="px-4">Event</TH>
                   <TH className="px-4">Date</TH>
                   <TH className="px-4">Type</TH>
+                  <TH className="px-4">Status</TH>
                   <TH className="px-4">Value note</TH>
                   <TH className="px-4">Feedback</TH>
                   <TH className="px-4"></TH>
@@ -238,6 +240,8 @@ export default async function EventsPage({
                     pickOne(r.member)?.full_name ?? 'Unknown';
                   const canMutate =
                     user.role === 'admin' || r.member_id === user.id;
+                  const isVerified =
+                    r.status === 'attended' && !!r.proof_path;
                   return (
                     <TR key={r.id} className="hover:bg-agsi-lightGray/20">
                       <TD className="px-4 font-medium text-agsi-navy">
@@ -264,6 +268,20 @@ export default async function EventsPage({
                           {EVENT_TYPE_LABEL[r.event_type]}
                         </Badge>
                       </TD>
+                      <TD className="px-4">
+                        <div className="flex flex-col gap-1">
+                          {r.status === 'planned' ? (
+                            <Badge variant="amber">Upcoming</Badge>
+                          ) : isVerified ? (
+                            <Badge variant="green">Verified</Badge>
+                          ) : (
+                            <Badge variant="neutral">Attended</Badge>
+                          )}
+                          {canReviewProofs && r.proof_path && (
+                            <EventProofLink path={r.proof_path} />
+                          )}
+                        </div>
+                      </TD>
                       <TD className="px-4 text-xs text-agsi-darkGray">
                         {r.value_note ?? '—'}
                       </TD>
@@ -281,7 +299,10 @@ export default async function EventsPage({
                               website: r.website,
                               value_note: r.value_note,
                               feedback: r.feedback,
+                              status: r.status,
+                              proof_path: r.proof_path,
                             }}
+                            viewerId={user.id}
                           />
                         )}
                       </TD>

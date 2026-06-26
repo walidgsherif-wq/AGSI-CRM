@@ -9,22 +9,38 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { EVENT_TYPE_LABEL, type EventType } from '@/lib/zod/event';
 
+type TeamEventPreview = {
+  id: string;
+  member_name: string | null;
+  event_name: string;
+  event_date: string;
+  event_type: EventType;
+  verified?: boolean;
+};
+
 export type TeamEventSummary = {
-  totalEvents: number;
+  /** Count of attended events in the FY-to-date window. */
+  attendedTotal: number;
+  /** Of attendedTotal, how many have a proof_path attached. */
+  verifiedTotal: number;
+  /** Unique members who logged at least one attended event in the window. */
   uniqueMembers: number;
-  /** Most recent N rows for the period — used as the small preview. */
-  recent: Array<{
-    id: string;
-    member_name: string | null;
-    event_name: string;
-    event_date: string;
-    event_type: EventType;
-  }>;
+  /** Most-recent attended events (with verified flag). */
+  recentAttended: TeamEventPreview[];
+  /** Upcoming planned events across the team (next N). */
+  upcoming: TeamEventPreview[];
   periodLabel: string;
 };
 
 export function TeamEventsCard({ summary }: { summary: TeamEventSummary }) {
-  const { totalEvents, uniqueMembers, recent, periodLabel } = summary;
+  const {
+    attendedTotal,
+    verifiedTotal,
+    uniqueMembers,
+    recentAttended,
+    upcoming,
+    periodLabel,
+  } = summary;
   return (
     <Card>
       <CardHeader>
@@ -44,22 +60,61 @@ export function TeamEventsCard({ summary }: { summary: TeamEventSummary }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Stat label="Events logged" value={totalEvents.toString()} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat label="Attended" value={attendedTotal.toString()} />
+          <Stat
+            label="Verified (proof attached)"
+            value={`${verifiedTotal} of ${attendedTotal}`}
+          />
           <Stat
             label="Members who logged"
             value={uniqueMembers.toString()}
           />
         </div>
-        <div className="mt-4">
+
+        <div className="mt-5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-agsi-darkGray">
-            Most recent
+            Upcoming team events
           </p>
-          {recent.length === 0 ? (
-            <p className="text-xs text-agsi-darkGray">No events in this period yet.</p>
+          {upcoming.length === 0 ? (
+            <p className="text-xs italic text-agsi-darkGray">
+              Nothing planned yet.
+            </p>
           ) : (
             <ul className="divide-y divide-agsi-lightGray rounded-lg border border-agsi-lightGray">
-              {recent.map((r) => (
+              {upcoming.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="amber">Upcoming</Badge>
+                    <Badge variant="blue">{EVENT_TYPE_LABEL[r.event_type]}</Badge>
+                    <span className="text-agsi-darkGray">{r.event_date}</span>
+                    <span className="font-medium text-agsi-navy">
+                      {r.event_name}
+                    </span>
+                  </div>
+                  <span className="text-xs2 text-agsi-darkGray">
+                    {r.member_name ?? 'Unknown'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-5">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-agsi-darkGray">
+            Most recent attended
+          </p>
+          {recentAttended.length === 0 ? (
+            <p className="text-xs italic text-agsi-darkGray">
+              No attended events in this period yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-agsi-lightGray rounded-lg border border-agsi-lightGray">
+              {recentAttended.map((r) => (
                 <li
                   key={r.id}
                   className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
@@ -70,6 +125,7 @@ export function TeamEventsCard({ summary }: { summary: TeamEventSummary }) {
                     <span className="font-medium text-agsi-navy">
                       {r.event_name}
                     </span>
+                    {r.verified && <Badge variant="green">Verified</Badge>}
                   </div>
                   <span className="text-xs2 text-agsi-darkGray">
                     {r.member_name ?? 'Unknown'}
