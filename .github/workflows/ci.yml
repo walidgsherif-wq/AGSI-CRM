@@ -30,6 +30,12 @@ on:
     # Daily drift detector — 09:00 UTC = 13:00 Dubai.
     - cron: '0 9 * * *'
   workflow_dispatch:
+    inputs:
+      confirm_ledger_repair:
+        description: 'Type "yes" to run the one-time ledger-repair job (marks every local migration as applied in supabase_migrations.schema_migrations without executing any DDL). Leave blank for a normal manual run.'
+        required: false
+        default: ''
+        type: string
 
 # Don't cancel an in-progress migration apply if a new commit lands —
 # half-applied schema is worse than waiting.
@@ -189,7 +195,13 @@ jobs:
   # out-of-band edits.
   # ───────────────────────────────────────────────────────────────────
   drift-detector:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # On schedule (daily) or on a plain workflow_dispatch (confirm
+    # input left blank). A dispatch that requests the ledger repair
+    # skips drift-detection — that run has a different purpose.
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.confirm_ledger_repair != 'yes')
     name: Daily schema drift check
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -238,3 +250,107 @@ jobs:
             exit 1
           fi
           echo "OK — prod storage schema matches the migrations."
+
+  # ───────────────────────────────────────────────────────────────────
+  # ONE-TIME ledger repair. The session's migrations were applied by
+  # pasting SQL into the Supabase editor, which runs DDL but does NOT
+  # write a row into supabase_migrations.schema_migrations. So the
+  # live schema is fully at 0083, but the ledger only has 0001, and
+  # `db push` therefore tries to re-apply 0002–0083 → "type role_t
+  # already exists".
+  #
+  # This job loops over supabase/migrations/*.sql and marks each
+  # version as APPLIED in the ledger via `supabase migration repair
+  # --status applied <version>`. That command updates the ledger
+  # only — it executes no DDL. Re-marking 0001 (already applied) is
+  # a harmless no-op, so the job is idempotent.
+  #
+  # Gated on workflow_dispatch + `confirm_ledger_repair == 'yes'`, so
+  # it cannot fire on push / PR / schedule. After it runs once and
+  # apply-migrations reports "no migrations to apply" on the next
+  # push, this job can stay dormant (or be removed in a follow-up).
+  # ───────────────────────────────────────────────────────────────────
+  repair-migration-ledger:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_ledger_repair == 'yes'
+    name: One-time — mark local migrations as applied in the prod ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          # See pin rationale on the apply-migrations job above.
+          version: 1.226.4
+
+      - name: Link to prod project
+        run: |
+          supabase link \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
+      - name: Show ledger BEFORE repair
+        # Surfaces the gap in the run log so the diff after repair
+        # is easy to verify. Read-only.
+        run: supabase migration list --linked
+
+      - name: Mark every local migration as applied (no DDL)
+        # Parses the numeric prefix off each migration filename and
+        # calls `migration repair --status applied`. That command
+        # ONLY writes to supabase_migrations.schema_migrations — it
+        # does not execute the migration file. Idempotent: re-marking
+        # an already-applied version is a no-op.
+        #
+        # The loop is sorted explicitly so we walk the versions in
+        # ascending order (matches how the ledger naturally lists
+        # them) and so the run log is readable.
+        run: |
+          set -euo pipefail
+          count=0
+          skipped=0
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f" .sql)
+            version="${base%%_*}"
+            if [[ ! "$version" =~ ^[0-9]+$ ]]; then
+              echo "  skip (non-numeric prefix): $base"
+              skipped=$((skipped + 1))
+              continue
+            fi
+            echo "  mark applied: $version  ($base)"
+            supabase migration repair \
+              --status applied \
+              --password "${{ secrets.SUPABASE_DB_PASSWORD }}" \
+              "$version"
+            count=$((count + 1))
+          done
+          echo ""
+          echo "Marked $count migrations as applied; skipped $skipped."
+
+      - name: Show ledger AFTER repair
+        run: supabase migration list --linked
+
+      - name: Assert ledger now in sync
+        # Same check as the verify-migrations-in-sync job, inlined
+        # here so the repair run fails loudly if any version didn't
+        # take. Avoids a "looked successful but isn't" outcome.
+        run: |
+          set -euo pipefail
+          supabase migration list --linked > /tmp/migration-list.txt
+          DRIFT=$(awk -F'|' '
+            NR<=2 { next }
+            {
+              gsub(/[[:space:]]/, "", $1)
+              gsub(/[[:space:]]/, "", $2)
+              if ($1 != "" && $2 == "") print "committed-but-not-applied: " $1
+              if ($1 == "" && $2 != "") print "applied-but-not-committed: " $2
+            }
+          ' /tmp/migration-list.txt)
+          if [ -n "$DRIFT" ]; then
+            echo "::error::Repair did not fully reconcile the ledger:"
+            echo "$DRIFT"
+            exit 1
+          fi
+          echo "OK — ledger and repo are in sync."
