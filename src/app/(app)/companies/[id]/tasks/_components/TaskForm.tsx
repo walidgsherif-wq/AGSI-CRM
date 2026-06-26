@@ -18,6 +18,7 @@ import {
   type TaskStatus,
 } from '@/lib/zod/task';
 import { createTask, updateTask } from '@/server/actions/tasks';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 type ProfileOption = { id: string; full_name: string };
 
@@ -103,7 +104,7 @@ export function TaskForm({
   }
 
   return (
-    <form
+    <GuardedForm
       action={onSubmit}
       className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4"
     >
@@ -252,6 +253,6 @@ export function TaskForm({
         </Button>
         {error && <p className="text-xs text-rag-red">{error}</p>}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

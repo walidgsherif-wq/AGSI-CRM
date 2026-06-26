@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { GuardedForm } from '@/components/ui/guarded-form';
 import type { Role } from '@/types/domain';
 import {
   archiveContact,
@@ -324,75 +325,9 @@ function ContactForm({
   onSubmit: (formData: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
-  // Dirty-tracking guard. Any user input flips `dirty`; while dirty,
-  // navigation away triggers a confirmation:
-  //   - browser-level (tab close, refresh, back/forward, URL bar
-  //     change) → native "Leave site?" prompt via beforeunload.
-  //   - in-app SPA navigation (sidebar Link click, breadcrumb,
-  //     anywhere else) → window.confirm intercept on the captured
-  //     <a> click before Next.js's router handles it.
-  // Server-action submit and the Cancel button both clear dirty
-  // before navigating away.
-  const [dirty, setDirty] = useState(false);
-  useEffect(() => {
-    if (!dirty) return;
-
-    function onBeforeUnload(e: BeforeUnloadEvent) {
-      e.preventDefault();
-      e.returnValue = '';
-    }
-    window.addEventListener('beforeunload', onBeforeUnload);
-
-    function onAnchorClick(e: MouseEvent) {
-      // Modified clicks (cmd+click, middle-click, etc.) open in a
-      // new tab and don't lose this page's state.
-      if (e.defaultPrevented) return;
-      if (e.button !== 0) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const target = (e.target as HTMLElement | null)?.closest?.('a');
-      if (!target) return;
-      const href = target.getAttribute('href');
-      if (!href) return;
-      // Skip in-page anchors, mailto/tel, target=_blank, downloads
-      if (href.startsWith('#')) return;
-      if (target.target === '_blank') return;
-      if (target.hasAttribute('download')) return;
-      if (/^(mailto:|tel:)/i.test(href)) return;
-      if (
-        !window.confirm(
-          'Discard unsaved contact changes? Your edits will be lost.',
-        )
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-      } else {
-        setDirty(false);
-      }
-    }
-    document.addEventListener('click', onAnchorClick, true);
-
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
-      document.removeEventListener('click', onAnchorClick, true);
-    };
-  }, [dirty]);
-
-  function confirmDiscardIfDirty(): boolean {
-    if (!dirty) return true;
-    return window.confirm(
-      'Discard unsaved contact changes? Your edits will be lost.',
-    );
-  }
-
   return (
-    <form
-      action={async (fd) => {
-        setDirty(false);
-        await onSubmit(fd);
-      }}
-      onInput={() => {
-        if (!dirty) setDirty(true);
-      }}
+    <GuardedForm
+      action={onSubmit}
       className="space-y-3 rounded-xl border border-agsi-accent/40 bg-agsi-accent/5 p-4"
     >
       <input type="hidden" name="company_id" value={companyId} />
@@ -448,18 +383,13 @@ function ContactForm({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => {
-            if (confirmDiscardIfDirty()) {
-              setDirty(false);
-              onCancel();
-            }
-          }}
+          onClick={onCancel}
           disabled={pending}
         >
           Cancel
         </Button>
       </div>
-    </form>
+    </GuardedForm>
   );
 }
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { addRebarPrice } from '@/server/actions/insights';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 export function AddPriceForm() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export function AddPriceForm() {
   const [status, setStatus] = useState<{ ok?: true; error?: string } | null>(null);
 
   return (
-    <form
+    <GuardedForm
       action={(formData) => {
         setStatus(null);
         startTransition(async () => {
@@ -71,6 +72,6 @@ export function AddPriceForm() {
       {status?.error && (
         <p className="sm:col-span-4 text-xs text-rag-red">{status.error}</p>
       )}
-    </form>
+    </GuardedForm>
   );
 }

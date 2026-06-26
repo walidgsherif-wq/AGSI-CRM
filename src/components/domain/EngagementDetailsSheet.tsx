@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { GuardedForm } from '@/components/ui/guarded-form';
 import {
   ENGAGEMENT_TYPES,
   ENGAGEMENT_TYPE_LABEL,
@@ -212,7 +213,7 @@ function EditForm({
   onSubmit: (formData: FormData) => void;
 }) {
   return (
-    <form
+    <GuardedForm
       action={onSubmit}
       className="space-y-3"
       data-engagement-edit-form="true"
@@ -263,7 +264,7 @@ function EditForm({
           {pending ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
-    </form>
+    </GuardedForm>
   );
 }
 

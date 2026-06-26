@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABEL } from '@/lib/zod/document';
 import { createDocument } from '@/server/actions/documents';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 export function DocumentUploadForm({ companyId }: { companyId: string }) {
   const router = useRouter();
@@ -84,7 +85,7 @@ export function DocumentUploadForm({ companyId }: { companyId: string }) {
   }
 
   return (
-    <form
+    <GuardedForm
       onSubmit={onSubmit}
       className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4"
     >
@@ -130,6 +131,6 @@ export function DocumentUploadForm({ companyId }: { companyId: string }) {
         </Button>
         {error && <p className="text-xs text-rag-red">{error}</p>}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

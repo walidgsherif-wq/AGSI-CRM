@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { GuardedForm } from '@/components/ui/guarded-form';
 import { ENGAGEMENT_TYPES, ENGAGEMENT_TYPE_LABEL } from '@/lib/zod/engagement';
 import { createEngagement } from '@/server/actions/engagements';
 
@@ -46,7 +47,7 @@ export function EngagementForm({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <form action={onSubmit} className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4">
+    <GuardedForm action={onSubmit} className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4">
       <input type="hidden" name="company_id" value={companyId} />
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
@@ -107,6 +108,6 @@ export function EngagementForm({
         </Button>
         {error && <p className="text-xs text-rag-red">{error}</p>}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

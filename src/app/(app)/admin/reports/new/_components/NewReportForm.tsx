@@ -10,6 +10,7 @@ import {
   REPORT_TYPE_LABEL,
   type ReportType,
 } from '@/lib/zod/leadership-report';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 type Props = {
   defaultFiscalYear: number;
@@ -41,7 +42,7 @@ export function NewReportForm({
   const monthEnd = monthEndDate.toISOString().slice(0, 10);
 
   return (
-    <form
+    <GuardedForm
       action={(formData) => {
         setError(null);
         startTransition(async () => {
@@ -152,6 +153,6 @@ export function NewReportForm({
         </Button>
         {error && <p className="text-xs text-rag-red">{error}</p>}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

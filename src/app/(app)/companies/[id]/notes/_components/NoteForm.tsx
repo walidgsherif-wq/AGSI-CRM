@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { createNote } from '@/server/actions/notes';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 export function NoteForm({ companyId }: { companyId: string }) {
   const router = useRouter();
@@ -27,7 +28,7 @@ export function NoteForm({ companyId }: { companyId: string }) {
   }
 
   return (
-    <form
+    <GuardedForm
       action={onSubmit}
       className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4"
     >
@@ -56,6 +57,6 @@ export function NoteForm({ companyId }: { companyId: string }) {
         </label>
         {error && <p className="text-xs text-rag-red">{error}</p>}
       </div>
-    </form>
+    </GuardedForm>
   );
 }
