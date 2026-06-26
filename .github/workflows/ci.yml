@@ -278,6 +278,23 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      # Direct DB connection for psql. We bypass `supabase migration
+      # list --linked` because in v1.226.4 the CLI interleaves
+      # "Unknown config field" warnings and the upgrade notice onto
+      # stdout, contaminating any table-text parser and silently
+      # returning an empty version set — which is exactly what made
+      # the previous repair attempt fail with 23505 on the first
+      # `migration repair` call (loop thought 0001 was missing; it
+      # wasn't).
+      # PGSSLMODE=require because Supabase rejects unencrypted
+      # connections; postgresql-client ships on ubuntu-latest by
+      # default so no install step needed.
+      PGHOST: db.${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: postgres
+      PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PGSSLMODE: require
     steps:
       - uses: actions/checkout@v4
 
@@ -286,45 +303,53 @@ jobs:
           # See pin rationale on the apply-migrations job above.
           version: 1.226.4
 
-      - name: Link to prod project
+      - name: Sanity check — psql can reach prod
+        # Fail loudly here if the direct DB connection is unreachable
+        # (e.g., IPv4 routing, password wrong). Catches the failure
+        # mode where every downstream step would silently see an
+        # empty result set.
+        run: |
+          set -euo pipefail
+          psql -c "SELECT 1;" >/dev/null
+          echo "OK — psql connected to ${PGHOST}."
+
+      - name: Link to prod project (for migration repair calls)
         run: |
           supabase link \
             --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
             --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
 
-      - name: Show ledger BEFORE repair
-        # Surfaces the gap in the run log so the diff after repair
-        # is easy to verify. Read-only.
-        run: supabase migration list --linked
+      - name: Show ledger BEFORE repair (via direct SQL)
+        # psql -t -A = tuples only, unaligned. One version per line,
+        # nothing else. Stderr is not captured, so warnings/notices
+        # can't contaminate the output.
+        run: |
+          set -euo pipefail
+          echo "Versions in supabase_migrations.schema_migrations:"
+          psql -t -A -c "select version from supabase_migrations.schema_migrations order by version;" \
+            | grep -E '^[0-9]+$' \
+            || echo "  (none)"
 
       - name: Mark MISSING local migrations as applied (no DDL)
-        # Two-step idempotency:
-        #   1) Capture the set of versions already in the prod
-        #      ledger by parsing the Remote column of
-        #      `supabase migration list --linked`. (Same parser as
-        #      the verify-migrations-in-sync job below.)
-        #   2) Loop over supabase/migrations/*.sql; for each numeric
-        #      version, only call `migration repair --status applied`
-        #      when the version is NOT already in the remote set.
+        # Belt + braces idempotency:
+        #   1) Pre-query the ledger via psql (source of truth) to
+        #      build REMOTE_VERSIONS. No CLI table-text scrape.
+        #   2) Loop over supabase/migrations/*.sql. For each numeric
+        #      version, skip if already in REMOTE_VERSIONS; otherwise
+        #      call `migration repair --status applied`.
+        #   3) If the pre-query somehow missed a version, the per-call
+        #      handler catches 23505 (`duplicate key value violates
+        #      unique constraint`) and treats it as success. Any other
+        #      error still fails the job.
         #
-        # Why this matters: the first repair run found 0001 already
-        # recorded (its repair call worked because it stamped the
-        # missing 0001 line — but the next version was ALSO already
-        # in the ledger, and a second insert against the same PK
-        # raises 23505 schema_migrations_pkey violation). Tolerating
-        # the dup-key in the loop would also work but the per-version
-        # error noise is harder to read; pre-querying is cleaner.
-        #
-        # Re-running the whole job after a successful pass is now a
-        # clean no-op: every version is in the remote set on the
-        # second invocation, every iteration takes the "already
-        # recorded" branch, and no repair calls are made. The final
-        # in-sync assert at the end of the job is the safety net.
+        # Re-running after a clean pass is a true no-op: every
+        # iteration takes the "already recorded" branch.
         run: |
           set -euo pipefail
 
-          REMOTE_VERSIONS=$(supabase migration list --linked \
-            | awk -F'|' 'NR>2 { gsub(/[[:space:]]/, "", $2); if ($2 != "") print $2 }' \
+          REMOTE_VERSIONS=$(psql -t -A \
+            -c "select version from supabase_migrations.schema_migrations order by version;" \
+            | grep -E '^[0-9]+$' \
             | sort -u)
           echo "── Versions already in the ledger ──"
           if [ -z "$REMOTE_VERSIONS" ]; then
@@ -336,6 +361,7 @@ jobs:
 
           marked=0
           already=0
+          dup_tolerated=0
           skipped=0
           for f in $(ls supabase/migrations/*.sql | sort); do
             base=$(basename "$f" .sql)
@@ -346,42 +372,57 @@ jobs:
               continue
             fi
             if echo "$REMOTE_VERSIONS" | grep -qx "$version"; then
-              echo "  already recorded: $version  ($base)"
+              echo "  already recorded:  $version  ($base)"
               already=$((already + 1))
               continue
             fi
-            echo "  mark applied:     $version  ($base)"
-            supabase migration repair \
-              --status applied \
-              --password "${{ secrets.SUPABASE_DB_PASSWORD }}" \
-              "$version"
+            echo "  mark applied:      $version  ($base)"
+            if ! out=$(supabase migration repair \
+                         --status applied \
+                         --password "${{ secrets.SUPABASE_DB_PASSWORD }}" \
+                         "$version" 2>&1); then
+              if echo "$out" | grep -qi 'duplicate key value violates unique constraint'; then
+                echo "    (already recorded after all — treating as success)"
+                dup_tolerated=$((dup_tolerated + 1))
+                continue
+              fi
+              echo "::error::repair failed for $version"
+              echo "$out"
+              exit 1
+            fi
             marked=$((marked + 1))
           done
           echo ""
-          echo "Summary: marked $marked, already recorded $already, skipped $skipped."
+          echo "Summary: marked $marked, already recorded $already, dup-tolerated $dup_tolerated, skipped $skipped."
 
-      - name: Show ledger AFTER repair
-        run: supabase migration list --linked
-
-      - name: Assert ledger now in sync
-        # Same check as the verify-migrations-in-sync job, inlined
-        # here so the repair run fails loudly if any version didn't
-        # take. Avoids a "looked successful but isn't" outcome.
+      - name: Show ledger AFTER repair (via direct SQL)
         run: |
           set -euo pipefail
-          supabase migration list --linked > /tmp/migration-list.txt
-          DRIFT=$(awk -F'|' '
-            NR<=2 { next }
-            {
-              gsub(/[[:space:]]/, "", $1)
-              gsub(/[[:space:]]/, "", $2)
-              if ($1 != "" && $2 == "") print "committed-but-not-applied: " $1
-              if ($1 == "" && $2 != "") print "applied-but-not-committed: " $2
-            }
-          ' /tmp/migration-list.txt)
-          if [ -n "$DRIFT" ]; then
-            echo "::error::Repair did not fully reconcile the ledger:"
-            echo "$DRIFT"
+          echo "Versions in supabase_migrations.schema_migrations:"
+          psql -t -A -c "select version from supabase_migrations.schema_migrations order by version;" \
+            | grep -E '^[0-9]+$'
+
+      - name: Assert ledger now in sync (psql diff)
+        # Compare the applied version set (read via psql) to the
+        # local migration files. diff -u surfaces both directions:
+        # `-` lines are committed-but-not-applied, `+` lines are
+        # applied-but-not-committed. Either one fails the job.
+        run: |
+          set -euo pipefail
+
+          psql -t -A -c "select version from supabase_migrations.schema_migrations order by version;" \
+            | grep -E '^[0-9]+$' \
+            | sort -u > /tmp/remote-versions.txt
+
+          ls supabase/migrations/*.sql \
+            | xargs -n1 basename \
+            | sed -E 's/\.sql$//' \
+            | sed -E 's/^([0-9]+)_.*/\1/' \
+            | grep -E '^[0-9]+$' \
+            | sort -u > /tmp/local-versions.txt
+
+          if ! diff -u /tmp/local-versions.txt /tmp/remote-versions.txt; then
+            echo "::error::Ledger not fully reconciled — '-' lines are committed-but-not-applied, '+' lines are applied-but-not-committed."
             exit 1
           fi
-          echo "OK — ledger and repo are in sync."
+          echo "OK — $(wc -l < /tmp/local-versions.txt) versions in sync."
