@@ -172,8 +172,8 @@ export function CompanyForm({
         </Field>
       </Section>
 
-      <Section title="Contact">
-        <Field label="Phone">
+      <Section title="Company details">
+        <Field label="Company number">
           <Input name="phone" type="tel" defaultValue={data.phone ?? ''} readOnly={ro} />
         </Field>
         <Field label="Email">
