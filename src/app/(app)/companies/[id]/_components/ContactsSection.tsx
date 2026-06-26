@@ -393,7 +393,7 @@ function ContactForm({
       </div>
 
       {mode === 'edit' && onArchive && (
-        <div className="mt-4 border-t border-agsi-lightGray pt-3">
+        <div className="mt-4 flex justify-end border-t border-agsi-lightGray pt-3">
           <button
             type="button"
             disabled={pending}
@@ -406,7 +406,7 @@ function ContactForm({
                 onArchive();
               }
             }}
-            className="text-xs font-medium text-rag-red hover:underline disabled:opacity-50"
+            className="text-xs text-agsi-midGray hover:text-rag-red hover:underline disabled:opacity-50"
           >
             Delete
           </button>
