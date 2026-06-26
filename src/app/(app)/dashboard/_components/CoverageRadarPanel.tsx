@@ -20,6 +20,8 @@ import {
 import { AGSI } from '@/lib/design/colors';
 import { getCoverageByType } from '@/server/actions/coverage';
 import type { CoverageRow, ValueBand } from '@/types/coverage';
+import { ContributionStackedBars } from './ContributionStackedBars';
+import { MemberRadarGrid } from './MemberRadarGrid';
 
 const BANDS: { key: ValueBand; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -40,6 +42,7 @@ export function CoverageRadarPanel({
   const [band, setBand] = useState<ValueBand>(initialBand);
   const [data, setData] = useState<CoverageRow[]>(initial);
   const [pending, startTransition] = useTransition();
+  const [view, setView] = useState<'segment' | 'member'>('segment');
 
   function selectBand(next: ValueBand) {
     if (next === band) return;
@@ -140,6 +143,59 @@ export function CoverageRadarPanel({
               />
             </RadarChart>
           </ResponsiveContainer>
+        </div>
+
+        <div className="mt-6 border-t border-agsi-lightGray pt-5">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-agsi-navy">
+                Member contributions
+              </p>
+              <p className="text-xs text-agsi-darkGray">
+                Same value-band filter as the team radar. Numbers are
+                normalised against each type&apos;s universe so percentages
+                are comparable.
+              </p>
+            </div>
+            <div
+              className="inline-flex rounded border border-agsi-midGray bg-white p-0.5"
+              role="tablist"
+              aria-label="Contribution view"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'segment'}
+                onClick={() => setView('segment')}
+                className={
+                  view === 'segment'
+                    ? 'rounded bg-agsi-navy px-3 py-1 text-xs font-medium text-white'
+                    : 'rounded px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
+                }
+              >
+                By segment
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'member'}
+                onClick={() => setView('member')}
+                className={
+                  view === 'member'
+                    ? 'rounded bg-agsi-navy px-3 py-1 text-xs font-medium text-white'
+                    : 'rounded px-3 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40'
+                }
+              >
+                By member
+              </button>
+            </div>
+          </div>
+
+          {view === 'segment' ? (
+            <ContributionStackedBars data={data} />
+          ) : (
+            <MemberRadarGrid data={data} />
+          )}
         </div>
       </CardContent>
     </Card>

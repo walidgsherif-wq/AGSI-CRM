@@ -8,6 +8,7 @@ import {
   BAND_THRESHOLD,
   SPOKE_TYPES,
   type CoverageRow,
+  type MemberContribution,
   type SpokeType,
   type ValueBand,
 } from '@/types/coverage';
@@ -21,19 +22,27 @@ function supabase() {
 }
 
 /**
- * Per-stakeholder-type coverage figures.
+ * Per-stakeholder-type coverage + per-member contributions.
  *
- *   denominator = active companies of that type (or, when a value band
- *                 is set, active companies of that type linked to a
- *                 project with value_aed >= the band threshold).
- *   numerator   = same set, additionally constrained to owner_id IS NOT
- *                 NULL — companies the BD team has claimed.
- *   coverage    = numerator / denominator * 100.
+ *   denominator    = active companies of that type (or, when a value
+ *                    band is set, active companies of that type linked
+ *                    to a project with value_aed >= the band threshold).
+ *   numerator      = same set, additionally constrained to owner_id IS
+ *                    NOT NULL — companies the BD team has claimed.
+ *   coverage_pct   = numerator / denominator * 100.
+ *   by_member[]    = per-owner contribution to the numerator, with
+ *                    share_pct = count / denominator * 100 (their
+ *                    absolute share of the universe, NOT of the
+ *                    claimed slice — so the segments sum up to the
+ *                    overall coverage_pct).
  *
  * Aggregation runs server-side under the caller's RLS context.
- * companies / project_companies / projects all have transparent SELECT
- * for any authenticated user, so the totals are honest team-wide
- * counts regardless of who's viewing.
+ * companies / project_companies / projects / profiles all have
+ * transparent SELECT for any authenticated user, so the totals are
+ * honest team-wide counts regardless of who's viewing.
+ *
+ * Same value-band filter as before is applied consistently to both
+ * the numerator and the denominator so percentages stay honest.
  */
 export async function getCoverageByType(
   band: ValueBand = 'all',
@@ -41,7 +50,7 @@ export async function getCoverageByType(
   const sb = supabase();
   const threshold = BAND_THRESHOLD[band];
 
-  // 1) Paginated fetch of active companies — only the columns we need.
+  // 1) Paginated fetch of active companies.
   type CompanyMinimal = {
     id: string;
     company_type: SpokeType;
@@ -64,10 +73,8 @@ export async function getCoverageByType(
     if (rows.length < PAGE) break;
   }
 
-  // 2) Value-band filter. Distinct company_ids linked to a project with
-  // value_aed >= threshold. PostgREST embedded filter (projects!inner +
-  // .gte('projects.value_aed', ...)) keeps the join + filter in one
-  // round-trip. Paginated for the same silent-cap reason.
+  // 2) Optional value-band restriction — distinct company_ids linked to
+  // a project with value_aed >= threshold. Paginated embedded filter.
   let companyIdsInBand: Set<string> | null = null;
   if (threshold !== null) {
     type PcRow = { company_id: string };
@@ -86,33 +93,61 @@ export async function getCoverageByType(
     }
   }
 
-  // 3) Aggregate.
-  const buckets: Record<SpokeType, { num: number; den: number }> = {
-    developer: { num: 0, den: 0 },
-    design_consultant: { num: 0, den: 0 },
-    main_contractor: { num: 0, den: 0 },
-    mep_consultant: { num: 0, den: 0 },
-    mep_contractor: { num: 0, den: 0 },
-    authority: { num: 0, den: 0 },
-    society: { num: 0, den: 0 },
+  // 3) Bucket counts. Per type: denominator, numerator, per-owner counts.
+  type Bucket = { den: number; num: number; perMember: Map<string, number> };
+  const buckets: Record<SpokeType, Bucket> = {
+    developer: { den: 0, num: 0, perMember: new Map() },
+    design_consultant: { den: 0, num: 0, perMember: new Map() },
+    main_contractor: { den: 0, num: 0, perMember: new Map() },
+    mep_consultant: { den: 0, num: 0, perMember: new Map() },
+    mep_contractor: { den: 0, num: 0, perMember: new Map() },
+    authority: { den: 0, num: 0, perMember: new Map() },
+    society: { den: 0, num: 0, perMember: new Map() },
   };
 
+  const ownerIds = new Set<string>();
   for (const c of companies) {
     if (companyIdsInBand && !companyIdsInBand.has(c.id)) continue;
     const b = buckets[c.company_type];
     if (!b) continue;
     b.den += 1;
-    if (c.owner_id !== null) b.num += 1;
+    if (c.owner_id) {
+      b.num += 1;
+      b.perMember.set(c.owner_id, (b.perMember.get(c.owner_id) ?? 0) + 1);
+      ownerIds.add(c.owner_id);
+    }
+  }
+
+  // 4) Resolve owner names. Falls back to a truncated id if a profile
+  // can't be loaded (e.g. RLS edge case or deactivated user).
+  const memberNames = new Map<string, string>();
+  if (ownerIds.size > 0) {
+    type ProfileRow = { id: string; full_name: string };
+    const { data } = await sb
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', Array.from(ownerIds))
+      .returns<ProfileRow[]>();
+    for (const p of data ?? []) memberNames.set(p.id, p.full_name);
   }
 
   return SPOKE_TYPES.map((t) => {
-    const { num, den } = buckets[t];
+    const b = buckets[t];
+    const by_member: MemberContribution[] = Array.from(b.perMember.entries())
+      .map(([id, count]) => ({
+        member_id: id,
+        full_name: memberNames.get(id) ?? `${id.slice(0, 8)}…`,
+        count,
+        share_pct: b.den === 0 ? 0 : (count / b.den) * 100,
+      }))
+      .sort((a, b) => b.count - a.count);
     return {
       type: t,
       label: COMPANY_TYPE_LABEL[t],
-      numerator: num,
-      denominator: den,
-      coverage_pct: den === 0 ? 0 : (num / den) * 100,
+      numerator: b.num,
+      denominator: b.den,
+      coverage_pct: b.den === 0 ? 0 : (b.num / b.den) * 100,
+      by_member,
     };
   });
 }
