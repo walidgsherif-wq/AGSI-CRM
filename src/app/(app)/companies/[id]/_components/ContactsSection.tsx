@@ -365,16 +365,15 @@ function ContactForm({
           />
         </Field>
       </div>
-      {mode === 'create' && (
-        <label className="flex items-center gap-2 text-xs text-agsi-navy">
-          <input
-            type="checkbox"
-            name="is_primary"
-            className="h-4 w-4 rounded border-agsi-midGray"
-          />
-          Primary contact
-        </label>
-      )}
+      <label className="flex items-center gap-2 text-xs text-agsi-navy">
+        <input
+          type="checkbox"
+          name="is_primary"
+          defaultChecked={initial?.is_primary ?? false}
+          className="h-4 w-4 rounded border-agsi-midGray"
+        />
+        Primary contact
+      </label>
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? 'Saving…' : mode === 'create' ? 'Add contact' : 'Save'}
