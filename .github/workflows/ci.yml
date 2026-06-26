@@ -297,19 +297,45 @@ jobs:
         # is easy to verify. Read-only.
         run: supabase migration list --linked
 
-      - name: Mark every local migration as applied (no DDL)
-        # Parses the numeric prefix off each migration filename and
-        # calls `migration repair --status applied`. That command
-        # ONLY writes to supabase_migrations.schema_migrations — it
-        # does not execute the migration file. Idempotent: re-marking
-        # an already-applied version is a no-op.
+      - name: Mark MISSING local migrations as applied (no DDL)
+        # Two-step idempotency:
+        #   1) Capture the set of versions already in the prod
+        #      ledger by parsing the Remote column of
+        #      `supabase migration list --linked`. (Same parser as
+        #      the verify-migrations-in-sync job below.)
+        #   2) Loop over supabase/migrations/*.sql; for each numeric
+        #      version, only call `migration repair --status applied`
+        #      when the version is NOT already in the remote set.
         #
-        # The loop is sorted explicitly so we walk the versions in
-        # ascending order (matches how the ledger naturally lists
-        # them) and so the run log is readable.
+        # Why this matters: the first repair run found 0001 already
+        # recorded (its repair call worked because it stamped the
+        # missing 0001 line — but the next version was ALSO already
+        # in the ledger, and a second insert against the same PK
+        # raises 23505 schema_migrations_pkey violation). Tolerating
+        # the dup-key in the loop would also work but the per-version
+        # error noise is harder to read; pre-querying is cleaner.
+        #
+        # Re-running the whole job after a successful pass is now a
+        # clean no-op: every version is in the remote set on the
+        # second invocation, every iteration takes the "already
+        # recorded" branch, and no repair calls are made. The final
+        # in-sync assert at the end of the job is the safety net.
         run: |
           set -euo pipefail
-          count=0
+
+          REMOTE_VERSIONS=$(supabase migration list --linked \
+            | awk -F'|' 'NR>2 { gsub(/[[:space:]]/, "", $2); if ($2 != "") print $2 }' \
+            | sort -u)
+          echo "── Versions already in the ledger ──"
+          if [ -z "$REMOTE_VERSIONS" ]; then
+            echo "  (none)"
+          else
+            echo "$REMOTE_VERSIONS"
+          fi
+          echo "────────────────────────────────────"
+
+          marked=0
+          already=0
           skipped=0
           for f in $(ls supabase/migrations/*.sql | sort); do
             base=$(basename "$f" .sql)
@@ -319,15 +345,20 @@ jobs:
               skipped=$((skipped + 1))
               continue
             fi
-            echo "  mark applied: $version  ($base)"
+            if echo "$REMOTE_VERSIONS" | grep -qx "$version"; then
+              echo "  already recorded: $version  ($base)"
+              already=$((already + 1))
+              continue
+            fi
+            echo "  mark applied:     $version  ($base)"
             supabase migration repair \
               --status applied \
               --password "${{ secrets.SUPABASE_DB_PASSWORD }}" \
               "$version"
-            count=$((count + 1))
+            marked=$((marked + 1))
           done
           echo ""
-          echo "Marked $count migrations as applied; skipped $skipped."
+          echo "Summary: marked $marked, already recorded $already, skipped $skipped."
 
       - name: Show ledger AFTER repair
         run: supabase migration list --linked
