@@ -15,6 +15,7 @@ import {
 import { CompanyClaimButton } from './_components/CompanyClaimButton';
 import { CompanyReleaseButton } from './_components/CompanyReleaseButton';
 import { ContactsSection, type ContactRow } from './_components/ContactsSection';
+import { PendingLevelUpBadge } from '@/components/domain/PendingLevelUpBadge';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
 export const dynamic = 'force-dynamic';
@@ -139,11 +140,28 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
     (user.role === 'bd_manager' && company.owner_id === user.id);
 
   const canClaim = company.owner_id === null && user.role !== 'leadership';
-  // Claimed but missing progression prerequisites. Drives the
-  // "Needs details" badge + disables level-change requests upstream.
+  // L2+ progression requires a contactable stakeholder. "Live contact"
+  // alone isn't enough — they must have a non-empty email.
+  const hasEmailContact = liveContacts.some(
+    (c) => c.email !== null && c.email.trim() !== '',
+  );
   const needsDetails =
     company.owner_id !== null &&
-    (!company.location_id || liveContacts.length === 0);
+    (!company.location_id || !hasEmailContact);
+
+  // Most recent pending level_change_request (for the badge).
+  const { data: pendingRequest } = await supabase
+    .from('level_change_requests')
+    .select('id, from_level, to_level')
+    .eq('company_id', company.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      id: string;
+      from_level: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+      to_level: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+    }>();
   // Release: visible only when the company is currently claimed AND the
   // viewer is the owner OR a bd_head / admin. RPC re-checks the same
   // predicate; UI gate is just to avoid showing a control that would
@@ -165,8 +183,23 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
             Needs details
           </span>
           <p className="text-xs text-agsi-darkGray">
-            Add the stakeholder’s emirate and at least one contact before
-            requesting a level change.
+            Add the stakeholder’s emirate and a contact with a work email
+            before moving to L2 or beyond.
+          </p>
+        </div>
+      )}
+      {pendingRequest && (
+        <div className="flex items-center gap-2">
+          <PendingLevelUpBadge
+            request={{
+              request_id: pendingRequest.id,
+              from_level: pendingRequest.from_level,
+              to_level: pendingRequest.to_level,
+            }}
+            viewerRole={user.role}
+          />
+          <p className="text-xs text-agsi-darkGray">
+            A level change has been requested for this stakeholder.
           </p>
         </div>
       )}

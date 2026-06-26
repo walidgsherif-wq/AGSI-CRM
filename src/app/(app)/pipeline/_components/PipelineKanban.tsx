@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { LevelChangeDialog, adjacentTargets } from '@/components/domain/LevelChangeDialog';
+import { PendingLevelUpBadge } from '@/components/domain/PendingLevelUpBadge';
 import { LEVELS, type Level, type Role } from '@/types/domain';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { cn } from '@/lib/utils';
@@ -22,12 +23,17 @@ export type CardData = {
   has_active_projects: boolean;
   owner_id: string | null;
   owner_full_name: string | null;
-  pending_count: number;
+  /** Most recent pending level_change_request for this company, if any. */
+  pending: {
+    request_id: string;
+    from_level: Level;
+    to_level: Level;
+  } | null;
   engagement_bucket: EngagementBucket;
   engagement_days_since: number | null;
-  /** Owned but missing emirate (location_id) or any live contact. */
+  /** Owned but missing emirate (location_id) or any live contact w/ email. */
   needs_details: boolean;
-  /** Has emirate AND at least one live contact — gate for progression. */
+  /** Has emirate AND at least one live contact with email — gate for L2+. */
   is_progress_ready: boolean;
 };
 
@@ -221,7 +227,14 @@ export function PipelineKanban({
                   </p>
                 ) : (
                   colCards.map((c) => {
-                    const draggable = canChange(c) && c.is_progress_ready;
+                    // Drag is always allowed for movers — the gate
+                    // only bites when the target column is L2+ and
+                    // the company is incomplete. Backward and
+                    // L0 → L1 drags pass through. The dialog re-checks
+                    // on submit so a stale-state card can't sneak past.
+                    const draggable = canChange(c);
+                    const upwardBlocked =
+                      c.current_level >= 'L1' && !c.is_progress_ready;
                     return (
                       <div
                         key={c.id}
@@ -276,10 +289,14 @@ export function PipelineKanban({
                           {COMPANY_TYPE_LABEL[c.company_type]}
                           {c.city && ` · ${c.city}`}
                         </p>
-                        {c.pending_count > 0 && (
-                          <Badge variant="amber" className="mt-2">
-                            {c.pending_count} pending review
-                          </Badge>
+                        {c.pending && (
+                          <div className="mt-2">
+                            <PendingLevelUpBadge
+                              request={c.pending}
+                              viewerRole={userRole}
+                              size="card"
+                            />
+                          </div>
                         )}
                         {c.needs_details && (
                           <Badge variant="amber" className="mt-2">
@@ -288,7 +305,14 @@ export function PipelineKanban({
                         )}
                         {canChange(c) && (
                           <div className="mt-2 flex items-center justify-between">
-                            {c.is_progress_ready ? (
+                            {upwardBlocked ? (
+                              <span
+                                title="Add the stakeholder's emirate and a contact with a work email before moving to L2 or beyond."
+                                className="text-xs text-agsi-midGray"
+                              >
+                                {userRole === 'admin' ? 'Change level' : 'Request level change'}
+                              </span>
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -299,16 +323,9 @@ export function PipelineKanban({
                               >
                                 {userRole === 'admin' ? 'Change level →' : 'Request level change →'}
                               </button>
-                            ) : (
-                              <span
-                                title="Add the stakeholder's emirate and at least one contact before progressing."
-                                className="text-xs text-agsi-midGray"
-                              >
-                                {userRole === 'admin' ? 'Change level' : 'Request level change'}
-                              </span>
                             )}
                             <span className="text-xxs text-agsi-darkGray">
-                              {c.is_progress_ready ? 'drag ↔' : 'locked'}
+                              {upwardBlocked ? 'L2+ locked' : 'drag ↔'}
                             </span>
                           </div>
                         )}
@@ -329,6 +346,7 @@ export function PipelineKanban({
           currentLevel={forced.card.current_level}
           userRole={userRole}
           isOwner={forced.card.owner_id === userId}
+          isProgressReady={forced.card.is_progress_ready}
           forcedToLevel={forced.toLevel}
           onClose={() => setForced(null)}
         />

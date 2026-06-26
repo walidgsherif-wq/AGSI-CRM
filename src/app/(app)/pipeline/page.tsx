@@ -116,13 +116,33 @@ export default async function PipelinePage({
     if (rows.length < PAGE_SIZE) break;
   }
 
+  // One pending request per card. Schema allows multiple but in
+  // practice an approver acts on the latest before another is raised;
+  // we surface the most recent for the actionable badge.
+  type PendingRow = {
+    id: string;
+    company_id: string;
+    from_level: Level;
+    to_level: Level;
+    created_at: string;
+  };
   const { data: pendingRows } = await supabase
     .from('level_change_requests')
-    .select('company_id')
-    .eq('status', 'pending');
-  const pendingByCompany = new Map<string, number>();
-  for (const r of (pendingRows ?? []) as Array<{ company_id: string }>) {
-    pendingByCompany.set(r.company_id, (pendingByCompany.get(r.company_id) ?? 0) + 1);
+    .select('id, company_id, from_level, to_level, created_at')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .returns<PendingRow[]>();
+  const pendingByCompany = new Map<
+    string,
+    { request_id: string; from_level: Level; to_level: Level }
+  >();
+  for (const r of pendingRows ?? []) {
+    if (pendingByCompany.has(r.company_id)) continue;
+    pendingByCompany.set(r.company_id, {
+      request_id: r.id,
+      from_level: r.from_level,
+      to_level: r.to_level,
+    });
   }
 
   type ScoreRow = {
@@ -155,10 +175,10 @@ export default async function PipelinePage({
     for (const r of res.data ?? []) scoreByCompany.set(r.company_id, r);
   }
 
-  // Companies with ≥1 live contact — the completeness check (location
-  // is already on the card row) for the progression gate. Chunked .in()
-  // mirrors the engagement-score pattern above to dodge PostgREST's
-  // URL length cap.
+  // Companies with ≥1 live contact whose email is set. L2+ progression
+  // requires a contactable stakeholder, so a contact without an email
+  // doesn't satisfy the gate. Chunked .in() mirrors the engagement-
+  // score pattern above to dodge PostgREST's URL length cap.
   type ContactRow = { company_id: string };
   const contactChunks = await Promise.all(
     chunks.map((chunk) =>
@@ -166,6 +186,8 @@ export default async function PipelinePage({
         .from('contacts')
         .select('company_id')
         .is('deleted_at', null)
+        .not('email', 'is', null)
+        .neq('email', '')
         .in('company_id', chunk)
         .returns<ContactRow[]>(),
     ),
@@ -190,7 +212,7 @@ export default async function PipelinePage({
       has_active_projects: c.has_active_projects,
       owner_id: c.owner_id,
       owner_full_name: c.owner?.full_name ?? null,
-      pending_count: pendingByCompany.get(c.id) ?? 0,
+      pending: pendingByCompany.get(c.id) ?? null,
       engagement_bucket: s?.bucket ?? 'cold',
       engagement_days_since: s?.days_since_last_engagement ?? null,
       needs_details: isOwned && (!hasLocation || !hasContact),

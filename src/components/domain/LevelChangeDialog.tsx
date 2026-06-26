@@ -33,15 +33,17 @@ type CommonProps = {
   /** True when the current user is the company's owner. Admin always allowed. */
   isOwner: boolean;
   /** Completeness gate — when false, the company is missing its
-   *  location_id or has no live contact, so requestLevelChange /
-   *  approveLevelRequest would reject. The button is rendered disabled
-   *  with that explanation rather than opening a dialog that's bound
-   *  to fail. */
+   *  location_id or has no live contact with an email, so any L2+
+   *  target would be rejected by requestLevelChange /
+   *  approveLevelRequest. The button + the dialog's submit are
+   *  rendered disabled with that explanation when the chosen target
+   *  is L2 or higher and this flag is false. Backward moves and
+   *  L0 → L1 pass through. */
   isProgressReady?: boolean;
 };
 
 const INCOMPLETE_HINT =
-  'Add the stakeholder’s emirate and at least one contact before progressing.';
+  'Add the stakeholder’s emirate and a contact with a work email before moving to L2 or beyond.';
 
 export function LevelChangeButton({
   variant = 'inline',
@@ -54,12 +56,20 @@ export function LevelChangeButton({
   const isAdmin = common.userRole === 'admin';
   const canChange = isAdmin || common.isOwner;
   const isReady = common.isProgressReady !== false;
+  // Disable the entry point only when the only forward target is L2+
+  // and the company is incomplete. Backward moves and L0 → L1 stay
+  // available even on an incomplete card.
+  const adjacents = adjacentTargets(common.currentLevel);
+  const allAdjacentsBlocked =
+    !isReady &&
+    adjacents.length > 0 &&
+    adjacents.every((t) => t >= 'L2');
 
   if (!canChange) return null;
 
   if (!open) {
     const label = isAdmin ? 'Change level →' : 'Request level change →';
-    const disabled = !isReady;
+    const disabled = allAdjacentsBlocked;
     if (variant === 'button') {
       return (
         <div className="space-y-1">
@@ -107,6 +117,7 @@ export function LevelChangeDialog({
   currentLevel,
   userRole,
   isOwner,
+  isProgressReady,
   forcedToLevel,
   onClose,
 }: CommonProps & {
@@ -120,14 +131,20 @@ export function LevelChangeDialog({
 
   const isAdmin = userRole === 'admin';
   const canChange = isAdmin || isOwner;
-  if (!canChange) {
-    onClose();
-    return null;
-  }
+  const isReady = isProgressReady !== false;
 
   const targetOptions = adjacentTargets(currentLevel);
   // If forcedToLevel was supplied (drag-drop), validate adjacency and lock.
   const lockedTarget = forcedToLevel && targetOptions.includes(forcedToLevel) ? forcedToLevel : null;
+  const initialTarget = lockedTarget ?? targetOptions[0];
+  const [selectedTarget, setSelectedTarget] = useState<Level>(initialTarget);
+  const effectiveTarget = lockedTarget ?? selectedTarget;
+  const targetBlocked = !isReady && effectiveTarget >= 'L2';
+
+  if (!canChange) {
+    onClose();
+    return null;
+  }
 
   async function onSubmit(formData: FormData) {
     setError(null);
@@ -192,7 +209,8 @@ export function LevelChangeDialog({
                 <Select
                   name="to_level"
                   required
-                  defaultValue={targetOptions[0]}
+                  value={selectedTarget}
+                  onChange={(e) => setSelectedTarget(e.target.value as Level)}
                   className="mt-1"
                 >
                   {targetOptions.map((l) => (
@@ -228,8 +246,19 @@ export function LevelChangeDialog({
               <EvidenceUploader companyId={companyId} onChange={setEvidenceFiles} disabled={pending} />
             </div>
 
+            {targetBlocked && (
+              <p className="rounded-lg border border-rag-amber/40 bg-rag-amber/10 px-3 py-2 text-xs text-rag-amber">
+                {INCOMPLETE_HINT}
+              </p>
+            )}
+
             <div className="flex items-center gap-3">
-              <Button type="submit" size="sm" disabled={pending}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={pending || targetBlocked}
+                title={targetBlocked ? INCOMPLETE_HINT : undefined}
+              >
                 {pending ? 'Saving…' : isAdmin ? 'Confirm change' : 'Submit for approval'}
               </Button>
               <Dialog.Close asChild>
