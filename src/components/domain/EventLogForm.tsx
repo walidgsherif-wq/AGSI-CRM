@@ -9,6 +9,10 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { EVENT_TYPES, EVENT_TYPE_LABEL, type EventType } from '@/lib/zod/event';
 import { createEvent, updateEvent } from '@/server/actions/events';
+import {
+  EventProofUploader,
+  type UploadedProof,
+} from '@/components/domain/EventProofUploader';
 
 export type EventInitial = {
   id: string;
@@ -18,12 +22,18 @@ export type EventInitial = {
   website: string | null;
   value_note: string | null;
   feedback: string | null;
+  proof_path?: string | null;
 };
 
 /**
  * Add / edit modal for the team event-attendance log. Used from:
  *   - The dashboard's "My events attended" card (mode='create')
  *   - The /events table row actions (mode='edit', for own rows + admin)
+ *
+ * This form is the *direct-log* path: the member attended the event
+ * already and is recording it after the fact, optionally with a badge
+ * photo. For declaring a future event use PlanEventDialog, and for
+ * confirming a previously planned event use ConfirmAttendanceDialog.
  *
  * Submits to the createEvent / updateEvent server actions; member_id
  * is stamped server-side. The dialog closes + router.refresh()-es on
@@ -32,12 +42,15 @@ export type EventInitial = {
 export function EventLogForm({
   mode,
   initial,
+  memberId,
   trigger,
   open: controlledOpen,
   onOpenChange,
 }: {
   mode: 'create' | 'edit';
   initial?: EventInitial;
+  /** Path prefix for any uploaded badge photo. */
+  memberId: string;
   /** Element rendered inside Dialog.Trigger (uncontrolled usage). */
   trigger?: React.ReactNode;
   /** Controlled open state (parent owns visibility). */
@@ -53,9 +66,21 @@ export function EventLogForm({
   };
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [proof, setProof] = useState<UploadedProof | null>(null);
+
+  // Initial proof_path from edit mode flows in as a hidden input
+  // unless the user replaces it via the uploader.
+  const initialProofPath = initial?.proof_path ?? null;
+  const effectiveProofPath = proof?.path ?? initialProofPath ?? '';
 
   async function onSubmit(formData: FormData) {
     setError(null);
+    // Ensure the hidden proof_path field reflects either a fresh
+    // upload or the original (in edit mode) — the EventProofUploader
+    // only emits one when the user actually picks a file.
+    if (effectiveProofPath) {
+      formData.set('proof_path', effectiveProofPath);
+    }
     startTransition(async () => {
       const r =
         mode === 'create' ? await createEvent(formData) : await updateEvent(formData);
@@ -64,6 +89,7 @@ export function EventLogForm({
         return;
       }
       setOpen(false);
+      setProof(null);
       router.refresh();
     });
   }
@@ -73,7 +99,10 @@ export function EventLogForm({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setError(null);
+        if (!next) {
+          setError(null);
+          setProof(null);
+        }
       }}
     >
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
@@ -165,6 +194,25 @@ export function EventLogForm({
                   defaultValue={initial?.feedback ?? ''}
                 />
               </label>
+              <div className="sm:col-span-2">
+                <span className="block text-xs font-medium text-agsi-darkGray">
+                  Badge photo
+                </span>
+                <p className="mt-1 mb-2 text-xs2 text-agsi-darkGray">
+                  Optional. Attaching one marks the event{' '}
+                  <strong className="text-agsi-navy">Verified</strong>.
+                </p>
+                {initialProofPath && !proof && (
+                  <p className="mb-2 text-xs2 text-agsi-darkGray">
+                    Existing proof attached. Upload a new image to replace it.
+                  </p>
+                )}
+                <EventProofUploader
+                  memberId={memberId}
+                  onChange={setProof}
+                  disabled={pending}
+                />
+              </div>
             </div>
 
             {error && <p className="text-xs text-rag-red">{error}</p>}
