@@ -139,6 +139,11 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
     (user.role === 'bd_manager' && company.owner_id === user.id);
 
   const canClaim = company.owner_id === null && user.role !== 'leadership';
+  // Claimed but missing progression prerequisites. Drives the
+  // "Needs details" badge + disables level-change requests upstream.
+  const needsDetails =
+    company.owner_id !== null &&
+    (!company.location_id || liveContacts.length === 0);
   // Release: visible only when the company is currently claimed AND the
   // viewer is the owner OR a bd_head / admin. RPC re-checks the same
   // predicate; UI gate is just to avoid showing a control that would
@@ -151,7 +156,20 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
 
   return (
     <div className="space-y-6">
-      {canClaim && <CompanyClaimButton companyId={company.id} />}
+      {canClaim && (
+        <CompanyClaimButton companyId={company.id} locations={locations} />
+      )}
+      {!canClaim && company.owner_id !== null && needsDetails && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-rag-amber/40 bg-rag-amber/10 px-4 py-2">
+          <span className="rounded-full bg-rag-amber/20 px-2 py-0.5 text-xs font-semibold text-rag-amber">
+            Needs details
+          </span>
+          <p className="text-xs text-agsi-darkGray">
+            Add the stakeholder’s emirate and at least one contact before
+            requesting a level change.
+          </p>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-3">

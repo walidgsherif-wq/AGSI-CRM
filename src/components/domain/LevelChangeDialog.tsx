@@ -32,7 +32,16 @@ type CommonProps = {
   userRole: Role;
   /** True when the current user is the company's owner. Admin always allowed. */
   isOwner: boolean;
+  /** Completeness gate — when false, the company is missing its
+   *  location_id or has no live contact, so requestLevelChange /
+   *  approveLevelRequest would reject. The button is rendered disabled
+   *  with that explanation rather than opening a dialog that's bound
+   *  to fail. */
+  isProgressReady?: boolean;
 };
+
+const INCOMPLETE_HINT =
+  'Add the stakeholder’s emirate and at least one contact before progressing.';
 
 export function LevelChangeButton({
   variant = 'inline',
@@ -44,23 +53,41 @@ export function LevelChangeButton({
   const [open, setOpen] = useState(false);
   const isAdmin = common.userRole === 'admin';
   const canChange = isAdmin || common.isOwner;
+  const isReady = common.isProgressReady !== false;
 
   if (!canChange) return null;
 
   if (!open) {
     const label = isAdmin ? 'Change level →' : 'Request level change →';
+    const disabled = !isReady;
     if (variant === 'button') {
       return (
-        <Button onClick={() => setOpen(true)} size="sm">
-          {label}
-        </Button>
+        <div className="space-y-1">
+          <Button
+            onClick={() => isReady && setOpen(true)}
+            size="sm"
+            disabled={disabled}
+            title={disabled ? INCOMPLETE_HINT : undefined}
+          >
+            {label}
+          </Button>
+          {disabled && (
+            <p className="text-xs text-rag-amber">{INCOMPLETE_HINT}</p>
+          )}
+        </div>
       );
     }
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="text-xs text-agsi-accent hover:underline"
+        onClick={() => isReady && setOpen(true)}
+        disabled={disabled}
+        title={disabled ? INCOMPLETE_HINT : undefined}
+        className={
+          disabled
+            ? 'cursor-not-allowed text-xs text-agsi-midGray'
+            : 'text-xs text-agsi-accent hover:underline'
+        }
       >
         {label}
       </button>

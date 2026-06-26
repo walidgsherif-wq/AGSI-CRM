@@ -18,6 +18,7 @@ type CardRow = {
   company_type: keyof typeof COMPANY_TYPE_LABEL;
   current_level: Level;
   city: string | null;
+  location_id: string | null;
   is_key_stakeholder: boolean;
   has_active_projects: boolean;
   owner_id: string | null;
@@ -94,7 +95,7 @@ export default async function PipelinePage({
     let query = supabase
       .from('companies')
       .select(
-        'id, canonical_name, company_type, current_level, city, is_key_stakeholder, has_active_projects, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
+        'id, canonical_name, company_type, current_level, city, location_id, is_key_stakeholder, has_active_projects, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
       )
       .eq('is_active', true)
       .order('canonical_name', { ascending: true })
@@ -154,8 +155,31 @@ export default async function PipelinePage({
     for (const r of res.data ?? []) scoreByCompany.set(r.company_id, r);
   }
 
+  // Companies with ≥1 live contact — the completeness check (location
+  // is already on the card row) for the progression gate. Chunked .in()
+  // mirrors the engagement-score pattern above to dodge PostgREST's
+  // URL length cap.
+  type ContactRow = { company_id: string };
+  const contactChunks = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from('contacts')
+        .select('company_id')
+        .is('deleted_at', null)
+        .in('company_id', chunk)
+        .returns<ContactRow[]>(),
+    ),
+  );
+  const companiesWithContact = new Set<string>();
+  for (const res of contactChunks) {
+    for (const r of res.data ?? []) companiesWithContact.add(r.company_id);
+  }
+
   const cards: CardData[] = all.map((c) => {
     const s = scoreByCompany.get(c.id);
+    const hasContact = companiesWithContact.has(c.id);
+    const hasLocation = c.location_id !== null;
+    const isOwned = c.owner_id !== null;
     return {
       id: c.id,
       canonical_name: c.canonical_name,
@@ -169,6 +193,8 @@ export default async function PipelinePage({
       pending_count: pendingByCompany.get(c.id) ?? 0,
       engagement_bucket: s?.bucket ?? 'cold',
       engagement_days_since: s?.days_since_last_engagement ?? null,
+      needs_details: isOwned && (!hasLocation || !hasContact),
+      is_progress_ready: hasLocation && hasContact,
     };
   });
 

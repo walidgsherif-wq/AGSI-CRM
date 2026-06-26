@@ -124,16 +124,20 @@ export async function updateCompany(formData: FormData) {
  *
  * Returns { ok: true } or { error: '…' } — never throws.
  */
-export async function claimCompany(companyId: string) {
+export async function claimCompany(companyId: string, locationId: string) {
   const user = await getCurrentUser();
   // Echoed server-side so the UI fail-closed before any RPC round-trip
   // if a leadership session somehow reaches this action.
   if (user.role === 'leadership') {
     return { error: 'Leadership cannot claim companies.' };
   }
+  if (!locationId) {
+    return { error: 'Select an emirate to claim this stakeholder.' };
+  }
 
   const { error } = await supabaseFromRequest().rpc('claim_company', {
     p_company_id: companyId,
+    p_location_id: locationId,
   });
   if (error) return { error: error.message };
 
