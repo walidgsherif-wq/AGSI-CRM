@@ -137,6 +137,16 @@ export default async function CompaniesPage({
 
   // STEP 2 — enrich with company attrs (type / city / flags / owner).
   // Chunked .in() so the URL stays small (~100 uuids / chunk).
+  //
+  // We deliberately do NOT embed the parent name via the self-referencing
+  // FK (parent:companies!companies_parent_company_id_fkey). That embed
+  // fails whenever PostgREST's schema cache hasn't picked up the FK
+  // introduced by 0081 — and when the embed fails, the whole SELECT
+  // returns null, every chunk's data is empty, and the page renders
+  // "0 of N". Resolving parent names in a separate batch query (same
+  // pattern used by /companies/[id]) sidesteps the schema-cache
+  // dependency entirely.
+  type RawAttrs = Omit<CompanyAttrs, 'parent'>;
   const ids = stats.map((s) => s.company_id);
   const CHUNK = 100;
   const idChunks: string[][] = [];
@@ -146,18 +156,48 @@ export default async function CompaniesPage({
       let q = supabase
         .from('companies')
         .select(
-          'id, company_type, city, is_key_stakeholder, has_active_projects, parent_company_id, parent:companies!companies_parent_company_id_fkey(canonical_name), owner:profiles!companies_owner_id_fkey(full_name)',
+          'id, company_type, city, is_key_stakeholder, has_active_projects, parent_company_id, owner:profiles!companies_owner_id_fkey(full_name)',
         )
         .eq('is_active', true)
         .in('id', chunk);
       if (typeFilter) q = q.eq('company_type', typeFilter);
       if (regionFilter) q = q.ilike('city', `%${regionFilter}%`);
       if (liveOnly) q = q.eq('has_active_projects', true);
-      return q.returns<CompanyAttrs[]>();
+      return q.returns<RawAttrs[]>();
     }),
   );
+  const rawAttrs = attrResults.flatMap((r) => r.data ?? []);
+
+  // Batch-fetch parent canonical names so we can render "part of …".
+  const parentIds = Array.from(
+    new Set(
+      rawAttrs
+        .map((a) => a.parent_company_id)
+        .filter((id): id is string => !!id),
+    ),
+  );
+  let parentNames = new Map<string, string>();
+  if (parentIds.length > 0) {
+    const { data: parents } = await supabase
+      .from('companies')
+      .select('id, canonical_name')
+      .in('id', parentIds)
+      .returns<Array<{ id: string; canonical_name: string }>>();
+    parentNames = new Map((parents ?? []).map((p) => [p.id, p.canonical_name]));
+  }
+
   const attrsMap = new Map<string, CompanyAttrs>();
-  for (const r of attrResults) for (const a of r.data ?? []) attrsMap.set(a.id, a);
+  for (const a of rawAttrs) {
+    const parentName = a.parent_company_id
+      ? parentNames.get(a.parent_company_id)
+      : null;
+    attrsMap.set(a.id, {
+      ...a,
+      // Only attach parent if we resolved a name — suppresses the
+      // "part of …" link when the parent isn't readable.
+      parent: parentName ? { canonical_name: parentName } : null,
+    });
+  }
 
   // Preserve the sort order from STEP 1 — .in() doesn't, so iterate
   // stats and drop rows whose company didn't survive STEP 2 filters.
