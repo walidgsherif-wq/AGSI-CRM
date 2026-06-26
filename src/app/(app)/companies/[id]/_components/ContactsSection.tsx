@@ -393,19 +393,9 @@ function ContactForm({
       </div>
 
       {mode === 'edit' && onArchive && (
-        <div className="mt-6 rounded-lg border border-rag-red/30 bg-rag-red/5 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-rag-red">
-            Danger zone
-          </p>
-          <p className="mt-1 text-xs text-agsi-darkGray">
-            Archive this contact. Recoverable by an admin / BD head from
-            the Archived contacts panel — it isn’t purged.
-          </p>
-          <Button
+        <div className="mt-4 border-t border-agsi-lightGray pt-3">
+          <button
             type="button"
-            size="sm"
-            variant="danger"
-            className="mt-2"
             disabled={pending}
             onClick={() => {
               if (
@@ -416,9 +406,10 @@ function ContactForm({
                 onArchive();
               }
             }}
+            className="text-xs font-medium text-rag-red hover:underline disabled:opacity-50"
           >
-            Delete contact
-          </Button>
+            Delete
+          </button>
         </div>
       )}
     </GuardedForm>
