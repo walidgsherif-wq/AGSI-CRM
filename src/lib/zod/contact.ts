@@ -33,6 +33,7 @@ export const contactUpdateSchema = z.object({
   position: trimmedString(150),
   email: optionalEmail,
   phone: trimmedString(50),
+  is_primary: z.boolean().default(false),
 });
 
 export type ContactCreate = z.infer<typeof contactCreateSchema>;

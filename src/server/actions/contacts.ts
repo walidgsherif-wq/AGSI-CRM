@@ -65,12 +65,20 @@ export async function createContact(formData: FormData) {
 export async function updateContact(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   const companyId = String(formData.get('company_id') ?? '');
-  const parsed = contactUpdateSchema.safeParse({ id, ...rawFromForm(formData) });
+  const isPrimary = formData.get('is_primary') === 'on';
+  const parsed = contactUpdateSchema.safeParse({
+    id,
+    is_primary: isPrimary,
+    ...rawFromForm(formData),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues.map((i) => i.message).join('; ') };
   }
   const { id: _id, ...patch } = parsed.data;
 
+  // contacts_enforce_single_primary (0073) demotes any other live
+  // primary on the same company when is_primary flips to true here.
+  // contacts_audit writes a contact_updated row regardless.
   const { error } = await supabase()
     .from('contacts')
     .update(patch)
