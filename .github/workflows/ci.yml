@@ -94,7 +94,20 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin, not `latest`. The supabase CLI's config.toml schema
+          # had two breaking changes after this version:
+          #   - May 2025: [[storage.buckets]] (table-array, with
+          #     `name = "..."` field) was replaced by
+          #     [storage.buckets.<bucket>] (map keyed on bucket name).
+          #   - Around the same era: top-level [auth].enable_confirmations
+          #     was removed (only [auth.email].enable_confirmations
+          #     is still accepted).
+          # v1.226.4 is the last v1.x release (Dec 3, 2024) — it
+          # parses our config.toml cleanly and has every --linked
+          # subcommand used below (db push, migration list, db diff).
+          # If we ever need a newer CLI we'll migrate config.toml at
+          # the same time, in a single intentional PR.
+          version: 1.226.4
 
       - name: Link to prod project
         run: |
@@ -130,7 +143,8 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # See pin rationale on the apply-migrations job above.
+          version: 1.226.4
 
       - name: Link to prod project
         run: |
@@ -187,7 +201,8 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # See pin rationale on the apply-migrations job above.
+          version: 1.226.4
 
       - name: Link to prod project
         run: |
