@@ -11,6 +11,8 @@ import {
   markRead,
   type NotificationRow,
 } from '@/server/actions/notifications';
+import { ReviewActions } from '@/app/(app)/admin/level-requests/_components/ReviewActions';
+import type { Level, Role } from '@/types/domain';
 
 const TYPE_LABEL: Record<string, string> = {
   stagnation_warning: 'Stagnation warning',
@@ -42,14 +44,32 @@ const TYPE_VARIANT: Record<string, 'amber' | 'red' | 'blue' | 'green' | 'neutral
 
 const ALL_TYPES = Object.keys(TYPE_LABEL);
 
+/** Per-notification enrichment fetched server-side. */
+export type LevelChangeContext = {
+  request_id: string;
+  from_level: Level;
+  to_level: Level;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  evidence_note: string;
+  company_id: string;
+  company_name: string;
+  company_type_label: string;
+  requester_name: string;
+};
+
 export function NotificationsInbox({
   initial,
   initialFilter,
   initialType,
+  levelChangeContext,
+  viewerRole,
 }: {
   initial: NotificationRow[];
   initialFilter: 'all' | 'unread';
   initialType: string;
+  /** Keyed by notification.id. Populated server-side for level_change rows. */
+  levelChangeContext?: Record<string, LevelChangeContext>;
+  viewerRole: Role;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -123,6 +143,8 @@ export function NotificationsInbox({
             >
               <Row
                 n={n}
+                lc={levelChangeContext?.[n.id]}
+                viewerRole={viewerRole}
                 onMarkRead={() => {
                   startTransition(async () => {
                     await markRead(n.id);
@@ -142,17 +164,27 @@ export function NotificationsInbox({
 
 function Row({
   n,
+  lc,
+  viewerRole,
   onMarkRead,
 }: {
   n: NotificationRow;
+  lc?: LevelChangeContext;
+  viewerRole: Role;
   onMarkRead: () => void;
 }) {
   const variant = TYPE_VARIANT[n.notification_type] ?? 'neutral';
   const typeLabel = TYPE_LABEL[n.notification_type] ?? n.notification_type;
 
+  const isLevelChange = n.notification_type === 'level_change' && lc;
+  const canReview =
+    isLevelChange &&
+    lc!.status === 'pending' &&
+    (viewerRole === 'admin' || viewerRole === 'bd_head');
+
   return (
     <div className="flex items-start gap-3 px-4 py-3">
-      <div className="flex-1">
+      <div className="flex-1 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={variant}>{typeLabel}</Badge>
           <span className="text-xs text-agsi-darkGray">
@@ -167,17 +199,23 @@ function Row({
             </span>
           )}
         </div>
-        <p className="mt-1 text-sm font-medium text-agsi-navy">{n.subject}</p>
-        <p className="mt-0.5 whitespace-pre-wrap text-xs text-agsi-darkGray">
-          {n.body}
-        </p>
+
+        {isLevelChange ? (
+          <LevelChangeBody n={n} lc={lc!} canReview={canReview!} />
+        ) : (
+          <>
+            <p className="text-sm font-medium text-agsi-navy">{n.subject}</p>
+            <p className="whitespace-pre-wrap text-xs text-agsi-darkGray">{n.body}</p>
+          </>
+        )}
+
         {n.link_url && (
           <Link
             href={n.link_url as never}
             onClick={() => {
               if (!n.is_read) onMarkRead();
             }}
-            className="mt-1 inline-block text-xs font-medium text-agsi-accent hover:underline"
+            className="inline-block text-xs font-medium text-agsi-accent hover:underline"
           >
             Open →
           </Link>
@@ -191,6 +229,68 @@ function Row({
         >
           Mark read
         </button>
+      )}
+    </div>
+  );
+}
+
+function LevelChangeBody({
+  n,
+  lc,
+  canReview,
+}: {
+  n: NotificationRow;
+  lc: LevelChangeContext;
+  canReview: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p className="text-sm font-medium text-agsi-navy">
+          {lc.company_name}
+        </p>
+        <span className="text-xs text-agsi-darkGray">· {lc.company_type_label}</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="amber">
+          {lc.from_level} → {lc.to_level}
+        </Badge>
+        <span className="text-xs capitalize text-agsi-darkGray">
+          {lc.status}
+        </span>
+        <span className="text-xs text-agsi-darkGray">
+          · requested by {lc.requester_name}
+        </span>
+      </div>
+
+      <div className="rounded-lg border border-agsi-lightGray bg-agsi-offWhite px-3 py-2">
+        <p className="text-xxs font-semibold uppercase tracking-wider text-agsi-darkGray">
+          Justification
+        </p>
+        <p className="mt-1 whitespace-pre-wrap text-xs text-agsi-navy">
+          {lc.evidence_note?.trim() || (
+            <span className="text-agsi-midGray">No justification provided.</span>
+          )}
+        </p>
+      </div>
+
+      {/* Fallback for non-actionable level-change rows: still surface */}
+      {/* the original system body in muted text so review notes land */}
+      {/* somewhere visible. */}
+      {!canReview && n.body && (
+        <p className="whitespace-pre-wrap text-xs text-agsi-darkGray">
+          {n.body}
+        </p>
+      )}
+
+      {canReview && (
+        <div className="rounded-lg border border-agsi-lightGray bg-white p-3">
+          <p className="mb-2 text-xs font-semibold text-agsi-navy">
+            Review this request
+          </p>
+          <ReviewActions requestId={lc.request_id} />
+        </div>
       )}
     </div>
   );
