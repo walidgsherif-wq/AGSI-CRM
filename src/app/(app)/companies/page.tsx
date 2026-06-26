@@ -146,7 +146,7 @@ export default async function CompaniesPage({
       let q = supabase
         .from('companies')
         .select(
-          'id, company_type, city, is_key_stakeholder, has_active_projects, owner:profiles!companies_owner_id_fkey(full_name)',
+          'id, company_type, city, is_key_stakeholder, has_active_projects, parent_company_id, parent:companies!companies_parent_company_id_fkey(canonical_name), owner:profiles!companies_owner_id_fkey(full_name)',
         )
         .eq('is_active', true)
         .in('id', chunk);

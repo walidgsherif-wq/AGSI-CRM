@@ -16,6 +16,10 @@ import { CompanyClaimButton } from './_components/CompanyClaimButton';
 import { CompanyReleaseButton } from './_components/CompanyReleaseButton';
 import { ContactsSection, type ContactRow } from './_components/ContactsSection';
 import { PendingLevelUpBadge } from '@/components/domain/PendingLevelUpBadge';
+import { RequestGroupButton } from './_components/RequestGroupButton';
+import { UngroupChildButton } from './_components/UngroupChildButton';
+import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
+import { LevelBadge } from '@/components/domain/LevelBadge';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +30,7 @@ type DetailRow = CompanyInitial & {
   has_active_projects: boolean;
   source: string;
   created_at: string;
+  parent_company_id: string | null;
 };
 
 type LinkedProjectRow = {
@@ -50,7 +55,7 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, canonical_name, company_type, country, location_id, city, phone, email, website, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at',
+      'id, canonical_name, company_type, country, location_id, city, phone, email, website, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at, parent_company_id',
     )
     .eq('id', params.id)
     .single<DetailRow>();
@@ -139,6 +144,71 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
     user.role === 'bd_head' ||
     (user.role === 'bd_manager' && company.owner_id === user.id);
 
+  // Grouping context: parent (if child) + children (if parent) + any
+  // pending group request + the picker's company list.
+  type GroupMember = {
+    id: string;
+    canonical_name: string;
+    company_type: string;
+    current_level: string;
+    owner: { full_name: string } | { full_name: string }[] | null;
+  };
+  const [parentRes, childrenRes, pendingGroupRes, allCompaniesRes] =
+    await Promise.all([
+      company.parent_company_id
+        ? supabase
+            .from('companies')
+            .select('id, canonical_name')
+            .eq('id', company.parent_company_id)
+            .maybeSingle<{ id: string; canonical_name: string }>()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('companies')
+        .select(
+          'id, canonical_name, company_type, current_level, owner:profiles!companies_owner_id_fkey(full_name)',
+        )
+        .eq('parent_company_id', company.id)
+        .eq('is_active', true)
+        .order('canonical_name')
+        .returns<GroupMember[]>(),
+      supabase
+        .from('company_group_requests')
+        .select('id, parent_company_id, child_company_ids, status, created_at')
+        .or(
+          `parent_company_id.eq.${company.id},child_company_ids.cs.{${company.id}}`,
+        )
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle<{
+          id: string;
+          parent_company_id: string;
+          child_company_ids: string[];
+          status: string;
+          created_at: string;
+        }>(),
+      // Active companies for the request modal's picker. We pull a
+      // bounded list (most recent 500) — for a small single-tenant CRM
+      // this comfortably covers the picker without paginating.
+      supabase
+        .from('companies')
+        .select('id, canonical_name, parent_company_id')
+        .eq('is_active', true)
+        .order('canonical_name')
+        .limit(500)
+        .returns<
+          Array<{
+            id: string;
+            canonical_name: string;
+            parent_company_id: string | null;
+          }>
+        >(),
+    ]);
+  const parentRow = parentRes.data;
+  const groupChildren = childrenRes.data ?? [];
+  const pendingGroupRequest = pendingGroupRes.data ?? null;
+  const allCompanies = allCompaniesRes.data ?? [];
+
   const canClaim = company.owner_id === null && user.role !== 'leadership';
   // L2+ progression requires a contactable stakeholder. "Live contact"
   // alone isn't enough — they must have a non-empty email.
@@ -172,8 +242,27 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
       user.role === 'bd_head' ||
       company.owner_id === user.id);
 
+  const canRequestGroup =
+    user.role !== 'leadership' && !pendingGroupRequest;
+
   return (
     <div className="space-y-6">
+      {parentRow && (
+        <p className="text-xs text-agsi-darkGray">
+          Part of{' '}
+          <Link
+            href={`/companies/${parentRow.id}` as never}
+            className="font-medium text-agsi-accent hover:underline"
+          >
+            {parentRow.canonical_name}
+          </Link>
+        </p>
+      )}
+      {pendingGroupRequest && (
+        <div className="rounded-xl border border-rag-amber/40 bg-rag-amber/10 px-4 py-2 text-xs text-rag-amber">
+          Group request pending — an admin will review.
+        </div>
+      )}
       {canClaim && (
         <CompanyClaimButton companyId={company.id} locations={locations} />
       )}
@@ -251,6 +340,87 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
             currentUserId={user.id}
             userRole={user.role}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Group companies</CardTitle>
+              <CardDescription>
+                Other names listed under this main company, kept safe and
+                fully visible. Grouping is associative only — children
+                still show in all lists, search, and counts.
+              </CardDescription>
+            </div>
+            {canRequestGroup && (
+              <RequestGroupButton
+                companyId={company.id}
+                companyName={company.canonical_name}
+                seed={parentRow ? 'child' : 'parent'}
+                options={allCompanies}
+                alreadyPending={!!pendingGroupRequest}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {groupChildren.length === 0 ? (
+            <p className="p-6 text-sm text-agsi-darkGray">
+              No companies grouped under this one yet.
+            </p>
+          ) : (
+            <Table>
+              <THead>
+                <TR head>
+                  <TH className="px-4">Company</TH>
+                  <TH className="px-4">Type</TH>
+                  <TH className="px-4">Owner</TH>
+                  <TH className="px-4">Level</TH>
+                  {user.role === 'admin' && <TH className="px-4"></TH>}
+                </TR>
+              </THead>
+              <TBody>
+                {groupChildren.map((c) => {
+                  const owner = Array.isArray(c.owner)
+                    ? (c.owner[0]?.full_name ?? '—')
+                    : (c.owner?.full_name ?? '—');
+                  return (
+                    <TR key={c.id} className="hover:bg-agsi-lightGray/20">
+                      <TD className="px-4 font-medium">
+                        <Link
+                          href={`/companies/${c.id}` as never}
+                          className="text-agsi-navy hover:underline"
+                        >
+                          {c.canonical_name}
+                        </Link>
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">
+                        {COMPANY_TYPE_LABEL[
+                          c.company_type as keyof typeof COMPANY_TYPE_LABEL
+                        ] ?? c.company_type}
+                      </TD>
+                      <TD className="px-4 text-agsi-darkGray">{owner}</TD>
+                      <TD className="px-4">
+                        <LevelBadge
+                          level={c.current_level as 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5'}
+                        />
+                      </TD>
+                      {user.role === 'admin' && (
+                        <TD className="px-4">
+                          <UngroupChildButton
+                            childId={c.id}
+                            childName={c.canonical_name}
+                          />
+                        </TD>
+                      )}
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
