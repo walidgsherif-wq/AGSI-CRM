@@ -8,6 +8,7 @@ import {
   Building2,
   FolderKanban,
   CheckSquare,
+  CalendarDays,
   LineChart,
   Map as MapIcon,
   FileText,
@@ -68,6 +69,12 @@ const NAV: NavItem[] = [
     icon: CheckSquare,
     roles: ['admin', 'bd_head', 'bd_manager'],
     feature: 'tasks',
+  },
+  {
+    href: '/events',
+    label: 'Events',
+    icon: CalendarDays,
+    roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
   },
   {
     href: '/insights',
