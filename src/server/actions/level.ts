@@ -18,21 +18,35 @@ function supabase() {
 const VALID_LEVELS: Level[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
 
 const COMPANY_INCOMPLETE_MSG =
-  'Add the stakeholder’s emirate and at least one contact before progressing.';
+  'Add the stakeholder’s emirate and a contact with a work email before moving to L2 or beyond.';
 
 /**
- * A claimed company can be progressed only when it carries the
- * minimum BD data: an emirate (location_id) AND at least one live
- * contact. Returns null if complete, or an error string otherwise.
+ * Completeness gate for L2+ progression. A claimed company can only be
+ * moved into L2 or higher when it carries the minimum BD data:
+ *   - an emirate (location_id)
+ *   - at least one live contact (deleted_at IS NULL) with a non-empty
+ *     email — so the stakeholder is actually contactable.
  *
- * Used by requestLevelChange + approveLevelRequest as a pre-check
- * so we give a clean UI message rather than letting an INSERT or RPC
- * round-trip succeed against an incomplete stakeholder.
+ * Returns null when complete, or the standard error string otherwise.
+ * Gated on the target level (not the step) so a backward move (L2→L1)
+ * or a fresh first-touch (L0→L1) doesn't trip it. A skip-level forward
+ * (e.g. L1→L3) is still gated because the target is L3.
+ *
+ * Used by requestLevelChange + approveLevelRequest so the same message
+ * surfaces at both submission and approval time — a request that
+ * became incomplete after it was raised is rejected at approval too.
  */
+function targetRequiresCompleteness(target: Level): boolean {
+  return target >= 'L2';
+}
+
 async function assertCompanyProgressReady(
   sb: ReturnType<typeof supabase>,
   companyId: string,
+  target: Level,
 ): Promise<string | null> {
+  if (!targetRequiresCompleteness(target)) return null;
+
   const { data: company } = await sb
     .from('companies')
     .select('location_id')
@@ -46,6 +60,8 @@ async function assertCompanyProgressReady(
     .select('id')
     .eq('company_id', companyId)
     .is('deleted_at', null)
+    .not('email', 'is', null)
+    .neq('email', '')
     .limit(1)
     .maybeSingle<{ id: string }>();
   if (!contact) return COMPANY_INCOMPLETE_MSG;
@@ -130,11 +146,11 @@ export async function requestLevelChange(formData: FormData) {
     }
   }
 
-  // Completeness gate (defence in depth — UI also hides the action
-  // when this would fail). Both the request and the approval paths
-  // check the same shape so a request that became incomplete after
-  // it was raised gets rejected at approval time too.
-  const incomplete = await assertCompanyProgressReady(sb, companyId);
+  // Completeness gate — only fires for L2+ targets. L0/L1 first-touch
+  // and any backward move are unaffected. Both request and approval
+  // paths check the same shape so a request that became incomplete
+  // after it was raised gets rejected at approval time too.
+  const incomplete = await assertCompanyProgressReady(sb, companyId, toLevel);
   if (incomplete) return { error: incomplete };
 
   const { error } = await sb.from('level_change_requests').insert({
@@ -165,11 +181,15 @@ export async function approveLevelRequest(requestId: string, reviewNote: string 
   // requestLevelChange instead of an opaque RPC error.
   const { data: req } = await sb
     .from('level_change_requests')
-    .select('company_id')
+    .select('company_id, to_level')
     .eq('id', requestId)
-    .maybeSingle<{ company_id: string }>();
+    .maybeSingle<{ company_id: string; to_level: Level }>();
   if (!req) return { error: 'Request not found.' };
-  const incomplete = await assertCompanyProgressReady(sb, req.company_id);
+  const incomplete = await assertCompanyProgressReady(
+    sb,
+    req.company_id,
+    req.to_level,
+  );
   if (incomplete) return { error: incomplete };
 
   const { error } = await sb.rpc('approve_level_change_request', {
