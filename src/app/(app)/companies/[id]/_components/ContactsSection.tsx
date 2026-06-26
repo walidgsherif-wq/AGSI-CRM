@@ -124,6 +124,14 @@ export function ContactsSection({
                       router.refresh();
                     }
                   }}
+                  onArchive={
+                    canMutate(c)
+                      ? () => {
+                          run(() => archiveContact(c.id, companyId));
+                          setEditingId(null);
+                        }
+                      : undefined
+                  }
                 />
               ) : (
                 <ContactCard
@@ -131,9 +139,6 @@ export function ContactsSection({
                   canMutate={canMutate(c)}
                   pending={pending}
                   onEdit={() => setEditingId(c.id)}
-                  onArchive={() =>
-                    run(() => archiveContact(c.id, companyId))
-                  }
                   onMakePrimary={() =>
                     run(() => setPrimaryContact(c.id, companyId))
                   }
@@ -228,14 +233,12 @@ function ContactCard({
   canMutate,
   pending,
   onEdit,
-  onArchive,
   onMakePrimary,
 }: {
   contact: ContactRow;
   canMutate: boolean;
   pending: boolean;
   onEdit: () => void;
-  onArchive: () => void;
   onMakePrimary: () => void;
 }) {
   return (
@@ -292,18 +295,13 @@ function ContactCard({
             type="button"
             onClick={onEdit}
             disabled={pending}
-            className="text-xs font-medium text-agsi-navy hover:underline disabled:opacity-50"
+            className="ml-auto text-xs font-medium text-agsi-navy hover:underline disabled:opacity-50"
           >
             Edit
           </button>
-          <button
-            type="button"
-            onClick={onArchive}
-            disabled={pending}
-            className="ml-auto text-xs font-medium text-rag-red hover:underline disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {/* Delete lives inside the Edit view (separated danger zone + */}
+          {/* confirm) so it can't be triggered by an accidental click on */}
+          {/* the card face. */}
         </div>
       )}
     </div>
@@ -317,6 +315,7 @@ function ContactForm({
   pending,
   onSubmit,
   onCancel,
+  onArchive,
 }: {
   mode: 'create' | 'edit';
   companyId: string;
@@ -324,6 +323,10 @@ function ContactForm({
   pending: boolean;
   onSubmit: (formData: FormData) => Promise<void>;
   onCancel: () => void;
+  /** When provided, the form renders a "Danger zone" block at the
+   *  bottom with a confirmed Delete (archive) action. Pass undefined
+   *  for users who can't delete this contact. */
+  onArchive?: () => void;
 }) {
   return (
     <GuardedForm
@@ -388,6 +391,36 @@ function ContactForm({
           Cancel
         </Button>
       </div>
+
+      {mode === 'edit' && onArchive && (
+        <div className="mt-6 rounded-lg border border-rag-red/30 bg-rag-red/5 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-rag-red">
+            Danger zone
+          </p>
+          <p className="mt-1 text-xs text-agsi-darkGray">
+            Archive this contact. Recoverable by an admin / BD head from
+            the Archived contacts panel — it isn’t purged.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="danger"
+            className="mt-2"
+            disabled={pending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  'Archive this contact? Recoverable by an admin / BD head.',
+                )
+              ) {
+                onArchive();
+              }
+            }}
+          >
+            Delete contact
+          </Button>
+        </div>
+      )}
     </GuardedForm>
   );
 }
