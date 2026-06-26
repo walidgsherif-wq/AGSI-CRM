@@ -3,9 +3,12 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  dismissAllNotifications,
+  dismissNotification,
   listNotifications,
   markAllRead,
   markRead,
@@ -21,6 +24,7 @@ const TYPE_LABEL: Record<string, string> = {
   task_overdue: 'Task overdue',
   task_assigned: 'Task assigned',
   level_change: 'Level change',
+  company_group_request: 'Group request',
   upload_complete: 'Upload complete',
   upload_failed: 'Upload failed',
   unmatched_company: 'Unmatched company',
@@ -40,6 +44,7 @@ const TYPE_VARIANT: Record<string, 'amber' | 'red' | 'blue' | 'green' | 'neutral
   unmatched_company: 'amber',
   leadership_report_finalised: 'blue',
   task_assigned: 'blue',
+  company_group_request: 'amber',
 };
 
 const ALL_TYPES = Object.keys(TYPE_LABEL);
@@ -83,6 +88,16 @@ export function NotificationsInbox({
     router.push(`/notifications?${sp.toString()}` as never);
   }
 
+  async function reload() {
+    const r = await listNotifications({
+      filter: initialFilter,
+      type: initialType,
+      limit: 200,
+    });
+    setRows(r.rows);
+    router.refresh();
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-agsi-lightGray px-4 py-3">
@@ -108,26 +123,36 @@ export function NotificationsInbox({
             ))}
           </Select>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={pending || rows.every((r) => r.is_read)}
-          onClick={() => {
-            startTransition(async () => {
-              await markAllRead();
-              const r = await listNotifications({
-                filter: initialFilter,
-                type: initialType,
-                limit: 200,
+        <div className="flex flex-wrap items-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || rows.every((r) => r.is_read)}
+            onClick={() => {
+              startTransition(async () => {
+                await markAllRead();
+                await reload();
               });
-              setRows(r.rows);
-              router.refresh();
-            });
-          }}
-        >
-          Mark all read
-        </Button>
+            }}
+          >
+            Mark all read
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || rows.length === 0}
+            onClick={() => {
+              startTransition(async () => {
+                await dismissAllNotifications();
+                await reload();
+              });
+            }}
+          >
+            Clear all
+          </Button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -153,6 +178,12 @@ export function NotificationsInbox({
                     );
                   });
                 }}
+                onDismiss={() => {
+                  startTransition(async () => {
+                    await dismissNotification(n.id);
+                    setRows((cur) => cur.filter((r) => r.id !== n.id));
+                  });
+                }}
               />
             </li>
           ))}
@@ -167,11 +198,13 @@ function Row({
   lc,
   viewerRole,
   onMarkRead,
+  onDismiss,
 }: {
   n: NotificationRow;
   lc?: LevelChangeContext;
   viewerRole: Role;
   onMarkRead: () => void;
+  onDismiss: () => void;
 }) {
   const variant = TYPE_VARIANT[n.notification_type] ?? 'neutral';
   const typeLabel = TYPE_LABEL[n.notification_type] ?? n.notification_type;
@@ -221,15 +254,26 @@ function Row({
           </Link>
         )}
       </div>
-      {!n.is_read && (
+      <div className="flex flex-col items-end gap-1">
+        {!n.is_read && (
+          <button
+            type="button"
+            onClick={onMarkRead}
+            className="text-xs2 text-agsi-darkGray hover:underline"
+          >
+            Mark read
+          </button>
+        )}
         <button
           type="button"
-          onClick={onMarkRead}
-          className="text-xs2 text-agsi-darkGray hover:underline"
+          onClick={onDismiss}
+          title="Dismiss"
+          aria-label="Dismiss notification"
+          className="inline-flex items-center gap-1 rounded p-1 text-xs2 text-agsi-midGray hover:text-rag-red"
         >
-          Mark read
+          <X className="h-3 w-3" aria-hidden /> Dismiss
         </button>
-      )}
+      </div>
     </div>
   );
 }

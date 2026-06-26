@@ -82,16 +82,24 @@ export default async function NotificationsPage({
   const { rows } = await listNotifications({ filter, type, limit: 200 });
 
   // Enrich level-change notifications with the matching request, the
-  // company name + type, and the requester's full name. No request_id
-  // is stored on the notification, so we match by subject-parsed
-  // (status, from, to) within the related_company_id.
+  // company name + type, and the requester's full name. Prefer the
+  // entity_id (set by 0082) for a direct join; fall back to
+  // subject-parsing within related_company_id for any historic row
+  // the backfill couldn't resolve.
+  const lcRows = rows.filter(
+    (r) => r.notification_type === 'level_change' && r.related_company_id,
+  );
+  const lcEntityIds = Array.from(
+    new Set(
+      lcRows
+        .filter((r) => r.entity_type === 'level_change_request' && r.entity_id)
+        .map((r) => r.entity_id as string),
+    ),
+  );
   const lcCompanyIds = Array.from(
     new Set(
-      rows
-        .filter(
-          (r) =>
-            r.notification_type === 'level_change' && r.related_company_id,
-        )
+      lcRows
+        .filter((r) => !r.entity_id)
         .map((r) => r.related_company_id as string),
     ),
   );
@@ -103,34 +111,49 @@ export default async function NotificationsPage({
   );
 
   let lcRequests: LevelChangeRequestRow[] = [];
-  if (lcCompanyIds.length > 0) {
-    const { data } = await supabase
+  if (lcEntityIds.length > 0 || lcCompanyIds.length > 0) {
+    let q = supabase
       .from('level_change_requests')
       .select(
         'id, company_id, from_level, to_level, status, evidence_note, created_at, company:companies(canonical_name, company_type), requester:profiles!level_change_requests_requested_by_fkey(full_name)',
       )
-      .in('company_id', lcCompanyIds)
-      .order('created_at', { ascending: false })
-      .returns<LevelChangeRequestRow[]>();
+      .order('created_at', { ascending: false });
+    // Either we know the request id directly, or we need the company-id
+    // population for the subject-parsing fallback. The OR keeps it to
+    // a single round trip.
+    const orParts: string[] = [];
+    if (lcEntityIds.length > 0)
+      orParts.push(`id.in.(${lcEntityIds.join(',')})`);
+    if (lcCompanyIds.length > 0)
+      orParts.push(`company_id.in.(${lcCompanyIds.join(',')})`);
+    q = q.or(orParts.join(','));
+    const { data } = await q.returns<LevelChangeRequestRow[]>();
     lcRequests = data ?? [];
   }
 
-  // Build the per-notification context map. Match by
-  // (company_id, status, from, to); freshest wins (the order above is
-  // created_at DESC, so first match per notification is the freshest).
+  const requestsById = new Map(lcRequests.map((r) => [r.id, r]));
+
+  // Build the per-notification context map. Prefer entity_id match;
+  // fall back to (company_id, status, from, to) subject parse.
   const lcByNotificationId = new Map<string, LevelChangeContext>();
   for (const n of rows) {
     if (n.notification_type !== 'level_change') continue;
     if (!n.related_company_id) continue;
-    const parsed = parseLevelChangeSubject(n.subject);
-    if (!parsed) continue;
-    const match = lcRequests.find(
-      (r) =>
-        r.company_id === n.related_company_id &&
-        r.status === parsed.status &&
-        r.from_level === parsed.from &&
-        r.to_level === parsed.to,
-    );
+    let match: LevelChangeRequestRow | undefined;
+    if (n.entity_type === 'level_change_request' && n.entity_id) {
+      match = requestsById.get(n.entity_id);
+    }
+    if (!match) {
+      const parsed = parseLevelChangeSubject(n.subject);
+      if (!parsed) continue;
+      match = lcRequests.find(
+        (r) =>
+          r.company_id === n.related_company_id &&
+          r.status === parsed.status &&
+          r.from_level === parsed.from &&
+          r.to_level === parsed.to,
+      );
+    }
     if (!match) continue;
     const company = pickOne(match.company);
     const requester = pickOne(match.requester);

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Bell } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import {
+  dismissAllNotifications,
+  dismissNotification,
   getNotificationSummary,
   markAllRead,
   markRead,
@@ -18,6 +20,7 @@ const TYPE_LABEL: Record<string, string> = {
   task_due: 'Task due',
   task_overdue: 'Task overdue',
   level_change: 'Level change',
+  company_group_request: 'Group request',
   upload_complete: 'Upload complete',
   upload_failed: 'Upload failed',
   unmatched_company: 'Unmatched company',
@@ -44,7 +47,6 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Initial load + polling.
   useEffect(() => {
     void refresh();
     const id = window.setInterval(() => {
@@ -53,12 +55,10 @@ export function NotificationBell() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  // Refresh when dropdown opens (cheap freshness boost).
   useEffect(() => {
     if (open) void refresh();
   }, [open, refresh]);
 
-  // Click-outside closes dropdown.
   useEffect(() => {
     if (!open) return;
     function onDoc(ev: MouseEvent) {
@@ -68,6 +68,8 @@ export function NotificationBell() {
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
+
+  const hasAny = recent.length > 0;
 
   return (
     <div ref={containerRef} className="relative">
@@ -88,27 +90,44 @@ export function NotificationBell() {
 
       {open && (
         <div className="absolute bottom-full left-0 z-50 mb-2 w-80 rounded-lg border border-agsi-lightGray bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-agsi-lightGray px-3 py-2">
+          <div className="flex items-center justify-between gap-2 border-b border-agsi-lightGray px-3 py-2">
             <span className="text-xs font-semibold text-agsi-navy">
               {unread > 0 ? `${unread} unread` : 'All caught up'}
             </span>
-            {unread > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  startTransition(async () => {
-                    await markAllRead();
-                    await refresh();
-                  });
-                }}
-                className="text-xs2 font-medium text-agsi-accent hover:underline"
-              >
-                Mark all read
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {unread > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    startTransition(async () => {
+                      await markAllRead();
+                      await refresh();
+                    });
+                  }}
+                  className="text-xs2 font-medium text-agsi-accent hover:underline"
+                >
+                  Mark all read
+                </button>
+              )}
+              {hasAny && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    startTransition(async () => {
+                      await dismissAllNotifications();
+                      await refresh();
+                    });
+                  }}
+                  className="text-xs2 font-medium text-agsi-darkGray hover:text-rag-red hover:underline"
+                  title="Hide every notification from this list"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
-          {recent.length === 0 ? (
+          {!hasAny ? (
             <p className="px-3 py-4 text-xs text-agsi-darkGray">
               No notifications yet.
             </p>
@@ -124,6 +143,12 @@ export function NotificationBell() {
                     onMarkRead={() => {
                       startTransition(async () => {
                         await markRead(n.id);
+                        await refresh();
+                      });
+                    }}
+                    onDismiss={() => {
+                      startTransition(async () => {
+                        await dismissNotification(n.id);
                         await refresh();
                       });
                     }}
@@ -152,16 +177,18 @@ export function NotificationBell() {
 function NotificationItem({
   n,
   onMarkRead,
+  onDismiss,
   onClickLink,
 }: {
   n: NotificationRow;
   onMarkRead: () => void;
+  onDismiss: () => void;
   onClickLink: () => void;
 }) {
   const typeLabel = TYPE_LABEL[n.notification_type] ?? n.notification_type;
 
-  const inner = (
-    <div className="block px-3 py-2">
+  const body = (
+    <div className="block px-3 py-2 pr-7">
       <div className="flex items-center justify-between gap-2">
         <span className="truncate text-xxs font-semibold uppercase tracking-wide text-agsi-darkGray">
           {typeLabel}
@@ -179,27 +206,51 @@ function NotificationItem({
     </div>
   );
 
+  // Dismiss × is absolutely positioned so it sits inside the row but
+  // outside the Link/button — clicking it never navigates.
+  const dismissBtn = (
+    <button
+      type="button"
+      onClick={(ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        onDismiss();
+      }}
+      aria-label="Dismiss notification"
+      title="Dismiss"
+      className="absolute right-1.5 top-1.5 rounded p-1 text-agsi-midGray hover:bg-agsi-offWhite hover:text-rag-red"
+    >
+      <X className="h-3 w-3" aria-hidden />
+    </button>
+  );
+
   if (n.link_url) {
     return (
-      <Link
-        href={n.link_url as never}
-        onClick={() => {
-          onMarkRead();
-          onClickLink();
-        }}
-      >
-        {inner}
-      </Link>
+      <div className="relative">
+        <Link
+          href={n.link_url as never}
+          onClick={() => {
+            onMarkRead();
+            onClickLink();
+          }}
+        >
+          {body}
+        </Link>
+        {dismissBtn}
+      </div>
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onMarkRead}
-      className="block w-full text-left"
-    >
-      {inner}
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onMarkRead}
+        className="block w-full text-left"
+      >
+        {body}
+      </button>
+      {dismissBtn}
+    </div>
   );
 }
 
