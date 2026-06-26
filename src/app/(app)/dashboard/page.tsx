@@ -18,6 +18,7 @@ import {
 } from '@/lib/fiscal';
 import { RebuildButton } from './_components/RebuildButton';
 import { CoverageRadarPanel } from './_components/CoverageRadarPanel';
+import { MemberSelector, type BdMember } from './_components/MemberSelector';
 import { getCoverageByType } from '@/server/actions/coverage';
 
 export const dynamic = 'force-dynamic';
@@ -94,7 +95,11 @@ const TIER_LABEL: Record<string, string> = {
   stretch: 'Stretch',
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { member?: string };
+}) {
   const user = await getCurrentUser();
 
   const supabase = createServerClient(
@@ -110,7 +115,57 @@ export default async function DashboardPage() {
   const startMonth = await fetchFiscalStartMonth(supabase);
   const { fy, fq, quarters } = getFiscalContext(startMonth, new Date());
 
-  const showSelf = user.role !== 'leadership';
+  // Dashboard scope (?member=). leadership locked to team rollup;
+  // bd_manager locked to self; admin/bd_head can pick "team", "self",
+  // or any BD member's uuid.
+  const canPickMember = user.role === 'admin' || user.role === 'bd_head';
+  let members: BdMember[] = [];
+  if (canPickMember) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('is_active', true)
+      .in('role', ['admin', 'bd_head', 'bd_manager'])
+      .order('full_name')
+      .returns<BdMember[]>();
+    members = data ?? [];
+  }
+  const memberById = new Map(members.map((m) => [m.id, m]));
+
+  let selection: 'team' | string; // 'team' | uuid
+  let viewedUserId: string | null; // null => team rollup
+  if (user.role === 'leadership') {
+    selection = 'team';
+    viewedUserId = null;
+  } else if (user.role === 'bd_manager') {
+    selection = user.id;
+    viewedUserId = user.id;
+  } else {
+    // admin / bd_head
+    const raw = (searchParams.member ?? '').trim();
+    if (!raw || raw === 'team') {
+      selection = 'team';
+      viewedUserId = null;
+    } else if (raw === 'self') {
+      selection = user.id;
+      viewedUserId = user.id;
+    } else if (memberById.has(raw)) {
+      selection = raw;
+      viewedUserId = raw;
+    } else {
+      // Unknown / deactivated — fall back to team.
+      selection = 'team';
+      viewedUserId = null;
+    }
+  }
+  const viewedProfile = viewedUserId ? memberById.get(viewedUserId) : null;
+  const showSelf = viewedUserId !== null;
+  const viewLabel =
+    viewedUserId === null
+      ? 'Team rollup'
+      : viewedUserId === user.id
+        ? 'Your'
+        : `${viewedProfile?.full_name ?? 'Member'}’s`;
 
   // Initial radar data for the default 'all' band. Re-fetches client-
   // side when the user picks a different value band.
@@ -126,14 +181,15 @@ export default async function DashboardPage() {
     .order('metric_code', { ascending: true })
     .returns<PlaybookTargetRow[]>();
 
-  const { data: memberTargets } = showSelf
-    ? await supabase
-        .from('member_targets')
-        .select('metric_code, q1_target, q2_target, q3_target, q4_target')
-        .eq('user_id', user.id)
-        .eq('fiscal_year', fy)
-        .returns<MemberTargetRow[]>()
-    : { data: [] as MemberTargetRow[] };
+  const { data: memberTargets } =
+    viewedUserId !== null
+      ? await supabase
+          .from('member_targets')
+          .select('metric_code, q1_target, q2_target, q3_target, q4_target')
+          .eq('user_id', viewedUserId)
+          .eq('fiscal_year', fy)
+          .returns<MemberTargetRow[]>()
+      : { data: [] as MemberTargetRow[] };
 
   const memberTargetByMetric = new Map((memberTargets ?? []).map((m) => [m.metric_code, m]));
 
@@ -146,11 +202,11 @@ export default async function DashboardPage() {
   const snapshotDate = snap?.snapshot_date ?? null;
 
   let actualsRes;
-  if (showSelf) {
+  if (viewedUserId !== null) {
     actualsRes = await supabase
       .from('kpi_actuals_daily')
       .select('metric_code, fiscal_quarter, actual_value')
-      .eq('user_id', user.id)
+      .eq('user_id', viewedUserId)
       .eq('fiscal_year', fy)
       .returns<ActualRow[]>();
   } else {
@@ -163,14 +219,19 @@ export default async function DashboardPage() {
   }
   const actuals = actualsRes.data ?? [];
 
+  // BEI is per-user. Team rollup has no BEI semantics, so we only
+  // fetch when a specific member is being viewed AND they're in a
+  // role that the bei_for_caller view exposes.
   let bei: BEIRow | null = null;
-  if (user.role === 'bd_manager' || user.role === 'bd_head') {
+  const beiEligibleRoles: Array<'bd_manager' | 'bd_head'> = ['bd_manager', 'bd_head'];
+  const viewedRole = viewedProfile?.role;
+  if (viewedUserId !== null && viewedRole && beiEligibleRoles.includes(viewedRole as 'bd_manager' | 'bd_head')) {
     const beiRes = await supabase
       .from('bei_for_caller')
       .select(
         'user_id, driver_a_pct, driver_b_pct, driver_c_pct, driver_d_pct, bei, bei_tier, last_computed_at',
       )
-      .eq('user_id', user.id)
+      .eq('user_id', viewedUserId)
       .eq('fiscal_year', fy)
       .eq('fiscal_quarter', fq)
       .maybeSingle<BEIRow>();
@@ -235,7 +296,16 @@ export default async function DashboardPage() {
             <DataFreshnessBadge asOf={snapshotDate} compact />
           </div>
         </div>
-        {user.role === 'admin' && <RebuildButton />}
+        <div className="flex flex-wrap items-center gap-3">
+          {canPickMember && (
+            <MemberSelector
+              members={members}
+              currentSelection={selection}
+              currentUserId={user.id}
+            />
+          )}
+          {user.role === 'admin' && <RebuildButton />}
+        </div>
       </div>
 
       {!snapshotDate && (
@@ -257,7 +327,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              Your BEI — FY{fy} Q{fq}
+              {viewLabel === 'Your' ? 'Your' : viewLabel} BEI — FY{fy} Q{fq}
             </CardTitle>
             <CardDescription>
               Bonus Eligibility Index. Weighted average of Driver A (45%), B (20%), C (20%),
@@ -293,10 +363,12 @@ export default async function DashboardPage() {
             <CardHeader>
               <CardTitle>{DRIVER_LABEL[d]}</CardTitle>
               <CardDescription>
-                {showSelf ? 'Your actuals vs target' : 'Team rollup vs combined target'} —
-                FY{fy}, Q1–Q4 explicit. Counts events logged in the period (level moves,
-                engagements, documents) — not the current state of the pipeline.{' '}
-                {DRIVER_CREDIT_NOTE[d]}
+                {viewedUserId === null
+                  ? 'Team rollup vs combined target'
+                  : `${viewLabel} actuals vs target`}{' '}
+                — FY{fy}, Q1–Q4 explicit. Counts events logged in the period
+                (level moves, engagements, documents) — not the current state of
+                the pipeline. {DRIVER_CREDIT_NOTE[d]}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
