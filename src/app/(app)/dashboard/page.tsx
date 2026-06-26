@@ -358,6 +358,18 @@ export default async function DashboardPage({
       )}
 
       <div className="space-y-4">
+        {canPickMember && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-agsi-navy">
+              Drivers — FY{fy}, Q1–Q4
+            </h2>
+            <MemberSelector
+              members={members}
+              currentSelection={selection}
+              currentUserId={user.id}
+            />
+          </div>
+        )}
         {(['A', 'B', 'C', 'D'] as Driver[]).map((d) => (
           <Card key={d}>
             <CardHeader>
