@@ -59,10 +59,14 @@ BEGIN
 END
 $cron$;
 
--- Run once inline so today's notifications fire immediately instead
--- of waiting for the next scheduled tick. Safe — each eval_* function
--- is idempotent at the (subject, period) grain via its own
--- de-duplication checks (see 0038).
-SELECT public.eval_stagnation();
-SELECT public.eval_composition_warning();
-SELECT public.eval_composition_drift();
+-- NOTE: the original 0057 also ran each eval_* function inline here
+-- so today's notifications would fire immediately. Those three SELECTs
+-- have been removed because eval_composition_drift() — as defined in
+-- 0038 — had a latent ambiguous-column bug (`RETURNS TABLE(fired int)`
+-- collides with composition_drift_log.fired in a CTE WHERE clause).
+-- Calling it inline raises 42702 and kills the migration on a fresh
+-- replay (the drift-detector shadow rebuild). 0058 fixes the function
+-- via CREATE OR REPLACE, re-runs 0057's cron schedules idempotently,
+-- AND runs the three inline calls — so the only thing this deferral
+-- changes is the timing on a virgin replay. In prod (where 0058 ran
+-- after this file), the effective state is identical.
