@@ -17,6 +17,41 @@ function supabase() {
 
 const VALID_LEVELS: Level[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
 
+const COMPANY_INCOMPLETE_MSG =
+  'Add the stakeholder’s emirate and at least one contact before progressing.';
+
+/**
+ * A claimed company can be progressed only when it carries the
+ * minimum BD data: an emirate (location_id) AND at least one live
+ * contact. Returns null if complete, or an error string otherwise.
+ *
+ * Used by requestLevelChange + approveLevelRequest as a pre-check
+ * so we give a clean UI message rather than letting an INSERT or RPC
+ * round-trip succeed against an incomplete stakeholder.
+ */
+async function assertCompanyProgressReady(
+  sb: ReturnType<typeof supabase>,
+  companyId: string,
+): Promise<string | null> {
+  const { data: company } = await sb
+    .from('companies')
+    .select('location_id')
+    .eq('id', companyId)
+    .maybeSingle<{ location_id: string | null }>();
+  if (!company) return 'Company not found.';
+  if (!company.location_id) return COMPANY_INCOMPLETE_MSG;
+
+  const { data: contact } = await sb
+    .from('contacts')
+    .select('id')
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!contact) return COMPANY_INCOMPLETE_MSG;
+  return null;
+}
+
 /**
  * Direct level change (admin only). Bypasses the approval queue —
  * used when admin wants to correct a level themselves.
@@ -95,6 +130,13 @@ export async function requestLevelChange(formData: FormData) {
     }
   }
 
+  // Completeness gate (defence in depth — UI also hides the action
+  // when this would fail). Both the request and the approval paths
+  // check the same shape so a request that became incomplete after
+  // it was raised gets rejected at approval time too.
+  const incomplete = await assertCompanyProgressReady(sb, companyId);
+  if (incomplete) return { error: incomplete };
+
   const { error } = await sb.from('level_change_requests').insert({
     company_id: companyId,
     from_level: fromLevel,
@@ -114,7 +156,23 @@ export async function requestLevelChange(formData: FormData) {
 export async function approveLevelRequest(requestId: string, reviewNote: string | null) {
   const user = await getCurrentUser();
   if (user.role !== 'admin') return { error: 'Only admins can approve.' };
-  const { error } = await supabase().rpc('approve_level_change_request', {
+
+  const sb = supabase();
+
+  // Re-check completeness at approval time. A stakeholder might have
+  // become incomplete (location cleared, contact archived) between
+  // request and approval. Surfaces the same UI-friendly message as
+  // requestLevelChange instead of an opaque RPC error.
+  const { data: req } = await sb
+    .from('level_change_requests')
+    .select('company_id')
+    .eq('id', requestId)
+    .maybeSingle<{ company_id: string }>();
+  if (!req) return { error: 'Request not found.' };
+  const incomplete = await assertCompanyProgressReady(sb, req.company_id);
+  if (incomplete) return { error: incomplete };
+
+  const { error } = await sb.rpc('approve_level_change_request', {
     p_request_id: requestId,
     p_review_note: reviewNote,
   });

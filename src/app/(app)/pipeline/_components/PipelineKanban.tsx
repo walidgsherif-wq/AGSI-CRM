@@ -25,6 +25,10 @@ export type CardData = {
   pending_count: number;
   engagement_bucket: EngagementBucket;
   engagement_days_since: number | null;
+  /** Owned but missing emirate (location_id) or any live contact. */
+  needs_details: boolean;
+  /** Has emirate AND at least one live contact — gate for progression. */
+  is_progress_ready: boolean;
 };
 
 const GLOW_CLASSES: Record<EngagementBucket, string> = {
@@ -217,7 +221,7 @@ export function PipelineKanban({
                   </p>
                 ) : (
                   colCards.map((c) => {
-                    const draggable = canChange(c);
+                    const draggable = canChange(c) && c.is_progress_ready;
                     return (
                       <div
                         key={c.id}
@@ -277,20 +281,35 @@ export function PipelineKanban({
                             {c.pending_count} pending review
                           </Badge>
                         )}
-                        {draggable && (
+                        {c.needs_details && (
+                          <Badge variant="amber" className="mt-2">
+                            Needs details
+                          </Badge>
+                        )}
+                        {canChange(c) && (
                           <div className="mt-2 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const targets = adjacentTargets(c.current_level);
-                                // Pop dialog without forcedToLevel so user picks dropdown
-                                setForced({ card: c, toLevel: targets[0] });
-                              }}
-                              className="text-xs text-agsi-accent hover:underline"
-                            >
-                              {userRole === 'admin' ? 'Change level →' : 'Request level change →'}
-                            </button>
-                            <span className="text-xxs text-agsi-darkGray">drag ↔</span>
+                            {c.is_progress_ready ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const targets = adjacentTargets(c.current_level);
+                                  setForced({ card: c, toLevel: targets[0] });
+                                }}
+                                className="text-xs text-agsi-accent hover:underline"
+                              >
+                                {userRole === 'admin' ? 'Change level →' : 'Request level change →'}
+                              </button>
+                            ) : (
+                              <span
+                                title="Add the stakeholder's emirate and at least one contact before progressing."
+                                className="text-xs text-agsi-midGray"
+                              >
+                                {userRole === 'admin' ? 'Change level' : 'Request level change'}
+                              </span>
+                            )}
+                            <span className="text-xxs text-agsi-darkGray">
+                              {c.is_progress_ready ? 'drag ↔' : 'locked'}
+                            </span>
                           </div>
                         )}
                       </div>
