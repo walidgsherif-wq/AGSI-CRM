@@ -1,0 +1,225 @@
+# CI — typecheck/lint/build on PR, auto-apply migrations on merge,
+# verify committed == applied, and a daily drift detector.
+#
+# Why this file exists:
+#   Migrations used to be hand-pasted into the Supabase SQL editor
+#   and confirmed verbally. That guarantees an eventual
+#   "committed-but-not-applied" gap. This workflow closes it by
+#   running `supabase db push` on every push to main, then asserting
+#   that the supabase_migrations.schema_migrations table matches
+#   the files in supabase/migrations/. The daily cron catches the
+#   inverse failure mode — schema edits made directly in Studio
+#   that have no migration file.
+#
+# Secrets required (Settings → Secrets and variables → Actions):
+#   SUPABASE_PROJECT_REF    The project ref from the dashboard URL.
+#   SUPABASE_ACCESS_TOKEN   Personal access token from
+#                           https://supabase.com/dashboard/account/tokens
+#   SUPABASE_DB_PASSWORD    The database password (Project Settings →
+#                           Database → Database Password). NOT the
+#                           anon / service-role API key.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Daily drift detector — 09:00 UTC = 13:00 Dubai.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+# Don't cancel an in-progress migration apply if a new commit lands —
+# half-applied schema is worse than waiting.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # PR check — typecheck, lint, build. No DB access. Blocks merge if
+  # any of these fail.
+  # ───────────────────────────────────────────────────────────────────
+  pr-check:
+    if: github.event_name == 'pull_request'
+    name: Typecheck · Lint · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+        env:
+          # The Next config validates env via a zod schema at build
+          # time; CI doesn't have the runtime secrets and doesn't
+          # need them to verify the build compiles.
+          SKIP_ENV_VALIDATION: '1'
+
+  # ───────────────────────────────────────────────────────────────────
+  # Apply pending migrations against the linked Supabase project. Runs
+  # on every push to main (i.e. every squash-merge). Replaces the
+  # manual SQL-editor paste.
+  # ───────────────────────────────────────────────────────────────────
+  apply-migrations:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Apply pending migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to prod project
+        run: |
+          supabase link \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
+      - name: Push migrations
+        # No-op if everything's already applied; otherwise applies
+        # only the ones missing from supabase_migrations.schema_migrations.
+        run: |
+          supabase db push \
+            --linked \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
+  # ───────────────────────────────────────────────────────────────────
+  # Tripwire: parse `supabase migration list --linked` and fail if any
+  # local migration isn't applied, or vice versa. Runs after the apply
+  # step so a successful apply gets verified end-to-end; if anything
+  # mismatches here it's a genuine bug in the apply path.
+  # ───────────────────────────────────────────────────────────────────
+  verify-migrations-in-sync:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Verify committed == applied
+    needs: apply-migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to prod project
+        run: |
+          supabase link \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
+      - name: Diff committed vs applied
+        # `supabase migration list --linked` prints a 3-col table:
+        # "Local | Remote | Time (UTC)". A blank Remote = committed
+        # but not applied; a blank Local = applied but not committed.
+        # Either is a drift signal we should fail on.
+        run: |
+          set -euo pipefail
+          supabase migration list --linked > /tmp/migration-list.txt
+          echo "── supabase migration list ──"
+          cat /tmp/migration-list.txt
+          echo "─────────────────────────────"
+
+          DRIFT=$(awk -F'|' '
+            NR<=2 { next }                               # skip header rows
+            {
+              gsub(/[[:space:]]/, "", $1)
+              gsub(/[[:space:]]/, "", $2)
+              if ($1 != "" && $2 == "") print "committed-but-not-applied: " $1
+              if ($1 == "" && $2 != "") print "applied-but-not-committed: " $2
+            }
+          ' /tmp/migration-list.txt)
+
+          if [ -n "$DRIFT" ]; then
+            echo "::error::Migration drift detected:"
+            echo "$DRIFT"
+            exit 1
+          fi
+          echo "OK — every committed migration is applied and vice versa."
+
+  # ───────────────────────────────────────────────────────────────────
+  # Daily drift detector — catches schema changes made directly in the
+  # SQL editor (which won't show up as a missing migration but WILL
+  # diverge the live schema from the migration history). Also runs on
+  # workflow_dispatch so you can fire it manually after suspected
+  # out-of-band edits.
+  # ───────────────────────────────────────────────────────────────────
+  drift-detector:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: Daily schema drift check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to prod project
+        run: |
+          supabase link \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
+      - name: Diff prod schema vs migrations (public schema)
+        # `supabase db diff --linked` emits the SQL needed to bring the
+        # linked DB in line with the migration history. Empty output =
+        # in sync; non-empty = someone touched the schema outside the
+        # migration files.
+        run: |
+          set -euo pipefail
+          DIFF=$(supabase db diff --linked --schema public)
+          if [ -n "$DIFF" ]; then
+            echo "::error::Schema drift detected — prod schema differs from migrations:"
+            echo "$DIFF"
+            exit 1
+          fi
+          echo "OK — prod schema matches the public migrations."
+
+      - name: Diff prod schema vs migrations (storage schema)
+        # Storage RLS lives in storage.objects policies. Worth a
+        # separate diff so a hand-edited policy doesn't silently
+        # diverge.
+        run: |
+          set -euo pipefail
+          DIFF=$(supabase db diff --linked --schema storage)
+          if [ -n "$DIFF" ]; then
+            echo "::error::Schema drift detected on storage schema:"
+            echo "$DIFF"
+            exit 1
+          fi
+          echo "OK — prod storage schema matches the migrations."
