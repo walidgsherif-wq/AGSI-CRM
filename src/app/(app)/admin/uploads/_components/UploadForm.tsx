@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 type RawRow = Record<string, string | null>;
 
@@ -213,7 +214,7 @@ export function UploadForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <GuardedForm onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-agsi-darkGray">XLSX file</label>
@@ -279,6 +280,6 @@ export function UploadForm() {
           </div>
         )}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

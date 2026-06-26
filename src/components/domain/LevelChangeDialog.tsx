@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { LEVELS, type Level, type Role } from '@/types/domain';
 import { changeCompanyLevel, requestLevelChange } from '@/server/actions/level';
 import { EvidenceUploader, type UploadedEvidence } from '@/components/domain/EvidenceUploader';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 const LEVEL_INDEX: Record<Level, number> = {
   L0: 0,
@@ -134,7 +135,7 @@ export function LevelChangeDialog({
           className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 p-4 focus:outline-none"
           aria-describedby={undefined}
         >
-          <form
+          <GuardedForm
             action={onSubmit}
             className="max-h-[90vh] space-y-4 overflow-y-auto rounded-xl border border-agsi-lightGray bg-white p-5 shadow-xl"
           >
@@ -211,7 +212,7 @@ export function LevelChangeDialog({
               </Dialog.Close>
               {error && <p className="text-xs text-rag-red">{error}</p>}
             </div>
-          </form>
+          </GuardedForm>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

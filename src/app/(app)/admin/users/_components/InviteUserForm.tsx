@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { inviteUser } from '@/server/actions/users';
 import { ROLES, ROLE_LABEL, type Role } from '@/types/domain';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 export function InviteUserForm() {
   const [pending, startTransition] = useTransition();
@@ -29,7 +30,7 @@ export function InviteUserForm() {
   }
 
   return (
-    <form action={onSubmit} className="grid gap-4 sm:grid-cols-4">
+    <GuardedForm action={onSubmit} className="grid gap-4 sm:grid-cols-4">
       <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-agsi-darkGray">Full name</label>
         <Input name="full_name" required className="mt-1" />
@@ -67,6 +68,6 @@ export function InviteUserForm() {
           </p>
         )}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

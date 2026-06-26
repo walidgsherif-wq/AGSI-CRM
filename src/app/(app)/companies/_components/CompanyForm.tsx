@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { GuardedForm } from '@/components/ui/guarded-form';
 import { COMPANY_TYPES, COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import type { Role } from '@/types/domain';
 import { createCompany, updateCompany } from '@/server/actions/companies';
@@ -106,7 +107,7 @@ export function CompanyForm({
     profiles.find((p) => p.id === (data.owner_id ?? ''))?.full_name ?? 'You';
 
   return (
-    <form action={onSubmit} className="space-y-6">
+    <GuardedForm action={onSubmit} className="space-y-6">
       {mode === 'edit' && data.id && <input type="hidden" name="id" value={data.id} />}
 
       <Section title="Identity">
@@ -270,7 +271,7 @@ export function CompanyForm({
           You don&apos;t have permission to edit this company.
         </p>
       )}
-    </form>
+    </GuardedForm>
   );
 }
 

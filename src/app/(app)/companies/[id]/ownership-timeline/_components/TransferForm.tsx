@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { transferOwnership } from '@/server/actions/level';
+import { GuardedForm } from '@/components/ui/guarded-form';
 
 type ProfileOption = { id: string; full_name: string; role: string };
 
@@ -48,7 +49,7 @@ export function TransferForm({
   const candidates = profiles.filter((p) => p.id !== currentOwnerId);
 
   return (
-    <form
+    <GuardedForm
       action={onSubmit}
       className="space-y-3 rounded-xl border border-agsi-lightGray bg-white p-4"
     >
@@ -88,6 +89,6 @@ export function TransferForm({
         {error && <p className="text-xs text-rag-red">{error}</p>}
         {info && <p className="text-xs text-agsi-green">{info}</p>}
       </div>
-    </form>
+    </GuardedForm>
   );
 }

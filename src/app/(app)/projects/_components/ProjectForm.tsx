@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { GuardedForm } from '@/components/ui/guarded-form';
 import {
   PROJECT_STAGES,
   PROJECT_STAGE_LABEL,
@@ -76,7 +77,7 @@ export function ProjectForm({
   const ro = !editable;
 
   return (
-    <form action={onSubmit} className="space-y-6">
+    <GuardedForm action={onSubmit} className="space-y-6">
       {mode === 'edit' && data.id && <input type="hidden" name="id" value={data.id} />}
 
       <Section title="Identity">
@@ -203,7 +204,7 @@ export function ProjectForm({
           You don&apos;t have permission to edit this project.
         </p>
       )}
-    </form>
+    </GuardedForm>
   );
 }
 
