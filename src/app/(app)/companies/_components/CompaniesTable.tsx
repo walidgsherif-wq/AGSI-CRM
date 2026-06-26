@@ -32,6 +32,8 @@ export type CompanyAttrs = {
   city: string | null;
   is_key_stakeholder: boolean;
   has_active_projects: boolean;
+  parent_company_id: string | null;
+  parent: { canonical_name: string } | { canonical_name: string }[] | null;
   owner: { full_name: string } | null;
 };
 
@@ -75,6 +77,9 @@ const columns: ColumnDef<CompaniesRow, unknown>[] = [
     enableSorting: false,
     cell: ({ row }) => {
       const { stats: s, attrs } = row.original;
+      const parent = Array.isArray(attrs.parent)
+        ? (attrs.parent[0] ?? null)
+        : attrs.parent;
       return (
         <div>
           <Link
@@ -83,6 +88,14 @@ const columns: ColumnDef<CompaniesRow, unknown>[] = [
           >
             {s.canonical_name}
           </Link>
+          {parent && attrs.parent_company_id && (
+            <Link
+              href={`/companies/${attrs.parent_company_id}` as Route}
+              className="ml-2 text-xs text-agsi-darkGray hover:underline"
+            >
+              part of {parent.canonical_name}
+            </Link>
+          )}
           <div className="mt-1 flex flex-wrap gap-1">
             {attrs.is_key_stakeholder && <Badge variant="gold">Key</Badge>}
             {attrs.has_active_projects && (
