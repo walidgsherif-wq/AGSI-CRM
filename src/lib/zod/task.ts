@@ -56,6 +56,7 @@ export const taskCreateSchema = z
   .object({
     company_id: optionalUuid,
     project_id: optionalUuid,
+    engagement_id: optionalUuid,
     title: z.string().trim().min(1, 'Title is required').max(300),
     description: optionalDescription,
     owner_id: z.string().uuid('Owner is required'),
@@ -93,6 +94,7 @@ export const taskUpdateSchema = z.object({
   id: z.string().uuid(),
   company_id: optionalUuid,
   project_id: optionalUuid,
+  engagement_id: optionalUuid,
   title: z.string().trim().min(1).max(300).optional(),
   description: optionalDescription,
   owner_id: z.string().uuid().optional(),

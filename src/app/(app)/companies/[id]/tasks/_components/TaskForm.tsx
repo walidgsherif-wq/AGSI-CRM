@@ -34,6 +34,15 @@ export type TaskFormInitial = {
   reminder_custom_at: string | null;
 };
 
+export type EngagementContext = {
+  id: string;
+  summary: string;
+  engagement_date: string;
+  author_name: string | null;
+  /** Where to send the user when they click "From engagement". */
+  href: string;
+};
+
 export function TaskForm({
   mode,
   companyId,
@@ -42,6 +51,9 @@ export function TaskForm({
   initial,
   onClose,
   canAssignToOthers = false,
+  engagementContext,
+  titleDefault,
+  defaultOpen,
 }: {
   mode: 'create' | 'edit';
   /** Null for standalone / ad-hoc tasks (FX-014c). When null, the
@@ -54,15 +66,28 @@ export function TaskForm({
   initial?: TaskFormInitial;
   onClose?: () => void;
   canAssignToOthers?: boolean;
+  /** When set (follow-up entry path): renders a collapsible read-only
+   *  "From engagement" block above the form, emits a hidden
+   *  engagement_id input so the saved task carries the link, and
+   *  opens the form on mount. */
+  engagementContext?: EngagementContext;
+  /** Used when initial.title is empty — typically
+   *  "Follow up: {companyName}" for the follow-up path. */
+  titleDefault?: string;
+  /** Open the form on mount (used when arriving via follow-up URL). */
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(mode === 'edit');
+  const [open, setOpen] = useState(
+    mode === 'edit' || defaultOpen === true || !!engagementContext,
+  );
   const [reminders, setReminders] = useState<Set<ReminderKind>>(
     new Set(initial?.reminder_kinds ?? []),
   );
   const [customAt, setCustomAt] = useState(initial?.reminder_custom_at ?? '');
+  const [engagementExpanded, setEngagementExpanded] = useState(false);
 
   function close() {
     if (mode === 'edit' && onClose) onClose();
@@ -110,13 +135,48 @@ export function TaskForm({
     >
       {mode === 'edit' && initial && <input type="hidden" name="id" value={initial.id} />}
       {companyId && <input type="hidden" name="company_id" value={companyId} />}
+      {engagementContext && (
+        <input
+          type="hidden"
+          name="engagement_id"
+          value={engagementContext.id}
+        />
+      )}
+
+      {engagementContext && (
+        <div className="rounded-lg border border-agsi-accent/40 bg-agsi-accent/5 px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold text-agsi-navy">
+              From engagement · {engagementContext.engagement_date}
+              {engagementContext.author_name && (
+                <span className="font-normal text-agsi-darkGray">
+                  {' '}
+                  · by {engagementContext.author_name}
+                </span>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setEngagementExpanded((v) => !v)}
+              className="text-xs font-medium text-agsi-accent hover:underline"
+            >
+              {engagementExpanded ? 'Hide note' : 'Show note'}
+            </button>
+          </div>
+          {engagementExpanded && (
+            <p className="mt-2 whitespace-pre-wrap text-agsi-navy">
+              {engagementContext.summary}
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="block text-xs font-medium text-agsi-darkGray">Title</label>
         <Input
           name="title"
           required
-          defaultValue={initial?.title ?? ''}
+          defaultValue={initial?.title ?? titleDefault ?? ''}
           className="mt-1"
         />
       </div>

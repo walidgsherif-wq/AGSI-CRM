@@ -86,7 +86,10 @@ export function EngagementsList({
                   </button>
                   {canCreate && (
                     <div className="flex items-center pr-4">
-                      <FollowUpTaskButton engagementId={e.id} />
+                      <FollowUpTaskButton
+                        companyId={companyId}
+                        engagementId={e.id}
+                      />
                     </div>
                   )}
                 </li>

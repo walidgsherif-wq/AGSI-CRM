@@ -31,6 +31,7 @@ function rawFromForm(formData: FormData) {
   return {
     company_id: get('company_id'),
     project_id: get('project_id'),
+    engagement_id: get('engagement_id'),
     title: get('title'),
     description: get('description'),
     owner_id: get('owner_id'),

@@ -1,67 +1,47 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import { createFollowUpTask } from '@/server/actions/tasks';
+import Link from 'next/link';
 
-// Small action button rendered on each engagement row. Spins up a
-// follow-up task pre-linked to the same company, assigned to the
-// caller, title seeded from the engagement summary. Click handler
-// stops propagation so the parent row's drawer-open doesn't fire.
-
+/**
+ * "+ Follow-up task" button on each engagement row. Opens the
+ * stakeholder's Tasks tab with the standard task-create form pre-
+ * filled with this engagement's context (engagement_id +
+ * "Follow up: {company}" default title + a collapsible "From
+ * engagement" note). Reuses the existing TaskForm — including its
+ * reminder/assignment/due-date controls — so this button never
+ * forks into a parallel task-create path.
+ */
 export function FollowUpTaskButton({
+  companyId,
   engagementId,
   disabled,
 }: {
+  companyId: string;
   engagementId: string;
   disabled?: boolean;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [state, setState] = useState<'idle' | 'done' | 'error'>('idle');
-  const [error, setError] = useState<string | null>(null);
-
-  function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
-    e.stopPropagation();
-    if (disabled || pending || state === 'done') return;
-    setError(null);
-    startTransition(async () => {
-      const r = await createFollowUpTask(engagementId);
-      if (r.error) {
-        setError(r.error);
-        setState('error');
-      } else {
-        setState('done');
-        router.refresh();
-      }
-    });
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="rounded border border-agsi-midGray bg-white px-2 py-1 text-xs font-medium text-agsi-navy opacity-50"
+      >
+        + Follow-up task
+      </button>
+    );
   }
-
-  const label =
-    pending ? 'Creating…'
-    : state === 'done' ? 'Task created ✓'
-    : state === 'error' ? 'Try again'
-    : '+ Follow-up task';
-
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled || pending || state === 'done'}
-      title={
-        error ??
-        'Create a follow-up task on this company, assigned to you. Set the due date afterward in the Tasks tab.'
+    <Link
+      href={
+        `/companies/${companyId}/tasks?from_engagement=${engagementId}` as never
       }
-      aria-label="Create follow-up task from this engagement"
-      className={
-        state === 'done'
-          ? 'rounded border border-rag-green/30 bg-rag-green/10 px-2 py-1 text-xs font-medium text-rag-green'
-          : state === 'error'
-          ? 'rounded border border-rag-red/30 bg-white px-2 py-1 text-xs font-medium text-rag-red hover:bg-rag-red/5'
-          : 'rounded border border-agsi-midGray bg-white px-2 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40 disabled:opacity-50'
-      }
+      onClick={(e) => e.stopPropagation()}
+      aria-label="Create a follow-up task from this engagement"
+      title="Opens the task form pre-filled with this engagement's context — set the due date, reminders, and assignee there."
+      className="rounded border border-agsi-midGray bg-white px-2 py-1 text-xs font-medium text-agsi-navy hover:bg-agsi-lightGray/40"
     >
-      {label}
-    </button>
+      + Follow-up task
+    </Link>
   );
 }
