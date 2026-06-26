@@ -13,6 +13,7 @@ import {
   type ProfileOption,
 } from '../_components/CompanyForm';
 import { CompanyClaimButton } from './_components/CompanyClaimButton';
+import { CompanyReleaseButton } from './_components/CompanyReleaseButton';
 import { ContactsSection, type ContactRow } from './_components/ContactsSection';
 import { PROJECT_STAGE_LABEL } from '@/lib/zod/project';
 
@@ -138,18 +139,37 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
     (user.role === 'bd_manager' && company.owner_id === user.id);
 
   const canClaim = company.owner_id === null && user.role !== 'leadership';
+  // Release: visible only when the company is currently claimed AND the
+  // viewer is the owner OR a bd_head / admin. RPC re-checks the same
+  // predicate; UI gate is just to avoid showing a control that would
+  // error on click.
+  const canRelease =
+    company.owner_id !== null &&
+    (user.role === 'admin' ||
+      user.role === 'bd_head' ||
+      company.owner_id === user.id);
 
   return (
     <div className="space-y-6">
       {canClaim && <CompanyClaimButton companyId={company.id} />}
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>
-            {editable
-              ? 'Edit and save. Level changes go through a separate flow (M7).'
-              : 'Read-only — you do not own this company and are not a BD Head / Admin.'}
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Details</CardTitle>
+              <CardDescription>
+                {editable
+                  ? 'Edit and save. Level changes go through a separate flow (M7).'
+                  : 'Read-only — you do not own this company and are not a BD Head / Admin.'}
+              </CardDescription>
+            </div>
+            {canRelease && (
+              <CompanyReleaseButton
+                companyId={company.id}
+                companyName={company.canonical_name}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <CompanyForm

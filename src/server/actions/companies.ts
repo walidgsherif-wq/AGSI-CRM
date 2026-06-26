@@ -141,3 +141,34 @@ export async function claimCompany(companyId: string) {
   revalidatePath(`/companies/${companyId}`);
   return { ok: true as const };
 }
+
+/**
+ * Inverse of claimCompany: release a stakeholder back to unclaimed.
+ *
+ * The unclaim_company RPC (0076) is SECURITY DEFINER and enforces:
+ *   - non-leadership / non-anon
+ *   - non-empty reason
+ *   - caller is the current owner OR admin/bd_head
+ *   - row is currently claimed (race-guarded by the UPDATE WHERE)
+ * It also writes the audit_events row and the bd_head/admin
+ * notifications, so this action is a thin wrapper.
+ */
+export async function unclaimCompany(companyId: string, reason: string) {
+  const user = await getCurrentUser();
+  if (user.role === 'leadership') {
+    return { error: 'Leadership cannot release companies.' };
+  }
+  if (!reason || !reason.trim()) {
+    return { error: 'A reason is required to release a stakeholder.' };
+  }
+
+  const { error } = await supabaseFromRequest().rpc('unclaim_company', {
+    p_company_id: companyId,
+    p_reason: reason,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath('/companies');
+  revalidatePath(`/companies/${companyId}`);
+  return { ok: true as const };
+}
