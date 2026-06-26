@@ -67,6 +67,17 @@ const DRIVER_LABEL: Record<Driver, string> = {
   D: 'Driver D — Visibility outputs',
 };
 
+// rebuild_kpi_actuals attributes A/B from level_history.owner_at_time
+// (the stakeholder's owner at the moment of the move), and C/D from
+// engagements.created_by / documents.uploaded_by (the actor). Surface
+// the rule per-card so the description matches the data.
+const DRIVER_CREDIT_NOTE: Record<Driver, string> = {
+  A: 'Credit goes to the stakeholder’s owner at the time of the move.',
+  B: 'Credit goes to the stakeholder’s owner at the time of the move.',
+  C: 'Credit goes to the person who logged the engagement.',
+  D: 'Credit goes to the person who uploaded the document.',
+};
+
 const TIER_VARIANT: Record<string, 'red' | 'amber' | 'blue' | 'green' | 'gold'> = {
   below_threshold: 'red',
   approaching: 'amber',
@@ -284,8 +295,8 @@ export default async function DashboardPage() {
               <CardDescription>
                 {showSelf ? 'Your actuals vs target' : 'Team rollup vs combined target'} —
                 FY{fy}, Q1–Q4 explicit. Counts events logged in the period (level moves,
-                engagements, documents) — not the current state of the pipeline. Credit
-                goes by who logged the action.
+                engagements, documents) — not the current state of the pipeline.{' '}
+                {DRIVER_CREDIT_NOTE[d]}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
