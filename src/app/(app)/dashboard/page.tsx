@@ -17,6 +17,8 @@ import {
   type QuarterInfo,
 } from '@/lib/fiscal';
 import { RebuildButton } from './_components/RebuildButton';
+import { CoverageRadarPanel } from './_components/CoverageRadarPanel';
+import { getCoverageByType } from '@/server/actions/coverage';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +100,10 @@ export default async function DashboardPage() {
   const { fy, fq, quarters } = getFiscalContext(startMonth, new Date());
 
   const showSelf = user.role !== 'leadership';
+
+  // Initial radar data for the default 'all' band. Re-fetches client-
+  // side when the user picks a different value band.
+  const initialCoverage = await getCoverageByType('all');
 
   const { data: playbook } = await supabase
     .from('playbook_targets')
@@ -233,6 +239,8 @@ export default async function DashboardPage() {
       )}
 
       {user.role !== 'bd_manager' && <EcosystemPanel />}
+
+      <CoverageRadarPanel initial={initialCoverage} initialBand="all" />
 
       {bei && (
         <Card>
