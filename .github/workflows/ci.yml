@@ -44,6 +44,11 @@ on:
         required: false
         default: ''
         type: string
+      smoke_test_drift:
+        description: 'Type "yes" to run the verify-gate smoke test (injects a phantom version into the local list in-memory and asserts the diff fires — does NOT touch prod or write any file).'
+        required: false
+        default: 'no'
+        type: string
 
 # Don't cancel an in-progress migration apply if a new commit lands —
 # half-applied schema is worse than waiting.
@@ -195,13 +200,15 @@ jobs:
   # out-of-band edits.
   # ───────────────────────────────────────────────────────────────────
   drift-detector:
-    # On schedule (daily) or on a plain workflow_dispatch (confirm
-    # input left blank). A dispatch that requests the ledger repair
-    # skips drift-detection — that run has a different purpose.
+    # On schedule (daily) or on a plain workflow_dispatch (with no
+    # ledger-repair or smoke-test input). Dispatches that target the
+    # repair or smoke jobs have different purposes; running drift
+    # detection alongside is just noise.
     if: >-
       github.event_name == 'schedule' ||
       (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.confirm_ledger_repair != 'yes')
+       github.event.inputs.confirm_ledger_repair != 'yes' &&
+       github.event.inputs.smoke_test_drift != 'yes')
     name: Daily schema drift check
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -421,3 +428,94 @@ jobs:
             exit 1
           fi
           echo "OK — $(wc -l < /tmp/local-versions.txt) versions in sync."
+
+  # ───────────────────────────────────────────────────────────────────
+  # Smoke test for the verify-migrations-in-sync gate. Reuses the EXACT
+  # psql query + filename-extraction + `diff -u` logic, but injects a
+  # phantom "0099" version into the local list in-memory before running
+  # the diff. The diff MUST fire (exit non-zero); if it doesn't, the
+  # real gate is broken and the smoke job fails loudly.
+  #
+  # Safety:
+  #   - Gated on workflow_dispatch + smoke_test_drift == 'yes'. Never
+  #     fires on push / PR / schedule. Drift-detector and ledger-repair
+  #     jobs skip on this dispatch (their `if` clauses check the input).
+  #   - Reads supabase_migrations.schema_migrations but writes NOTHING.
+  #     No `migration repair`, no `db push`, no INSERTs.
+  #   - The phantom "0099" exists ONLY as a line in /tmp/...phantom.txt
+  #     inside the runner. Nothing is created under supabase/migrations/.
+  # ───────────────────────────────────────────────────────────────────
+  smoke-test-verify-gate:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.smoke_test_drift == 'yes'
+    name: Smoke test — prove the verify gate catches injected drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject phantom 0099 and run the real gate logic
+        run: |
+          set -euo pipefail
+
+          PHANTOM="0099"
+
+          # Mirror the real gate: read schema_migrations via psql.
+          psql "$SUPABASE_DB_URL" -t -A \
+            -c "select version from supabase_migrations.schema_migrations order by version;" \
+            | grep -E '^[0-9]+$' \
+            | sort -u > /tmp/remote-versions.txt
+
+          # Mirror the real gate: build local-versions from filenames.
+          ls supabase/migrations/*.sql \
+            | xargs -n1 basename \
+            | sed -E 's/\.sql$//' \
+            | sed -E 's/^([0-9]+)_.*/\1/' \
+            | grep -E '^[0-9]+$' \
+            | sort -u > /tmp/local-versions-real.txt
+
+          # Sanity: PHANTOM must not collide with reality, otherwise
+          # "injecting" it changes nothing and the test is vacuous.
+          if grep -qx "$PHANTOM" /tmp/local-versions-real.txt; then
+            echo "::error::Phantom $PHANTOM is already a real local migration. Bump PHANTOM and re-run."
+            exit 1
+          fi
+          if grep -qx "$PHANTOM" /tmp/remote-versions.txt; then
+            echo "::error::Phantom $PHANTOM is already in the ledger. Bump PHANTOM and re-run."
+            exit 1
+          fi
+
+          # Inject — append PHANTOM to the local list in a NEW file.
+          # /tmp/local-versions-real.txt is untouched; no file is
+          # created under supabase/migrations/.
+          (cat /tmp/local-versions-real.txt; echo "$PHANTOM") \
+            | sort -u > /tmp/local-versions-with-phantom.txt
+
+          echo "── Local + phantom (in-memory) ──"
+          cat /tmp/local-versions-with-phantom.txt
+          echo "── Remote (real ledger) ──"
+          cat /tmp/remote-versions.txt
+          echo ""
+          echo "Running the real gate's `diff -u` against the injected list..."
+
+          # The EXACT failure check from verify-migrations-in-sync,
+          # against the phantom-injected file. We want it to fire:
+          # diff -u returns non-zero → real gate would have errored.
+          if diff -u /tmp/local-versions-with-phantom.txt /tmp/remote-versions.txt > /tmp/diff-out.txt; then
+            echo "::error::SMOKE TEST FAILED — gate did NOT catch injected phantom $PHANTOM."
+            echo "The real verify-migrations-in-sync would have falsely reported 'OK' on a real $PHANTOM drift. Investigate immediately."
+            exit 1
+          fi
+
+          # Belt-and-braces: confirm the diff specifically flagged
+          # PHANTOM as committed-but-not-applied (a `-` line).
+          if ! grep -qx "-$PHANTOM" /tmp/diff-out.txt; then
+            echo "::error::SMOKE TEST FAILED — diff fired but did not flag $PHANTOM as committed-but-not-applied."
+            cat /tmp/diff-out.txt
+            exit 1
+          fi
+
+          echo ""
+          echo "SMOKE TEST PASSED — gate correctly caught injected phantom $PHANTOM as committed-but-not-applied."
+          echo "The real verify-migrations-in-sync would have fired '::error::Migration drift detected …' here."
