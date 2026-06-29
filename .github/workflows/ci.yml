@@ -497,7 +497,11 @@ jobs:
           echo "── Remote (real ledger) ──"
           cat /tmp/remote-versions.txt
           echo ""
-          echo "Running the real gate's `diff -u` against the injected list..."
+          # NOTE: avoid backticks in this line — bash treats them as
+          # command substitution. The previous version literally ran
+          # `diff -u` with no args here and logged "missing operand
+          # after '-u'" alongside an empty substitution result.
+          echo "Running the real gate's 'diff -u' against the injected list..."
 
           # The EXACT failure check from verify-migrations-in-sync,
           # against the phantom-injected file. We want it to fire:
@@ -508,11 +512,22 @@ jobs:
             exit 1
           fi
 
+          # Surface the diff output unconditionally so a future
+          # smoke-test failure is debuggable from the log alone.
+          echo "── diff -u output ──"
+          cat /tmp/diff-out.txt
+          echo "────────────────────"
+
           # Belt-and-braces: confirm the diff specifically flagged
-          # PHANTOM as committed-but-not-applied (a `-` line).
-          if ! grep -qx "-$PHANTOM" /tmp/diff-out.txt; then
+          # PHANTOM as committed-but-not-applied (a `-` line). The
+          # `--` is critical: PHANTOM starts with no leading dash,
+          # but the pattern "-$PHANTOM" does, and GNU grep would
+          # otherwise try to parse "-0099" as an option (and fail
+          # with `invalid option -- '0'`, exit 2). The `--`
+          # terminates grep's option parsing so the next arg is
+          # always the pattern.
+          if ! grep -qx -- "-$PHANTOM" /tmp/diff-out.txt; then
             echo "::error::SMOKE TEST FAILED — diff fired but did not flag $PHANTOM as committed-but-not-applied."
-            cat /tmp/diff-out.txt
             exit 1
           fi
 
