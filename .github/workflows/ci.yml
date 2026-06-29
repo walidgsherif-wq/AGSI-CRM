@@ -18,6 +18,14 @@
 #   SUPABASE_DB_PASSWORD    The database password (Project Settings →
 #                           Database → Database Password). NOT the
 #                           anon / service-role API key.
+#   SUPABASE_DB_URL         Session-pooler connection string. Copy from
+#                           Project Settings → Database → Connection
+#                           string → "Session pooler" tab. Looks like:
+#                             postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+#                           Used because GitHub Actions runners are
+#                           IPv4-only and db.<ref>.supabase.co resolves
+#                           IPv6-only — the direct host is unreachable
+#                           from CI. The pooler is IPv4-reachable.
 
 name: CI
 
@@ -130,10 +138,18 @@ jobs:
             --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
 
   # ───────────────────────────────────────────────────────────────────
-  # Tripwire: parse `supabase migration list --linked` and fail if any
-  # local migration isn't applied, or vice versa. Runs after the apply
-  # step so a successful apply gets verified end-to-end; if anything
-  # mismatches here it's a genuine bug in the apply path.
+  # Tripwire: query supabase_migrations.schema_migrations directly via
+  # psql and fail if any local migration isn't applied, or vice versa.
+  # Runs after the apply step so a successful apply gets verified
+  # end-to-end; if anything mismatches here it's a genuine bug in the
+  # apply path.
+  #
+  # We bypass `supabase migration list --linked` here for the same
+  # reason as the repair job — in CLI v1.226.4, "Unknown config field"
+  # warnings + the upgrade notice land on stdout in some run paths,
+  # break the awk parser, and silently emit an empty drift set
+  # (false-positive "OK" — worst-possible failure mode for a gate).
+  # Direct SQL via the pooler is unambiguous.
   # ───────────────────────────────────────────────────────────────────
   verify-migrations-in-sync:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -142,50 +158,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
-        with:
-          # See pin rationale on the apply-migrations job above.
-          version: 1.226.4
-
-      - name: Link to prod project
-        run: |
-          supabase link \
-            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
-            --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
-
       - name: Diff committed vs applied
-        # `supabase migration list --linked` prints a 3-col table:
-        # "Local | Remote | Time (UTC)". A blank Remote = committed
-        # but not applied; a blank Local = applied but not committed.
-        # Either is a drift signal we should fail on.
+        # diff -u between the local migration filenames and the ledger:
+        # `-` lines are committed-but-not-applied, `+` lines are
+        # applied-but-not-committed. Either fails the job.
         run: |
           set -euo pipefail
-          supabase migration list --linked > /tmp/migration-list.txt
-          echo "── supabase migration list ──"
-          cat /tmp/migration-list.txt
-          echo "─────────────────────────────"
 
-          DRIFT=$(awk -F'|' '
-            NR<=2 { next }                               # skip header rows
-            {
-              gsub(/[[:space:]]/, "", $1)
-              gsub(/[[:space:]]/, "", $2)
-              if ($1 != "" && $2 == "") print "committed-but-not-applied: " $1
-              if ($1 == "" && $2 != "") print "applied-but-not-committed: " $2
-            }
-          ' /tmp/migration-list.txt)
+          psql "$SUPABASE_DB_URL" -t -A \
+            -c "select version from supabase_migrations.schema_migrations order by version;" \
+            | grep -E '^[0-9]+$' \
+            | sort -u > /tmp/remote-versions.txt
 
-          if [ -n "$DRIFT" ]; then
-            echo "::error::Migration drift detected:"
-            echo "$DRIFT"
+          ls supabase/migrations/*.sql \
+            | xargs -n1 basename \
+            | sed -E 's/\.sql$//' \
+            | sed -E 's/^([0-9]+)_.*/\1/' \
+            | grep -E '^[0-9]+$' \
+            | sort -u > /tmp/local-versions.txt
+
+          if ! diff -u /tmp/local-versions.txt /tmp/remote-versions.txt; then
+            echo "::error::Migration drift detected — '-' lines are committed-but-not-applied, '+' lines are applied-but-not-committed."
             exit 1
           fi
-          echo "OK — every committed migration is applied and vice versa."
+          echo "OK — $(wc -l < /tmp/local-versions.txt) versions in sync."
 
   # ───────────────────────────────────────────────────────────────────
   # Daily drift detector — catches schema changes made directly in the
@@ -278,23 +278,16 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      # Direct DB connection for psql. We bypass `supabase migration
-      # list --linked` because in v1.226.4 the CLI interleaves
-      # "Unknown config field" warnings and the upgrade notice onto
-      # stdout, contaminating any table-text parser and silently
-      # returning an empty version set — which is exactly what made
-      # the previous repair attempt fail with 23505 on the first
-      # `migration repair` call (loop thought 0001 was missing; it
-      # wasn't).
-      # PGSSLMODE=require because Supabase rejects unencrypted
-      # connections; postgresql-client ships on ubuntu-latest by
-      # default so no install step needed.
-      PGHOST: db.${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
-      PGPORT: "5432"
-      PGUSER: postgres
-      PGDATABASE: postgres
-      PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      PGSSLMODE: require
+      # Session-pooler connection string. The previous direct-DB
+      # approach (db.<ref>.supabase.co:5432) resolves to an IPv6-only
+      # address; GitHub Actions runners are IPv4-only, so psql got
+      # "Network is unreachable" on every call. The pooler endpoint
+      # (aws-0-<region>.pooler.supabase.com) is IPv4-reachable, so
+      # routing every psql call through it fixes the reachability
+      # bug. We use the SESSION pooler (port 5432) rather than
+      # transaction-pooler (6543) for compatibility — session mode
+      # supports the full set of psql features.
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -304,14 +297,13 @@ jobs:
           version: 1.226.4
 
       - name: Sanity check — psql can reach prod
-        # Fail loudly here if the direct DB connection is unreachable
-        # (e.g., IPv4 routing, password wrong). Catches the failure
-        # mode where every downstream step would silently see an
-        # empty result set.
+        # Fail loudly here if the pooler is unreachable (wrong URL,
+        # network issue). Catches the failure mode where every
+        # downstream step would silently see an empty result set.
         run: |
           set -euo pipefail
-          psql -c "SELECT 1;" >/dev/null
-          echo "OK — psql connected to ${PGHOST}."
+          psql "$SUPABASE_DB_URL" -c "SELECT 1;" >/dev/null
+          echo "OK — psql connected via the session pooler."
 
       - name: Link to prod project (for migration repair calls)
         run: |
@@ -326,7 +318,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Versions in supabase_migrations.schema_migrations:"
-          psql -t -A -c "select version from supabase_migrations.schema_migrations order by version;" \
+          psql "$SUPABASE_DB_URL" -t -A \
+            -c "select version from supabase_migrations.schema_migrations order by version;" \
             | grep -E '^[0-9]+$' \
             || echo "  (none)"
 
@@ -347,7 +340,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          REMOTE_VERSIONS=$(psql -t -A \
+          REMOTE_VERSIONS=$(psql "$SUPABASE_DB_URL" -t -A \
             -c "select version from supabase_migrations.schema_migrations order by version;" \
             | grep -E '^[0-9]+$' \
             | sort -u)
@@ -399,7 +392,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Versions in supabase_migrations.schema_migrations:"
-          psql -t -A -c "select version from supabase_migrations.schema_migrations order by version;" \
+          psql "$SUPABASE_DB_URL" -t -A \
+            -c "select version from supabase_migrations.schema_migrations order by version;" \
             | grep -E '^[0-9]+$'
 
       - name: Assert ledger now in sync (psql diff)
@@ -410,7 +404,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          psql -t -A -c "select version from supabase_migrations.schema_migrations order by version;" \
+          psql "$SUPABASE_DB_URL" -t -A \
+            -c "select version from supabase_migrations.schema_migrations order by version;" \
             | grep -E '^[0-9]+$' \
             | sort -u > /tmp/remote-versions.txt
 
