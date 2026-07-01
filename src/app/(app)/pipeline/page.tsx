@@ -9,6 +9,7 @@ import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { PipelineKanban, type CardData } from './_components/PipelineKanban';
 import { OwnerFilter } from './_components/OwnerFilter';
 import { fetchOwnerOptions } from '@/lib/auth/owner-options';
+import { getCrmSetupMode } from '@/lib/setup-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,7 @@ export default async function PipelinePage({
   searchParams: { type?: string; owner?: string };
 }) {
   const user = await requireFeature('pipeline');
+  const crmSetupMode = await getCrmSetupMode();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
@@ -289,6 +291,7 @@ export default async function PipelinePage({
         cards={cards}
         userRole={user.role}
         userId={user.id}
+        crmSetupMode={crmSetupMode}
       />
 
       <Card>

@@ -83,13 +83,22 @@ export function PipelineKanban({
   cards,
   userRole,
   userId,
+  crmSetupMode = false,
 }: {
   cards: CardData[];
   userRole: Role;
   userId: string;
+  /** When ON, a non-admin owner can drop a card into any forward
+   *  column (not just adjacent). Backward stays single-step. Admins
+   *  keep strict adjacency because their direct-change RPC still
+   *  enforces the one-step rule. Matches migration 0086's trigger. */
+  crmSetupMode?: boolean;
 }) {
   const [dragging, setDragging] = useState<{ cardId: string; from: Level } | null>(null);
-  const [forced, setForced] = useState<{ card: CardData; toLevel: Level } | null>(null);
+  // toLevel = null → open the dialog with the picker unlocked (used by
+  // the inline "Change level" button when the caller has multi-level
+  // options under setup mode). Drag-drop always sets a concrete target.
+  const [forced, setForced] = useState<{ card: CardData; toLevel: Level | null } | null>(null);
   // L0 (~thousands of "not yet engaged" companies) buries L1–L5 by
   // default and bloats render. Hide it unless the user opts in via the
   // toggle below. Simple local state — no broader filter system yet.
@@ -126,12 +135,25 @@ export function PipelineKanban({
   const showL0Effective = showL0 || (searchActive && grouped.L0.length > 0);
   const visibleLevels = showL0Effective ? LEVELS : LEVELS.filter((l) => l !== 'L0');
 
+  const isAdmin = userRole === 'admin';
+
   function canChange(card: CardData) {
-    return userRole === 'admin' || card.owner_id === userId;
+    return isAdmin || card.owner_id === userId;
   }
 
-  function isAdjacent(from: Level, to: Level) {
-    return Math.abs(LEVEL_INDEX[from] - LEVEL_INDEX[to]) === 1;
+  // Which drops are accepted, given the current setup-mode/role
+  // context. Mirrors what LevelChangeDialog + the 0086 trigger will
+  // permit:
+  //   - single-step in either direction: always allowed
+  //   - forward multi-level: only for non-admin under setup mode
+  //     (admin direct-change still one-step)
+  //   - backward multi-level: never (would be an admin correction path,
+  //     not a backfill path — kept out of drag)
+  function canDropTo(from: Level, to: Level) {
+    if (from === to) return false;
+    const delta = LEVEL_INDEX[to] - LEVEL_INDEX[from];
+    if (Math.abs(delta) === 1) return true;
+    return crmSetupMode && !isAdmin && delta > 1;
   }
 
   function handleDrop(targetLevel: Level) {
@@ -140,9 +162,9 @@ export function PipelineKanban({
       setDragging(null);
       return;
     }
-    if (!isAdjacent(dragging.from, targetLevel)) {
-      // Skip-level drops are silently ignored — user gets visual feedback
-      // because adjacent columns highlight while non-adjacent don't.
+    if (!canDropTo(dragging.from, targetLevel)) {
+      // Invalid drops are silently ignored — user gets visual feedback
+      // because valid columns highlight while invalid ones don't.
       setDragging(null);
       return;
     }
@@ -191,25 +213,25 @@ export function PipelineKanban({
       >
         {visibleLevels.map((level) => {
           const colCards = grouped[level];
-          const isAdjacentTarget = dragging ? isAdjacent(dragging.from, level) : false;
+          const isValidTarget = dragging ? canDropTo(dragging.from, level) : false;
           const isSourceCol = dragging?.from === level;
           return (
             <div
               key={level}
               onDragOver={(e) => {
-                if (isAdjacentTarget) {
+                if (isValidTarget) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                 }
               }}
               onDrop={(e) => {
-                if (!isAdjacentTarget) return;
+                if (!isValidTarget) return;
                 e.preventDefault();
                 handleDrop(level);
               }}
               className={cn(
                 'flex min-h-[120px] flex-col rounded-lg p-1 transition-colors',
-                isAdjacentTarget && 'bg-agsi-accent/10 ring-2 ring-agsi-accent/40',
+                isValidTarget && 'bg-agsi-accent/10 ring-2 ring-agsi-accent/40',
                 isSourceCol && 'opacity-60',
               )}
             >
@@ -223,7 +245,7 @@ export function PipelineKanban({
               <div className="space-y-2">
                 {colCards.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-agsi-lightGray p-3 text-xs text-agsi-darkGray">
-                    {dragging && isAdjacentTarget ? 'Drop here to move →' : 'No companies at this level.'}
+                    {dragging && isValidTarget ? 'Drop here to move →' : 'No companies at this level.'}
                   </p>
                 ) : (
                   colCards.map((c) => {
@@ -316,8 +338,16 @@ export function PipelineKanban({
                               <button
                                 type="button"
                                 onClick={() => {
+                                  // Under setup mode, non-admins can
+                                  // pick any forward target — don't
+                                  // force the seed to L+1; open the
+                                  // dialog's picker instead.
+                                  const wantsPicker = crmSetupMode && !isAdmin;
                                   const targets = adjacentTargets(c.current_level);
-                                  setForced({ card: c, toLevel: targets[0] });
+                                  setForced({
+                                    card: c,
+                                    toLevel: wantsPicker ? null : (targets[0] ?? null),
+                                  });
                                 }}
                                 className="text-xs text-agsi-accent hover:underline"
                               >
@@ -347,7 +377,8 @@ export function PipelineKanban({
           userRole={userRole}
           isOwner={forced.card.owner_id === userId}
           isProgressReady={forced.card.is_progress_ready}
-          forcedToLevel={forced.toLevel}
+          crmSetupMode={crmSetupMode}
+          forcedToLevel={forced.toLevel ?? undefined}
           onClose={() => setForced(null)}
         />
       )}
