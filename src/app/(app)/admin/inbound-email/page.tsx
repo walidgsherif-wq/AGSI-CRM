@@ -158,7 +158,6 @@ export default async function InboundEmailPage({
                       <ResolveActions
                         unmatchedId={r.id}
                         fromEmail={r.from_email}
-                        fromName={r.from_name}
                       />
                     ) : (
                       <p className="text-xs italic text-agsi-darkGray">No further action.</p>

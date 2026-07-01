@@ -99,7 +99,7 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
       supabase
         .from('contacts')
         .select(
-          'id, company_id, full_name, position, email, phone, is_primary, created_by, created_at, deleted_at, deleted_by',
+          'id, company_id, full_name, position, email, phone, is_primary, needs_details, created_by, created_at, deleted_at, deleted_by',
         )
         .eq('company_id', params.id)
         .is('deleted_at', null)
@@ -110,7 +110,7 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
         ? supabase
             .from('contacts')
             .select(
-              'id, company_id, full_name, position, email, phone, is_primary, created_by, created_at, deleted_at, deleted_by',
+              'id, company_id, full_name, position, email, phone, is_primary, needs_details, created_by, created_at, deleted_at, deleted_by',
             )
             .eq('company_id', params.id)
             .not('deleted_at', 'is', null)

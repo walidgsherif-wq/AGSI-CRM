@@ -1,26 +1,26 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   resolveUnmatchedEmail,
   discardUnmatchedEmail,
+  type ResolveHarvestSummary,
 } from '@/server/actions/inbound-email';
 import { CompanyPickerCombobox } from './CompanyPickerCombobox';
 
 export function ResolveActions({
   unmatchedId,
   fromEmail,
-  fromName,
 }: {
   unmatchedId: string;
-  /** The sender of the queued email — offered as the contact email to
-   *  save against the resolved company so the next email from the same
-   *  address auto-matches. */
+  /** Sender address — used only in the small explainer text next to
+   *  the picker. The domain-scoped harvest reads all From / To / CC
+   *  addresses from the unmatched row server-side, not from this
+   *  prop. */
   fromEmail: string;
-  fromName: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -28,12 +28,7 @@ export function ResolveActions({
   const [companyId, setCompanyId] = useState('');
   const [note, setNote] = useState('');
   const [discardMode, setDiscardMode] = useState(false);
-
-  // Save-as-contact controls.
-  const [saveContact, setSaveContact] = useState(true);
-  const [contactFullName, setContactFullName] = useState(
-    fromName ?? deriveNameFromEmail(fromEmail),
-  );
+  const [harvest, setHarvest] = useState<ResolveHarvestSummary | null>(null);
 
   function resolve() {
     if (!companyId) {
@@ -41,24 +36,18 @@ export function ResolveActions({
       return;
     }
     setError(null);
+    setHarvest(null);
     startTransition(async () => {
       const r = await resolveUnmatchedEmail(
         unmatchedId,
         companyId,
         note.trim() || null,
-        saveContact
-          ? { email: fromEmail, full_name: contactFullName }
-          : null,
       );
       if (r.error) {
         setError(r.error);
         return;
       }
-      if (r.contact_warning) {
-        // Resolution succeeded; just note the contact-save problem.
-        setError(`Resolved, but contact not saved: ${r.contact_warning}`);
-      }
-      setCompanyId('');
+      setHarvest(r.harvest ?? null);
       setNote('');
       router.refresh();
     });
@@ -92,28 +81,13 @@ export function ResolveActions({
             placeholder="Type to search a company…"
           />
 
-          <label className="flex items-start gap-2 text-xs text-agsi-navy">
-            <input
-              type="checkbox"
-              checked={saveContact}
-              onChange={(e) => setSaveContact(e.target.checked)}
-              disabled={pending}
-              className="mt-0.5 h-4 w-4 rounded border-agsi-midGray"
-            />
-            <span>
-              Save <span className="font-medium">{fromEmail}</span> as a
-              contact on the selected company. Next email from this
-              address will auto-match.
-            </span>
-          </label>
-          {saveContact && (
-            <Input
-              value={contactFullName}
-              onChange={(e) => setContactFullName(e.target.value)}
-              disabled={pending}
-              placeholder="Contact full name"
-            />
-          )}
+          <p className="text-xs2 text-agsi-darkGray">
+            On resolve, external counterparty contacts on the company&rsquo;s
+            domain are auto-added and flagged for completion.{' '}
+            Internal <span className="font-medium">@agsi.ae</span>{' '}
+            addresses (like {fromEmail.endsWith('@agsi.ae') ? fromEmail : 'anna.m@agsi.ae'})
+            are never saved as contacts.
+          </p>
         </>
       )}
 
@@ -163,20 +137,79 @@ export function ResolveActions({
         )}
         {error && <span className="text-xs text-rag-red">{error}</span>}
       </div>
+
+      {harvest && (
+        <HarvestSummary
+          summary={harvest}
+          companyId={companyId}
+        />
+      )}
     </div>
   );
 }
 
-function deriveNameFromEmail(addr: string): string {
-  const local = addr.split('@')[0] ?? '';
-  // Replace common separators, title-case each word. Falls back to the
-  // raw local part if the heuristic produces nothing.
-  const cleaned = local
-    .replace(/[._\-+]+/g, ' ')
-    .trim()
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
-  return cleaned || local;
+function HarvestSummary({
+  summary,
+  companyId,
+}: {
+  summary: ResolveHarvestSummary;
+  companyId: string;
+}) {
+  const added = summary.added.length;
+  return (
+    <div className="rounded-lg border border-agsi-lightGray bg-agsi-offWhite/50 px-3 py-2 text-xs text-agsi-navy">
+      <p className="font-medium">
+        {added > 0
+          ? `Added ${added} contact${added === 1 ? '' : 's'} to `
+          : 'No new contacts added — '}
+        <Link
+          href={`/companies/${companyId}` as never}
+          className="text-agsi-accent hover:underline"
+        >
+          the company
+        </Link>
+        {summary.counterparty_domain && (
+          <>
+            {' '}from <span className="font-medium">@{summary.counterparty_domain}</span>
+          </>
+        )}
+        .
+      </p>
+      {summary.added.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {summary.added.map((c) => (
+            <li key={c.email} className="text-xs2 text-agsi-darkGray">
+              • {c.full_name} &lt;{c.email}&gt;
+            </li>
+          ))}
+        </ul>
+      )}
+      {summary.learned_domain && (
+        <p className="mt-1 text-xs2 text-agsi-darkGray">
+          Learned the counterparty domain{' '}
+          <span className="font-medium">{summary.learned_domain}</span> —
+          future emails from this domain will auto-match.
+        </p>
+      )}
+      {summary.skipped_duplicates > 0 && (
+        <p className="mt-1 text-xs2 text-agsi-darkGray">
+          {summary.skipped_duplicates} address
+          {summary.skipped_duplicates === 1 ? '' : 'es'} were skipped as a
+          duplicate at insert time.
+        </p>
+      )}
+      {summary.reason && (
+        <p className="mt-1 text-xs2 italic text-agsi-darkGray">
+          {summary.reason} Complete each contact&rsquo;s name and designation on
+          the company page.
+        </p>
+      )}
+      {added > 0 && (
+        <p className="mt-1 text-xs2 text-agsi-darkGray">
+          Complete each contact&rsquo;s name and designation on the company
+          page — they&rsquo;re flagged <strong>Needs details</strong>.
+        </p>
+      )}
+    </div>
+  );
 }

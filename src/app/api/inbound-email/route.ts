@@ -160,7 +160,19 @@ async function resolveCompanyIds(
   if (stakeholderEmails.length === 0) return [];
   type Row = { id: string };
   type ContactRow = { company_id: string };
-  const [companies, contacts] = await Promise.all([
+  // Distinct external mail domains among the stakeholder emails.
+  // Feeds the third matcher below (companies.email_domain), which is
+  // how a domain learned by the admin resolve action starts closing
+  // the unmatched queue on subsequent inbound emails from the same
+  // party.
+  const domains = Array.from(
+    new Set(
+      stakeholderEmails
+        .map((e) => e.toLowerCase().split('@')[1])
+        .filter((d): d is string => !!d && d !== 'agsi.ae'),
+    ),
+  );
+  const [companies, contacts, companiesByDomain] = await Promise.all([
     admin
       .from('companies')
       .select('id')
@@ -172,10 +184,18 @@ async function resolveCompanyIds(
       .is('deleted_at', null)
       .in('email', stakeholderEmails)
       .returns<ContactRow[]>(),
+    domains.length > 0
+      ? admin
+          .from('companies')
+          .select('id')
+          .in('email_domain', domains)
+          .returns<Row[]>()
+      : Promise.resolve({ data: [] as Row[] }),
   ]);
   const ids = new Set<string>();
   for (const c of companies.data ?? []) ids.add(c.id);
   for (const c of contacts.data ?? []) ids.add(c.company_id);
+  for (const c of companiesByDomain.data ?? []) ids.add(c.id);
   return Array.from(ids);
 }
 
