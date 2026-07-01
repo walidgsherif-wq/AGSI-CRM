@@ -51,6 +51,7 @@ export default async function EngagementFreshnessPage() {
         'id, canonical_name, company_type, current_level, owner_id, has_active_projects',
       )
       .eq('is_active', true)
+      .is('merged_into_company_id', null)
       .not('owner_id', 'is', null)
       .order('canonical_name', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)

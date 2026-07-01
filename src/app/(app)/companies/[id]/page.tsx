@@ -31,6 +31,7 @@ type DetailRow = CompanyInitial & {
   source: string;
   created_at: string;
   parent_company_id: string | null;
+  merged_into_company_id: string | null;
 };
 
 type LinkedProjectRow = {
@@ -55,12 +56,26 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, canonical_name, company_type, country, location_id, city, phone, email, website, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at, parent_company_id',
+      'id, canonical_name, company_type, country, location_id, city, phone, email, website, notes_internal, is_key_stakeholder, owner_id, current_level, has_active_projects, source, created_at, parent_company_id, merged_into_company_id',
     )
     .eq('id', params.id)
     .single<DetailRow>();
 
   if (!company) notFound();
+
+  // If this company was merged into another, resolve the survivor's
+  // name so the banner below can link. The absorbed page still loads
+  // (historical URLs shouldn't 404) but it warns loudly and hides
+  // most write affordances.
+  let mergedIntoRow: { id: string; canonical_name: string } | null = null;
+  if (company.merged_into_company_id) {
+    const { data } = await supabase
+      .from('companies')
+      .select('id, canonical_name')
+      .eq('id', company.merged_into_company_id)
+      .maybeSingle<{ id: string; canonical_name: string }>();
+    mergedIntoRow = data ?? null;
+  }
 
   const isHeadOrAdmin = user.role === 'admin' || user.role === 'bd_head';
 
@@ -247,6 +262,23 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
 
   return (
     <div className="space-y-6">
+      {company.merged_into_company_id && (
+        <div className="rounded-xl border border-rag-red/40 bg-rag-red/10 px-4 py-3 text-sm text-rag-red">
+          <strong>Merged</strong> — this record was absorbed into{' '}
+          {mergedIntoRow ? (
+            <Link
+              href={`/companies/${mergedIntoRow.id}` as never}
+              className="font-medium underline"
+            >
+              {mergedIntoRow.canonical_name}
+            </Link>
+          ) : (
+            'another record'
+          )}
+          . It&rsquo;s hidden from lists but this URL still resolves for audit. New
+          activity should be added to the surviving record.
+        </div>
+      )}
       {parentRow && (
         <p className="text-xs text-agsi-darkGray">
           Part of{' '}

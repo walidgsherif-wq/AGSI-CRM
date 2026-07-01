@@ -584,6 +584,10 @@ async function loadCompanyIndex(supabase: SupabaseClient): Promise<{
     const { data, error } = await supabase
       .from('companies')
       .select('id, canonical_name, aliases')
+      // Never auto-match new BNC entries onto a merged-away row —
+      // that would silently resurrect a company we deliberately
+      // hid. The rebuild-time universe therefore excludes them.
+      .is('merged_into_company_id', null)
       .range(from, from + PAGE - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
