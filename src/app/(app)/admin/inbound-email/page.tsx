@@ -54,27 +54,17 @@ export default async function InboundEmailPage({
     ? (searchParams.status as Status)
     : 'pending';
 
-  const [rowsRes, companiesRes] = await Promise.all([
-    supabase
-      .from('inbound_email_unmatched')
-      .select(
-        'id, message_id, from_email, from_name, to_emails, cc_emails, subject, body_preview, received_at, status, reason, review_note, resolved_at, resolved_engagement_id, reviewer:profiles!inbound_email_unmatched_resolved_by_fkey(full_name)',
-      )
-      .eq('status', status)
-      .order('received_at', { ascending: false })
-      .limit(200)
-      .returns<Row[]>(),
-    supabase
-      .from('companies')
-      .select('id, canonical_name')
-      .eq('is_active', true)
-      .order('canonical_name')
-      .limit(2000),
-  ]);
+  const rowsRes = await supabase
+    .from('inbound_email_unmatched')
+    .select(
+      'id, message_id, from_email, from_name, to_emails, cc_emails, subject, body_preview, received_at, status, reason, review_note, resolved_at, resolved_engagement_id, reviewer:profiles!inbound_email_unmatched_resolved_by_fkey(full_name)',
+    )
+    .eq('status', status)
+    .order('received_at', { ascending: false })
+    .limit(200)
+    .returns<Row[]>();
 
   const rows = rowsRes.data ?? [];
-  const companies =
-    (companiesRes.data ?? []) as Array<{ id: string; canonical_name: string }>;
 
   return (
     <div className="space-y-6">
@@ -167,7 +157,6 @@ export default async function InboundEmailPage({
                     {r.status === 'pending' ? (
                       <ResolveActions
                         unmatchedId={r.id}
-                        companies={companies}
                         fromEmail={r.from_email}
                         fromName={r.from_name}
                       />
