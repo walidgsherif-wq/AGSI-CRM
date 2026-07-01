@@ -24,6 +24,10 @@ export type ContactRow = {
   email: string | null;
   phone: string | null;
   is_primary: boolean;
+  /** True when the row was auto-harvested from an inbound email and
+   *  a human hasn't opened the edit form yet. Cleared automatically
+   *  by updateContact on any manual save. */
+  needs_details: boolean;
   created_by: string | null;
   created_at: string;
   deleted_at: string | null;
@@ -252,7 +256,14 @@ function ContactCard({
             <p className="text-xs text-agsi-darkGray">{contact.position}</p>
           )}
         </div>
-        {contact.is_primary && <Badge variant="gold">Primary</Badge>}
+        <div className="flex flex-shrink-0 flex-col items-end gap-1">
+          {contact.is_primary && <Badge variant="gold">Primary</Badge>}
+          {contact.needs_details && (
+            <Badge variant="amber" title="Auto-added from an inbound email. Click Edit to complete the name and designation.">
+              Needs details
+            </Badge>
+          )}
+        </div>
       </div>
       <div className="space-y-1 text-xs text-agsi-darkGray">
         {contact.email && (

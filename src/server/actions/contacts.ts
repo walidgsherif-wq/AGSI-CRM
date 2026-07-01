@@ -79,9 +79,14 @@ export async function updateContact(formData: FormData) {
   // contacts_enforce_single_primary (0073) demotes any other live
   // primary on the same company when is_primary flips to true here.
   // contacts_audit writes a contact_updated row regardless.
+  //
+  // Every manual update clears needs_details — the flag is only for
+  // "auto-harvested rows a human hasn't looked at yet". Once someone
+  // opens the edit form and saves anything, treat the contact as
+  // reviewed even if position is still blank.
   const { error } = await supabase()
     .from('contacts')
-    .update(patch)
+    .update({ ...patch, needs_details: false })
     .eq('id', id);
   if (error) return { error: error.message };
 
