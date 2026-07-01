@@ -10,6 +10,8 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { ROLE_LABEL } from '@/types/domain';
 import { EngagementTemperaturePanel } from './_components/EngagementTemperaturePanel';
 import { getEngagementTemperature } from '@/server/actions/engagement-temperature';
+import { MarketValueEngagementPanel } from './_components/MarketValueEngagementPanel';
+import { getMarketValueEngagement } from '@/server/actions/market-value-engagement';
 import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
 import {
   fetchFiscalStartMonth,
@@ -194,6 +196,18 @@ export default async function DashboardPage({
   const initialTemperature =
     initialTemperatureRaw && !('error' in initialTemperatureRaw)
       ? initialTemperatureRaw
+      : null;
+
+  // Value-weighted engagement panel — same role gate as the temperature
+  // board; get_market_value_engagement() (0091) also blocks bd_manager
+  // server-side.
+  const initialMarketValueRaw =
+    user.role !== 'bd_manager'
+      ? await getMarketValueEngagement()
+      : null;
+  const initialMarketValue =
+    initialMarketValueRaw && !('error' in initialMarketValueRaw)
+      ? initialMarketValueRaw
       : null;
 
   const { data: playbook } = await supabase
@@ -421,6 +435,10 @@ export default async function DashboardPage({
               : 'Ask an admin to run the first rebuild.'}
           </CardContent>
         </Card>
+      )}
+
+      {user.role !== 'bd_manager' && initialMarketValue && (
+        <MarketValueEngagementPanel data={initialMarketValue} />
       )}
 
       {user.role !== 'bd_manager' && initialTemperature && (
