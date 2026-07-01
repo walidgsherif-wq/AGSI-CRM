@@ -10,6 +10,8 @@ import type { FeatureKey } from '@/lib/auth/features';
 type Props = {
   user: { role: Role; fullName: string; email: string };
   features: FeatureKey[];
+  /** Rendered above <main>; null when CRM setup mode is off. */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -20,7 +22,7 @@ type Props = {
  * overlay triggered by the top-bar hamburger. Backdrop click + ESC +
  * route change all close the menu.
  */
-export function AppShell({ user, features, children }: Props) {
+export function AppShell({ user, features, banner, children }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -88,6 +90,8 @@ export function AppShell({ user, features, children }: Props) {
           </div>
           <span aria-hidden className="h-9 w-9" />
         </div>
+
+        {banner}
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}

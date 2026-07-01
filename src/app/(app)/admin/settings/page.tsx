@@ -18,6 +18,8 @@ import { EcosystemTuningCard } from './_components/EcosystemTuningCard';
 import { BeiWeightingsCard } from './_components/BeiWeightingsCard';
 import { RebarCard } from './_components/RebarCard';
 import { EcosystemPointScaleCard } from './_components/EcosystemPointScaleCard';
+import { CrmSetupModeCard } from './_components/CrmSetupModeCard';
+import { getCrmSetupMode } from '@/lib/setup-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,6 +119,8 @@ export default async function AdminSettingsPage() {
     'notification_channels_enabled',
   ) ?? { in_app: true, email: false, whatsapp: false };
 
+  const crmSetupMode = await getCrmSetupMode();
+
   return (
     <div className="space-y-6">
       <div>
@@ -130,6 +134,7 @@ export default async function AdminSettingsPage() {
         </p>
       </div>
 
+      <CrmSetupModeCard initial={crmSetupMode} />
       <FiscalYearCard initialMonth={fyMonth} />
       <InboundEmailAddressCard initialAddress={inboundEmailAddress} />
       <UniverseSizesCard
