@@ -153,6 +153,15 @@ export async function requestLevelChange(formData: FormData) {
   const incomplete = await assertCompanyProgressReady(sb, companyId, toLevel);
   if (incomplete) return { error: incomplete };
 
+  // Setup-mode stamp: if setup mode is on at submission, mark the
+  // request as backfill. The 0086 approve function honours this at
+  // decision time — approved backfill requests land in level_history
+  // with source='initial_backfill' and are excluded from earned
+  // Driver A by rebuild_kpi_actuals. The DB-side step-rule trigger
+  // (0086) also permits a forward multi-level request only when
+  // setup mode is on.
+  const { data: setupModeOn } = await sb.rpc('crm_setup_mode');
+
   const { error } = await sb.from('level_change_requests').insert({
     company_id: companyId,
     from_level: fromLevel,
@@ -160,6 +169,7 @@ export async function requestLevelChange(formData: FormData) {
     requested_by: user.id,
     evidence_note: evidenceNote,
     evidence_file_paths: evidenceFilePaths,
+    is_backfill: setupModeOn === true,
   });
 
   if (error) return { error: error.message };
