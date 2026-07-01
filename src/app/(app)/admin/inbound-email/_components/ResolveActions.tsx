@@ -8,17 +8,14 @@ import {
   resolveUnmatchedEmail,
   discardUnmatchedEmail,
 } from '@/server/actions/inbound-email';
-
-type CompanyOption = { id: string; canonical_name: string };
+import { CompanyPickerCombobox } from './CompanyPickerCombobox';
 
 export function ResolveActions({
   unmatchedId,
-  companies,
   fromEmail,
   fromName,
 }: {
   unmatchedId: string;
-  companies: CompanyOption[];
   /** The sender of the queued email — offered as the contact email to
    *  save against the resolved company so the next email from the same
    *  address auto-matches. */
@@ -88,19 +85,12 @@ export function ResolveActions({
     <div className="space-y-2">
       {!discardMode && (
         <>
-          <select
+          <CompanyPickerCombobox
             value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
+            onChange={(next) => setCompanyId(next ?? '')}
             disabled={pending}
-            className="w-full rounded border border-agsi-midGray bg-white px-2 py-1 text-xs"
-          >
-            <option value="">— Pick a company —</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.canonical_name}
-              </option>
-            ))}
-          </select>
+            placeholder="Type to search a company…"
+          />
 
           <label className="flex items-start gap-2 text-xs text-agsi-navy">
             <input
