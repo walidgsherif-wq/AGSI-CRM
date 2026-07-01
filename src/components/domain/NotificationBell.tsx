@@ -11,6 +11,10 @@ import {
   markRead,
   type NotificationRow,
 } from '@/server/actions/notifications';
+import {
+  notifyUnreadChanged,
+  subscribeUnreadChanged,
+} from '@/lib/notifications-events';
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -53,6 +57,18 @@ export function NotificationBell() {
       void refresh();
     }, POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
+  }, [refresh]);
+
+  // Client-side signal: any callsite that mutates unread state fires
+  // notifyUnreadChanged(); we subscribe and refetch immediately. This
+  // is what makes the badge decrement in real time when the user
+  // approves a level change from the /notifications inbox, marks a
+  // notification read there, dismisses one from there, etc. — none
+  // of which touch the bell's local state directly.
+  useEffect(() => {
+    return subscribeUnreadChanged(() => {
+      void refresh();
+    });
   }, [refresh]);
 
   useEffect(() => {
@@ -101,7 +117,7 @@ export function NotificationBell() {
                   onClick={() => {
                     startTransition(async () => {
                       await markAllRead();
-                      await refresh();
+                      notifyUnreadChanged();
                     });
                   }}
                   className="text-xs2 font-medium text-agsi-accent hover:underline"
@@ -115,7 +131,7 @@ export function NotificationBell() {
                   onClick={() => {
                     startTransition(async () => {
                       await dismissAllNotifications();
-                      await refresh();
+                      notifyUnreadChanged();
                     });
                   }}
                   className="text-xs2 font-medium text-agsi-darkGray hover:text-rag-red hover:underline"
@@ -143,13 +159,13 @@ export function NotificationBell() {
                     onMarkRead={() => {
                       startTransition(async () => {
                         await markRead(n.id);
-                        await refresh();
+                        notifyUnreadChanged();
                       });
                     }}
                     onDismiss={() => {
                       startTransition(async () => {
                         await dismissNotification(n.id);
-                        await refresh();
+                        notifyUnreadChanged();
                       });
                     }}
                     onClickLink={() => setOpen(false)}

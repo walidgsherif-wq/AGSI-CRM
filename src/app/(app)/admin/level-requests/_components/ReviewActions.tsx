@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { approveLevelRequest, rejectLevelRequest } from '@/server/actions/level';
+import { notifyUnreadChanged } from '@/lib/notifications-events';
 
 export function ReviewActions({ requestId }: { requestId: string }) {
   const router = useRouter();
@@ -19,6 +20,11 @@ export function ReviewActions({ requestId }: { requestId: string }) {
       if (r.error) setError(r.error);
       else {
         setReviewNote('');
+        // 0082's approve auto-resolves the admin's pending-review
+        // notification for this request via
+        // resolve_notifications_for_entity — tell the sidebar bell
+        // so its badge decrements without waiting for the 60s poll.
+        notifyUnreadChanged();
         router.refresh();
       }
     });
@@ -36,6 +42,8 @@ export function ReviewActions({ requestId }: { requestId: string }) {
       else {
         setReviewNote('');
         setRejectMode(false);
+        // Same auto-resolve path as approve — see comment above.
+        notifyUnreadChanged();
         router.refresh();
       }
     });
