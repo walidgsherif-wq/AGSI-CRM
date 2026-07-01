@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -20,6 +20,10 @@ import {
 import { AGSI } from '@/lib/design/colors';
 import { getCoverageByType } from '@/server/actions/coverage';
 import type { CoverageRow, ValueBand } from '@/types/coverage';
+import {
+  notifyBandChanged,
+  subscribeBandChanged,
+} from '@/lib/coverage-band-events';
 import { ContributionStackedBars } from './ContributionStackedBars';
 import { MemberRadarGrid } from './MemberRadarGrid';
 
@@ -44,14 +48,33 @@ export function CoverageRadarPanel({
   const [pending, startTransition] = useTransition();
   const [view, setView] = useState<'segment' | 'member'>('segment');
 
-  function selectBand(next: ValueBand) {
-    if (next === band) return;
-    setBand(next);
+  function fetchForBand(next: ValueBand) {
     startTransition(async () => {
       const rows = await getCoverageByType(next);
       setData(rows);
     });
   }
+
+  function selectBand(next: ValueBand) {
+    if (next === band) return;
+    setBand(next);
+    fetchForBand(next);
+    // Broadcast so the sibling SegmentPenetrationPanel moves with us.
+    notifyBandChanged(next);
+  }
+
+  // Sync when the segment-penetration panel changes the band. Two
+  // panels, one filter — see src/lib/coverage-band-events.ts.
+  useEffect(() => {
+    return subscribeBandChanged((next) => {
+      setBand((cur) => {
+        if (cur === next) return cur;
+        fetchForBand(next);
+        return next;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalNumerator = data.reduce((s, r) => s + r.numerator, 0);
   const totalDenominator = data.reduce((s, r) => s + r.denominator, 0);

@@ -19,6 +19,8 @@ import {
 } from '@/lib/fiscal';
 import { RebuildButton } from './_components/RebuildButton';
 import { CoverageRadarPanel } from './_components/CoverageRadarPanel';
+import { SegmentPenetrationPanel } from './_components/SegmentPenetrationPanel';
+import { getSegmentPenetration } from '@/server/actions/segment-penetration';
 import { MemberSelector, type BdMember } from './_components/MemberSelector';
 import { MyEventsCard, type MyEventRow } from './_components/MyEventsCard';
 import {
@@ -177,6 +179,10 @@ export default async function DashboardPage({
   // Initial radar data for the default 'all' band. Re-fetches client-
   // side when the user picks a different value band.
   const initialCoverage = await getCoverageByType('all');
+  // Same 'all' band as coverage — the two panels share a client-side
+  // event bus (src/lib/coverage-band-events.ts) so a click on either
+  // filter moves both.
+  const initialPenetration = await getSegmentPenetration('all');
 
   // Engagement-temperature initial snapshot (companies mode). Only
   // fetched for roles that see the panel. Client re-fetches when the
@@ -420,6 +426,8 @@ export default async function DashboardPage({
       {user.role !== 'bd_manager' && initialTemperature && (
         <EngagementTemperaturePanel initial={initialTemperature} />
       )}
+
+      <SegmentPenetrationPanel initial={initialPenetration} initialBand="all" />
 
       <CoverageRadarPanel initial={initialCoverage} initialBand="all" />
 
