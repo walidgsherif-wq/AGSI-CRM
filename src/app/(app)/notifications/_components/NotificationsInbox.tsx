@@ -15,6 +15,7 @@ import {
   type NotificationRow,
 } from '@/server/actions/notifications';
 import { ReviewActions } from '@/app/(app)/admin/level-requests/_components/ReviewActions';
+import { notifyUnreadChanged } from '@/lib/notifications-events';
 import type { Level, Role } from '@/types/domain';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -132,6 +133,7 @@ export function NotificationsInbox({
             onClick={() => {
               startTransition(async () => {
                 await markAllRead();
+                notifyUnreadChanged();
                 await reload();
               });
             }}
@@ -146,6 +148,7 @@ export function NotificationsInbox({
             onClick={() => {
               startTransition(async () => {
                 await dismissAllNotifications();
+                notifyUnreadChanged();
                 await reload();
               });
             }}
@@ -176,12 +179,14 @@ export function NotificationsInbox({
                     setRows((cur) =>
                       cur.map((r) => (r.id === n.id ? { ...r, is_read: true } : r)),
                     );
+                    notifyUnreadChanged();
                   });
                 }}
                 onDismiss={() => {
                   startTransition(async () => {
                     await dismissNotification(n.id);
                     setRows((cur) => cur.filter((r) => r.id !== n.id));
+                    notifyUnreadChanged();
                   });
                 }}
               />
