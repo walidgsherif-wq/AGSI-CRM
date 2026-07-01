@@ -247,7 +247,7 @@ export async function deleteUser(userId: string) {
   // Count what's about to be orphaned. Service-role bypasses RLS, so
   // the counts are accurate even if the caller couldn't see all rows.
   const [companies, engagements, tasksOwned, notes, documents] = await Promise.all([
-    admin.from('companies').select('id', { count: 'exact', head: true }).eq('owner_id', userId),
+    admin.from('companies').select('id', { count: 'exact', head: true }).eq('owner_id', userId).is('merged_into_company_id', null),
     admin.from('engagements').select('id', { count: 'exact', head: true }).eq('created_by', userId),
     admin.from('tasks').select('id', { count: 'exact', head: true }).eq('owner_id', userId),
     admin.from('notes').select('id', { count: 'exact', head: true }).eq('author_id', userId),

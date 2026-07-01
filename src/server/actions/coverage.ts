@@ -64,6 +64,7 @@ export async function getCoverageByType(
       .from('companies')
       .select('id, company_type, owner_id')
       .eq('is_active', true)
+      .is('merged_into_company_id', null)
       .in('company_type', SPOKE_TYPES as unknown as string[])
       .order('id', { ascending: true })
       .range(offset, offset + PAGE - 1)

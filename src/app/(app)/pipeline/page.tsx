@@ -98,6 +98,7 @@ export default async function PipelinePage({
         'id, canonical_name, company_type, current_level, city, location_id, is_key_stakeholder, has_active_projects, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
       )
       .eq('is_active', true)
+      .is('merged_into_company_id', null)
       .order('canonical_name', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
     if (searchParams.type) query = query.eq('company_type', searchParams.type);

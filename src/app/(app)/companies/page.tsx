@@ -159,6 +159,7 @@ export default async function CompaniesPage({
           'id, company_type, city, is_key_stakeholder, has_active_projects, parent_company_id, owner:profiles!companies_owner_id_fkey(full_name)',
         )
         .eq('is_active', true)
+        .is('merged_into_company_id', null)
         .in('id', chunk);
       if (typeFilter) q = q.eq('company_type', typeFilter);
       if (regionFilter) q = q.ilike('city', `%${regionFilter}%`);

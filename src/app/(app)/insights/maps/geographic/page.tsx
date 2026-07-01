@@ -68,6 +68,7 @@ export default async function GeographicMapPage({
         'id, canonical_name, location_id, company_type, current_level, has_active_projects',
       )
       .eq('is_active', true)
+      .is('merged_into_company_id', null)
       .in('current_level', allowedLevels)
       .order('canonical_name', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
