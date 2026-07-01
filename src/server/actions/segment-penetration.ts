@@ -11,7 +11,10 @@ import {
   type ValueBand,
 } from '@/types/coverage';
 import { LEVELS, type Level } from '@/types/domain';
-import type { SegmentPenetrationRow } from '@/lib/segment-penetration';
+import type {
+  SegmentPenetrationResult,
+  SegmentPenetrationRow,
+} from '@/lib/segment-penetration';
 
 function supabase() {
   return createServerClient(
@@ -38,16 +41,28 @@ function supabase() {
  * notifyBandChanged / subscribeBandChanged in
  * src/lib/coverage-band-events.ts).
  *
- * Reads companies only (+ project_companies for value-band). No
- * schema change. RLS lets any authenticated user see these fields
- * transparently across the team, so team-wide totals are honest
- * regardless of viewer role.
+ * Errors: every DB fetch's error is captured. The first error short-
+ * circuits the pipeline and surfaces via `error` on the result so the
+ * panel can render a real error state instead of silently rendering
+ * "0 of 0."
  */
 export async function getSegmentPenetration(
   band: ValueBand = 'all',
-): Promise<SegmentPenetrationRow[]> {
+): Promise<SegmentPenetrationResult> {
   const sb = supabase();
   const threshold = BAND_THRESHOLD[band];
+  const emptyLevelMap = (): Record<Level, number> => {
+    const out = {} as Record<Level, number>;
+    for (const l of LEVELS) out[l] = 0;
+    return out;
+  };
+  const emptyRows: SegmentPenetrationRow[] = SPOKE_TYPES.map((t) => ({
+    type: t,
+    label: COMPANY_TYPE_LABEL[t],
+    total: 0,
+    unclaimed: 0,
+    by_level: emptyLevelMap(),
+  }));
 
   // 1) Paginated fetch of active, non-merged companies. Same shape
   //    as getCoverageByType — extended with current_level for the
@@ -62,7 +77,7 @@ export async function getSegmentPenetration(
   const HARD_CAP = 20_000;
   const companies: CompanyMinimal[] = [];
   for (let offset = 0; offset < HARD_CAP; offset += PAGE) {
-    const { data } = await sb
+    const { data, error } = await sb
       .from('companies')
       .select('id, company_type, owner_id, current_level')
       .eq('is_active', true)
@@ -71,6 +86,17 @@ export async function getSegmentPenetration(
       .order('id', { ascending: true })
       .range(offset, offset + PAGE - 1)
       .returns<CompanyMinimal[]>();
+    if (error) {
+      console.error('[segment-penetration] companies fetch failed', {
+        offset,
+        band,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      return { rows: emptyRows, error: `companies fetch: ${error.message}` };
+    }
     const rows = data ?? [];
     companies.push(...rows);
     if (rows.length < PAGE) break;
@@ -84,13 +110,30 @@ export async function getSegmentPenetration(
     type PcRow = { company_id: string };
     companyIdsInBand = new Set<string>();
     for (let offset = 0; offset < HARD_CAP; offset += PAGE) {
-      const { data } = await sb
+      const { data, error } = await sb
         .from('project_companies')
         .select('company_id, projects!inner(value_aed)')
         .gte('projects.value_aed', threshold)
         .order('company_id', { ascending: true })
         .range(offset, offset + PAGE - 1)
         .returns<PcRow[]>();
+      if (error) {
+        console.error(
+          '[segment-penetration] project_companies fetch failed',
+          {
+            offset,
+            band,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          },
+        );
+        return {
+          rows: emptyRows,
+          error: `project_companies fetch: ${error.message}`,
+        };
+      }
       const rows = data ?? [];
       for (const r of rows) companyIdsInBand.add(r.company_id);
       if (rows.length < PAGE) break;
@@ -102,11 +145,6 @@ export async function getSegmentPenetration(
     total: number;
     unclaimed: number;
     by_level: Record<Level, number>;
-  };
-  const emptyLevelMap = (): Record<Level, number> => {
-    const out = {} as Record<Level, number>;
-    for (const l of LEVELS) out[l] = 0;
-    return out;
   };
   const buckets: Record<SpokeType, Bucket> = {
     developer:         { total: 0, unclaimed: 0, by_level: emptyLevelMap() },
@@ -134,7 +172,7 @@ export async function getSegmentPenetration(
     }
   }
 
-  return SPOKE_TYPES.map((t) => {
+  const rows = SPOKE_TYPES.map((t) => {
     const b = buckets[t];
     return {
       type: t,
@@ -144,4 +182,6 @@ export async function getSegmentPenetration(
       by_level: b.by_level,
     };
   });
+
+  return { rows, error: null };
 }

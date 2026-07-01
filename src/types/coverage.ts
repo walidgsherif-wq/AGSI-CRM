@@ -28,6 +28,18 @@ export type CoverageRow = {
   by_member: MemberContribution[];
 };
 
+/**
+ * Wrapper for the coverage action so the panel can distinguish
+ * "empty universe" (rows = 7 SPOKE_TYPES with denominator 0) from
+ * "the query failed and we silently returned nothing" (error set).
+ * Prior shape returned only rows, which meant a swallowed DB error
+ * rendered as "0 of 0" — the exact symptom this build fixes.
+ */
+export type CoverageResult = {
+  rows: CoverageRow[];
+  error: string | null;
+};
+
 // Spokes shown on every coverage view — exclude 'other' as a catch-all.
 export const SPOKE_TYPES = [
   'developer',

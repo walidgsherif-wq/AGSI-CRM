@@ -23,6 +23,10 @@ import { RebuildButton } from './_components/RebuildButton';
 import { CoverageRadarPanel } from './_components/CoverageRadarPanel';
 import { SegmentPenetrationPanel } from './_components/SegmentPenetrationPanel';
 import { getSegmentPenetration } from '@/server/actions/segment-penetration';
+import {
+  getCoverageDiagnostics,
+  type CoverageDiagnostics,
+} from '@/server/actions/coverage-diagnostics';
 import { MemberSelector, type BdMember } from './_components/MemberSelector';
 import { MyEventsCard, type MyEventRow } from './_components/MyEventsCard';
 import {
@@ -109,7 +113,7 @@ const TIER_LABEL: Record<string, string> = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { member?: string };
+  searchParams: { member?: string; debug?: string };
 }) {
   const user = await getCurrentUser();
 
@@ -185,6 +189,18 @@ export default async function DashboardPage({
   // event bus (src/lib/coverage-band-events.ts) so a click on either
   // filter moves both.
   const initialPenetration = await getSegmentPenetration('all');
+
+  // Step-0 diagnostic: only prefetched when ?debug=coverage AND the
+  // caller is admin/bd_head/leadership (RPC also gates server-side).
+  // Renders as a small blue banner above the panels. Safe to leave in
+  // once we ship the root-cause fix — the panel + RPC both cap the
+  // blast radius (SELECT only, one aggregate query).
+  const wantsCoverageDebug =
+    (searchParams.debug ?? '').toLowerCase() === 'coverage';
+  const coverageDebug =
+    wantsCoverageDebug && ['admin', 'bd_head', 'leadership'].includes(user.role)
+      ? await getCoverageDiagnostics()
+      : null;
 
   // Engagement-temperature initial snapshot (companies mode). Only
   // fetched for roles that see the panel. Client re-fetches when the
@@ -437,6 +453,8 @@ export default async function DashboardPage({
         </Card>
       )}
 
+      {coverageDebug && <CoverageDebugBanner data={coverageDebug} />}
+
       {user.role !== 'bd_manager' && initialMarketValue && (
         <MarketValueEngagementPanel data={initialMarketValue} />
       )}
@@ -545,6 +563,49 @@ export default async function DashboardPage({
         </p>
       )}
     </div>
+  );
+}
+
+function CoverageDebugBanner({
+  data,
+}: {
+  data: CoverageDiagnostics | { error: string };
+}) {
+  if ('error' in data) {
+    return (
+      <Card>
+        <CardContent className="p-3 text-xs text-rag-red">
+          <strong>Coverage diagnostics failed:</strong> {data.error}
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardContent className="space-y-2 p-3 text-xs text-agsi-darkGray">
+        <p className="font-medium text-agsi-navy">
+          Coverage diagnostics (?debug=coverage) — companies row counts
+        </p>
+        <ul className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4 tabular-nums">
+          <li>total: <strong className="text-agsi-navy">{data.total}</strong></li>
+          <li>is_active=true: <strong className="text-agsi-navy">{data.is_active_true}</strong></li>
+          <li>is_active≠true: <strong className="text-agsi-navy">{data.is_active_not_true}</strong></li>
+          <li>merged NULL: <strong className="text-agsi-navy">{data.merged_null}</strong></li>
+          <li>merged NOT NULL: <strong className="text-agsi-navy">{data.merged_not_null}</strong></li>
+          <li>all-three-filter survivors: <strong className="text-agsi-navy">{data.all_three_filters}</strong></li>
+          <li>universe owner NULL: <strong className="text-agsi-navy">{data.owner_null_in_universe}</strong></li>
+          <li>universe owner NOT NULL: <strong className="text-agsi-navy">{data.owner_not_null_in_universe}</strong></li>
+        </ul>
+        <div>
+          <p className="mt-2 font-medium text-agsi-navy">by_type (all rows):</p>
+          <pre className="overflow-x-auto rounded bg-agsi-offWhite/60 p-2">{JSON.stringify(data.by_type, null, 2)}</pre>
+        </div>
+        <div>
+          <p className="mt-2 font-medium text-agsi-navy">by_type_survivors (after all 3 filters):</p>
+          <pre className="overflow-x-auto rounded bg-agsi-offWhite/60 p-2">{JSON.stringify(data.by_type_survivors, null, 2)}</pre>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
