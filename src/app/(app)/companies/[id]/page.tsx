@@ -13,8 +13,6 @@ import {
   type ProfileOption,
 } from '../_components/CompanyForm';
 import { CompanyClaimButton } from './_components/CompanyClaimButton';
-import { SetInitialLevelButton } from './_components/SetInitialLevelButton';
-import { getCrmSetupMode } from '@/lib/setup-mode';
 import { CompanyReleaseButton } from './_components/CompanyReleaseButton';
 import { ContactsSection, type ContactRow } from './_components/ContactsSection';
 import { PendingLevelUpBadge } from '@/components/domain/PendingLevelUpBadge';
@@ -262,20 +260,6 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
   const canRequestGroup =
     user.role !== 'leadership' && !pendingGroupRequest;
 
-  // Setup-mode backfill affordance. Server-side gate matches the RPC:
-  // must be on, caller must own OR be admin/bd_head, target company
-  // isn't merged, and current level is below L5 (so a forward move is
-  // possible). Server ALSO enforces this; the UI check just avoids
-  // rendering a button that would error on click.
-  const setupModeOn = await getCrmSetupMode();
-  const canSetInitialLevel =
-    setupModeOn &&
-    !company.merged_into_company_id &&
-    company.current_level !== 'L5' &&
-    (user.role === 'admin' ||
-      user.role === 'bd_head' ||
-      (user.role === 'bd_manager' && company.owner_id === user.id));
-
   return (
     <div className="space-y-6">
       {company.merged_into_company_id && (
@@ -313,25 +297,6 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
       )}
       {canClaim && (
         <CompanyClaimButton companyId={company.id} locations={locations} />
-      )}
-      {canSetInitialLevel && (
-        <div className="rounded-xl border border-rag-amber/40 bg-rag-amber/5 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-rag-amber">
-                Setup mode
-              </p>
-              <p className="mt-1 text-xs text-agsi-darkGray">
-                Backfill the true current level directly. Not credited to
-                Driver A.
-              </p>
-            </div>
-            <SetInitialLevelButton
-              companyId={company.id}
-              currentLevel={company.current_level}
-            />
-          </div>
-        </div>
       )}
       {!canClaim && company.owner_id !== null && needsDetails && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-rag-amber/40 bg-rag-amber/10 px-4 py-2">

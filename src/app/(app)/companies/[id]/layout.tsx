@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
+import { getCrmSetupMode } from '@/lib/setup-mode';
 import { Badge } from '@/components/ui/badge';
 import { LevelBadge } from '@/components/domain/LevelBadge';
 import { LevelChangeButton } from '@/components/domain/LevelChangeDialog';
@@ -47,6 +48,8 @@ export default async function CompanyLayout({
 
   if (!company) notFound();
 
+  const crmSetupMode = await getCrmSetupMode();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -71,6 +74,7 @@ export default async function CompanyLayout({
           currentLevel={company.current_level}
           userRole={user.role}
           isOwner={company.owner_id === user.id}
+          crmSetupMode={crmSetupMode}
           variant="button"
         />
       </div>

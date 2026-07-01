@@ -40,6 +40,12 @@ type CommonProps = {
    *  is L2 or higher and this flag is false. Backward moves and
    *  L0 → L1 pass through. */
   isProgressReady?: boolean;
+  /** Setup mode ON → non-admin users can submit a forward multi-level
+   *  request (e.g. L0 → L4). Approved multi-level requests write
+   *  level_history.source='initial_backfill' and are excluded from
+   *  earned Driver A. Admin's direct-change path stays single-step
+   *  regardless. See migration 0086. */
+  crmSetupMode?: boolean;
 };
 
 const INCOMPLETE_HINT =
@@ -118,6 +124,7 @@ export function LevelChangeDialog({
   userRole,
   isOwner,
   isProgressReady,
+  crmSetupMode,
   forcedToLevel,
   onClose,
 }: CommonProps & {
@@ -133,7 +140,21 @@ export function LevelChangeDialog({
   const canChange = isAdmin || isOwner;
   const isReady = isProgressReady !== false;
 
-  const targetOptions = adjacentTargets(currentLevel);
+  // Under setup mode, a non-admin owner can submit a multi-level
+  // forward request. Admin's direct-change path stays single-step —
+  // its RPC still enforces the one-step rule (0031) and always writes
+  // source='progression'. Backward moves stay single-step for
+  // everyone.
+  const setupMultiLevelAllowed = !!crmSetupMode && !isAdmin;
+  const adjacents = adjacentTargets(currentLevel);
+  const forwardMultiLevel = LEVELS.filter(
+    (l) => LEVEL_INDEX[l] > LEVEL_INDEX[currentLevel] + 1,
+  );
+  const targetOptions = setupMultiLevelAllowed
+    ? [...adjacents, ...forwardMultiLevel].sort(
+        (a, b) => LEVEL_INDEX[a] - LEVEL_INDEX[b],
+      )
+    : adjacents;
   // If forcedToLevel was supplied (drag-drop), validate adjacency and lock.
   const lockedTarget = forcedToLevel && targetOptions.includes(forcedToLevel) ? forcedToLevel : null;
   const initialTarget = lockedTarget ?? targetOptions[0];
@@ -220,8 +241,9 @@ export function LevelChangeDialog({
                   ))}
                 </Select>
                 <p className="mt-1 text-xs text-agsi-darkGray">
-                  Single-step only. To move multiple levels, make each step its own change with its
-                  own evidence.
+                  {setupMultiLevelAllowed
+                    ? 'Setup mode: pick any forward level. Admin will approve; the move is flagged as backfill and won’t credit earned Driver A.'
+                    : 'Single-step only. To move multiple levels, make each step its own change with its own evidence.'}
                 </p>
               </div>
             )}
