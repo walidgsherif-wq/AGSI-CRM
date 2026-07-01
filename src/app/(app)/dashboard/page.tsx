@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { ROLE_LABEL } from '@/types/domain';
-import { EcosystemPanel } from '@/components/domain/EcosystemPanel';
+import { EngagementTemperaturePanel } from './_components/EngagementTemperaturePanel';
+import { getEngagementTemperature } from '@/server/actions/engagement-temperature';
 import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
 import {
   fetchFiscalStartMonth,
@@ -176,6 +177,18 @@ export default async function DashboardPage({
   // Initial radar data for the default 'all' band. Re-fetches client-
   // side when the user picks a different value band.
   const initialCoverage = await getCoverageByType('all');
+
+  // Engagement-temperature initial snapshot (companies mode). Only
+  // fetched for roles that see the panel. Client re-fetches when the
+  // user switches the Measure dropdown.
+  const initialTemperatureRaw =
+    user.role !== 'bd_manager'
+      ? await getEngagementTemperature('companies')
+      : null;
+  const initialTemperature =
+    initialTemperatureRaw && !('error' in initialTemperatureRaw)
+      ? initialTemperatureRaw
+      : null;
 
   const { data: playbook } = await supabase
     .from('playbook_targets')
@@ -404,7 +417,9 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      {user.role !== 'bd_manager' && <EcosystemPanel />}
+      {user.role !== 'bd_manager' && initialTemperature && (
+        <EngagementTemperaturePanel initial={initialTemperature} />
+      )}
 
       <CoverageRadarPanel initial={initialCoverage} initialBand="all" />
 
