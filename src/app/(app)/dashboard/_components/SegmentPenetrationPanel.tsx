@@ -16,6 +16,7 @@ import {
   LEVELS,
   UNCLAIMED_COLOR,
   type Level,
+  type SegmentPenetrationResult,
   type SegmentPenetrationRow,
 } from '@/lib/segment-penetration';
 import {
@@ -34,19 +35,21 @@ export function SegmentPenetrationPanel({
   initial,
   initialBand = 'all',
 }: {
-  initial: SegmentPenetrationRow[];
+  initial: SegmentPenetrationResult;
   initialBand?: ValueBand;
 }) {
   const [band, setBand] = useState<ValueBand>(initialBand);
-  const [data, setData] = useState<SegmentPenetrationRow[]>(initial);
+  const [data, setData] = useState<SegmentPenetrationRow[]>(initial.rows);
+  const [error, setError] = useState<string | null>(initial.error);
   const [pending, startTransition] = useTransition();
 
   // Fetch when the band changes. Broken out so both the button
   // handler and the event subscription can share the same code path.
   function fetchForBand(next: ValueBand) {
     startTransition(async () => {
-      const rows = await getSegmentPenetration(next);
-      setData(rows);
+      const res = await getSegmentPenetration(next);
+      setData(res.rows);
+      setError(res.error);
     });
   }
 
@@ -111,6 +114,11 @@ export function SegmentPenetrationPanel({
         </div>
       </CardHeader>
       <CardContent>
+        {error && (
+          <div className="mb-3 rounded border border-rag-red/40 bg-rag-red/5 px-3 py-2 text-xs text-rag-red">
+            <strong>Segment penetration failed to load:</strong> {error}
+          </div>
+        )}
         <div className="mb-3 flex flex-wrap items-baseline gap-2 text-xs text-agsi-darkGray">
           <span>
             Overall claimed:{' '}

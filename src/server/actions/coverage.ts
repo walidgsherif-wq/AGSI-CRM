@@ -7,6 +7,7 @@ import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import {
   BAND_THRESHOLD,
   SPOKE_TYPES,
+  type CoverageResult,
   type CoverageRow,
   type MemberContribution,
   type SpokeType,
@@ -41,14 +42,24 @@ function supabase() {
  * transparent SELECT for any authenticated user, so the totals are
  * honest team-wide counts regardless of who's viewing.
  *
- * Same value-band filter as before is applied consistently to both
- * the numerator and the denominator so percentages stay honest.
+ * Errors: every DB fetch's error is captured. The first error short-
+ * circuits the pipeline and surfaces via `error` on the result so the
+ * panel can render a real error state instead of silently rendering
+ * "0 of 0" (the exact symptom that hid a filter mismatch for a build).
  */
 export async function getCoverageByType(
   band: ValueBand = 'all',
-): Promise<CoverageRow[]> {
+): Promise<CoverageResult> {
   const sb = supabase();
   const threshold = BAND_THRESHOLD[band];
+  const emptyRows: CoverageRow[] = SPOKE_TYPES.map((t) => ({
+    type: t,
+    label: COMPANY_TYPE_LABEL[t],
+    numerator: 0,
+    denominator: 0,
+    coverage_pct: 0,
+    by_member: [],
+  }));
 
   // 1) Paginated fetch of active companies.
   type CompanyMinimal = {
@@ -60,7 +71,7 @@ export async function getCoverageByType(
   const HARD_CAP = 20_000;
   const companies: CompanyMinimal[] = [];
   for (let offset = 0; offset < HARD_CAP; offset += PAGE) {
-    const { data } = await sb
+    const { data, error } = await sb
       .from('companies')
       .select('id, company_type, owner_id')
       .eq('is_active', true)
@@ -69,6 +80,17 @@ export async function getCoverageByType(
       .order('id', { ascending: true })
       .range(offset, offset + PAGE - 1)
       .returns<CompanyMinimal[]>();
+    if (error) {
+      console.error('[coverage] companies fetch failed', {
+        offset,
+        band,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      return { rows: emptyRows, error: `companies fetch: ${error.message}` };
+    }
     const rows = data ?? [];
     companies.push(...rows);
     if (rows.length < PAGE) break;
@@ -81,13 +103,27 @@ export async function getCoverageByType(
     type PcRow = { company_id: string };
     companyIdsInBand = new Set<string>();
     for (let offset = 0; offset < HARD_CAP; offset += PAGE) {
-      const { data } = await sb
+      const { data, error } = await sb
         .from('project_companies')
         .select('company_id, projects!inner(value_aed)')
         .gte('projects.value_aed', threshold)
         .order('company_id', { ascending: true })
         .range(offset, offset + PAGE - 1)
         .returns<PcRow[]>();
+      if (error) {
+        console.error('[coverage] project_companies fetch failed', {
+          offset,
+          band,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        return {
+          rows: emptyRows,
+          error: `project_companies fetch: ${error.message}`,
+        };
+      }
       const rows = data ?? [];
       for (const r of rows) companyIdsInBand.add(r.company_id);
       if (rows.length < PAGE) break;
@@ -124,15 +160,24 @@ export async function getCoverageByType(
   const memberNames = new Map<string, string>();
   if (ownerIds.size > 0) {
     type ProfileRow = { id: string; full_name: string };
-    const { data } = await sb
+    const { data, error } = await sb
       .from('profiles')
       .select('id, full_name')
       .in('id', Array.from(ownerIds))
       .returns<ProfileRow[]>();
+    if (error) {
+      console.error('[coverage] profiles fetch failed', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      // Non-fatal — fall back to id-prefix labels below.
+    }
     for (const p of data ?? []) memberNames.set(p.id, p.full_name);
   }
 
-  return SPOKE_TYPES.map((t) => {
+  const rows = SPOKE_TYPES.map((t) => {
     const b = buckets[t];
     const by_member: MemberContribution[] = Array.from(b.perMember.entries())
       .map(([id, count]) => ({
@@ -151,4 +196,6 @@ export async function getCoverageByType(
       by_member,
     };
   });
+
+  return { rows, error: null };
 }

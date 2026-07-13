@@ -20,6 +20,16 @@ export type SegmentPenetrationRow = {
 };
 
 /**
+ * Wrapper for the segment-penetration action — mirrors CoverageResult.
+ * Lets the panel show a real error state when the DB fetch fails
+ * instead of silently rendering 0-of-0.
+ */
+export type SegmentPenetrationResult = {
+  rows: SegmentPenetrationRow[];
+  error: string | null;
+};
+
+/**
  * Neutral gray for the unclaimed slice. Sequential blue ramp for
  * L0 → L5 — light on the left (fresh contact / lower depth), dark
  * on the right (strategic partnership). The ramp reads

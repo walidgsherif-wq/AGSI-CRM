@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/card';
 import { AGSI } from '@/lib/design/colors';
 import { getCoverageByType } from '@/server/actions/coverage';
-import type { CoverageRow, ValueBand } from '@/types/coverage';
+import type { CoverageResult, CoverageRow, ValueBand } from '@/types/coverage';
 import {
   notifyBandChanged,
   subscribeBandChanged,
@@ -40,18 +40,20 @@ export function CoverageRadarPanel({
   initial,
   initialBand = 'all',
 }: {
-  initial: CoverageRow[];
+  initial: CoverageResult;
   initialBand?: ValueBand;
 }) {
   const [band, setBand] = useState<ValueBand>(initialBand);
-  const [data, setData] = useState<CoverageRow[]>(initial);
+  const [data, setData] = useState<CoverageRow[]>(initial.rows);
+  const [error, setError] = useState<string | null>(initial.error);
   const [pending, startTransition] = useTransition();
   const [view, setView] = useState<'segment' | 'member'>('segment');
 
   function fetchForBand(next: ValueBand) {
     startTransition(async () => {
-      const rows = await getCoverageByType(next);
-      setData(rows);
+      const res = await getCoverageByType(next);
+      setData(res.rows);
+      setError(res.error);
     });
   }
 
@@ -113,6 +115,11 @@ export function CoverageRadarPanel({
         </div>
       </CardHeader>
       <CardContent>
+        {error && (
+          <div className="mb-3 rounded border border-rag-red/40 bg-rag-red/5 px-3 py-2 text-xs text-rag-red">
+            <strong>Coverage failed to load:</strong> {error}
+          </div>
+        )}
         <div className="mb-3 flex flex-wrap items-baseline gap-2 text-xs text-agsi-darkGray">
           <span>
             Overall:{' '}
