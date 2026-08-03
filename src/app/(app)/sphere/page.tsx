@@ -12,6 +12,7 @@ import { SPOKE_TYPES } from '@/types/coverage';
 import { sphereQuerySchema } from '@/lib/zod/sphere';
 import { getSphereBuilderRows } from '@/server/actions/sphere';
 import { SphereBuilder } from './_components/SphereBuilder';
+import { ClearSphereButton } from './_components/ClearSphereButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,13 +69,18 @@ export default async function SpherePage({
             count to focus on the deals that matter.
           </p>
         </div>
-        <div className="rounded-lg border border-agsi-lightGray bg-white px-3 py-2 text-sm">
-          <span className="text-xs uppercase tracking-wider text-agsi-darkGray">
-            Sphere size
-          </span>
-          <p className="text-2xl font-semibold tabular-nums text-agsi-navy">
-            {data.sphereCount}
-          </p>
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg border border-agsi-lightGray bg-white px-3 py-2 text-sm">
+            <span className="text-xs uppercase tracking-wider text-agsi-darkGray">
+              Sphere size
+            </span>
+            <p className="text-2xl font-semibold tabular-nums text-agsi-navy">
+              {data.sphereCount}
+            </p>
+          </div>
+          {(user.role === 'admin' || user.role === 'bd_head') && (
+            <ClearSphereButton sphereCount={data.sphereCount} />
+          )}
         </div>
       </div>
 
