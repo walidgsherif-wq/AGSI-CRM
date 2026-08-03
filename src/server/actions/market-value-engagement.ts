@@ -13,6 +13,8 @@ import type {
   MarketValueTopUnengagedRow,
   MarketValueWhitespaceRow,
 } from '@/lib/market-value-engagement';
+import type { Universe } from '@/types/coverage';
+import { resolveSphereScope } from '@/lib/sphere-scope';
 
 function supabase() {
   return createServerClient(
@@ -71,13 +73,17 @@ function toBand(raw: unknown): MarketValueBand {
  * the numeric strings Postgres uses for numeric(18,2) columns into
  * plain JS numbers so the panel doesn't need to defend against them.
  */
-export async function getMarketValueEngagement(): Promise<
-  MarketValueEngagement | { error: string }
-> {
+export async function getMarketValueEngagement(
+  universe: Universe = 'sphere',
+): Promise<MarketValueEngagement | { error: string }> {
   const user = await getCurrentUser();
   if (user.role === 'bd_manager') return { error: 'forbidden' };
 
-  const { data, error } = await supabase().rpc('get_market_value_engagement');
+  const sb = supabase();
+  const scope = await resolveSphereScope(sb, universe);
+  const { data, error } = await sb.rpc('get_market_value_engagement', {
+    p_sphere_only: scope.applied === 'sphere',
+  });
   if (error) return { error: error.message };
 
   const payload = (data as RawPayload | null) ?? {};
@@ -128,5 +134,13 @@ export async function getMarketValueEngagement(): Promise<
     rn: toNumber(r.rn),
   }));
 
-  return { headline, cold_split, whitespace, pareto, top_unengaged };
+  return {
+    headline,
+    cold_split,
+    whitespace,
+    pareto,
+    top_unengaged,
+    universe: scope.applied,
+    sphereEmpty: scope.sphereEmpty,
+  };
 }

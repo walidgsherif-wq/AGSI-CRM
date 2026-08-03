@@ -19,7 +19,17 @@ import {
 } from '@/components/ui/card';
 import { AGSI } from '@/lib/design/colors';
 import { getCoverageByType } from '@/server/actions/coverage';
-import type { CoverageResult, CoverageRow, ValueBand } from '@/types/coverage';
+import type {
+  CoverageResult,
+  CoverageRow,
+  Universe,
+  ValueBand,
+} from '@/types/coverage';
+import {
+  SphereFallbackNotice,
+  UniverseToggle,
+  universeSuffix,
+} from '@/components/domain/UniverseToggle';
 import {
   notifyBandChanged,
   subscribeBandChanged,
@@ -44,39 +54,51 @@ export function CoverageRadarPanel({
   initialBand?: ValueBand;
 }) {
   const [band, setBand] = useState<ValueBand>(initialBand);
+  const [universe, setUniverse] = useState<Universe>(
+    initial.universe === 'full' && !initial.sphereEmpty ? 'full' : 'sphere',
+  );
+  const [appliedUniverse, setAppliedUniverse] = useState<Universe>(
+    initial.universe,
+  );
+  const [sphereEmpty, setSphereEmpty] = useState<boolean>(initial.sphereEmpty);
   const [data, setData] = useState<CoverageRow[]>(initial.rows);
   const [error, setError] = useState<string | null>(initial.error);
   const [pending, startTransition] = useTransition();
   const [view, setView] = useState<'segment' | 'member'>('segment');
 
-  function fetchForBand(next: ValueBand) {
+  function refetch(nextBand: ValueBand, nextUniverse: Universe) {
     startTransition(async () => {
-      const res = await getCoverageByType(next);
+      const res = await getCoverageByType(nextBand, nextUniverse);
       setData(res.rows);
       setError(res.error);
+      setAppliedUniverse(res.universe);
+      setSphereEmpty(res.sphereEmpty);
     });
   }
 
   function selectBand(next: ValueBand) {
     if (next === band) return;
     setBand(next);
-    fetchForBand(next);
-    // Broadcast so the sibling SegmentPenetrationPanel moves with us.
+    refetch(next, universe);
     notifyBandChanged(next);
   }
 
-  // Sync when the segment-penetration panel changes the band. Two
-  // panels, one filter — see src/lib/coverage-band-events.ts.
+  function selectUniverse(next: Universe) {
+    if (next === universe) return;
+    setUniverse(next);
+    refetch(band, next);
+  }
+
   useEffect(() => {
     return subscribeBandChanged((next) => {
       setBand((cur) => {
         if (cur === next) return cur;
-        fetchForBand(next);
+        refetch(next, universe);
         return next;
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [universe]);
 
   const totalNumerator = data.reduce((s, r) => s + r.numerator, 0);
   const totalDenominator = data.reduce((s, r) => s + r.denominator, 0);
@@ -94,7 +116,9 @@ export function CoverageRadarPanel({
               project value to focus on the deals that matter.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <UniverseToggle value={universe} onChange={selectUniverse} disabled={pending} />
+            <span className="text-xxs text-agsi-midGray">·</span>
             {BANDS.map((b) => (
               <button
                 key={b.key}
@@ -120,6 +144,7 @@ export function CoverageRadarPanel({
             <strong>Coverage failed to load:</strong> {error}
           </div>
         )}
+        {sphereEmpty && <SphereFallbackNotice />}
         <div className="mb-3 flex flex-wrap items-baseline gap-2 text-xs text-agsi-darkGray">
           <span>
             Overall:{' '}
@@ -127,6 +152,9 @@ export function CoverageRadarPanel({
               {totalNumerator} of {totalDenominator}
             </strong>{' '}
             ({PCT.format(overallPct)}%)
+            <span className="ml-1 text-agsi-midGray">
+              {universeSuffix(appliedUniverse)}
+            </span>
           </span>
           {pending && <span className="text-agsi-midGray">updating…</span>}
         </div>

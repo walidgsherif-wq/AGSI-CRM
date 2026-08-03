@@ -13,6 +13,8 @@ import {
   type EngagementTemperature,
   type EngagementBreadth,
 } from '@/lib/engagement-temperature';
+import type { Universe } from '@/types/coverage';
+import { resolveSphereScope } from '@/lib/sphere-scope';
 
 function supabase() {
   return createServerClient(
@@ -42,12 +44,17 @@ type RawPayload = {
  */
 export async function getEngagementTemperature(
   measure: EngagementMeasure,
+  universe: Universe = 'sphere',
 ): Promise<EngagementTemperature | { error: string }> {
   const user = await getCurrentUser();
   if (user.role === 'bd_manager') return { error: 'forbidden' };
 
-  const { data, error } = await supabase().rpc('get_engagement_temperature', {
+  const sb = supabase();
+  const scope = await resolveSphereScope(sb, universe);
+
+  const { data, error } = await sb.rpc('get_engagement_temperature', {
     p_measure: measure,
+    p_sphere_only: scope.applied === 'sphere',
   });
   if (error) return { error: error.message };
 
@@ -74,5 +81,12 @@ export async function getEngagementTemperature(
     if (row.cnt > cellMax) cellMax = row.cnt;
   }
 
-  return { measure, breadth, grid, cellMax };
+  return {
+    measure,
+    breadth,
+    grid,
+    cellMax,
+    universe: scope.applied,
+    sphereEmpty: scope.sphereEmpty,
+  };
 }

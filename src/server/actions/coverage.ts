@@ -11,8 +11,10 @@ import {
   type CoverageRow,
   type MemberContribution,
   type SpokeType,
+  type Universe,
   type ValueBand,
 } from '@/types/coverage';
+import { resolveSphereScope } from '@/lib/sphere-scope';
 
 function supabase() {
   return createServerClient(
@@ -49,9 +51,11 @@ function supabase() {
  */
 export async function getCoverageByType(
   band: ValueBand = 'all',
+  universe: Universe = 'sphere',
 ): Promise<CoverageResult> {
   const sb = supabase();
   const threshold = BAND_THRESHOLD[band];
+  const scope = await resolveSphereScope(sb, universe);
   const emptyRows: CoverageRow[] = SPOKE_TYPES.map((t) => ({
     type: t,
     label: COMPANY_TYPE_LABEL[t],
@@ -89,7 +93,12 @@ export async function getCoverageByType(
         hint: error.hint,
         code: error.code,
       });
-      return { rows: emptyRows, error: `companies fetch: ${error.message}` };
+      return {
+        rows: emptyRows,
+        error: `companies fetch: ${error.message}`,
+        universe: scope.applied,
+        sphereEmpty: scope.sphereEmpty,
+      };
     }
     const rows = data ?? [];
     companies.push(...rows);
@@ -122,6 +131,8 @@ export async function getCoverageByType(
         return {
           rows: emptyRows,
           error: `project_companies fetch: ${error.message}`,
+          universe: scope.applied,
+          sphereEmpty: scope.sphereEmpty,
         };
       }
       const rows = data ?? [];
@@ -145,6 +156,11 @@ export async function getCoverageByType(
   const ownerIds = new Set<string>();
   for (const c of companies) {
     if (companyIdsInBand && !companyIdsInBand.has(c.id)) continue;
+    // Sphere scope — intersect the universe with sphere_members.
+    // Applied to BOTH numerator and denominator so coverage_pct
+    // stays honest. Skipped when scope.memberIds is null (either
+    // universe='full' or the sphere was empty and we fell back).
+    if (scope.memberIds && !scope.memberIds.has(c.id)) continue;
     const b = buckets[c.company_type];
     if (!b) continue;
     b.den += 1;
@@ -197,5 +213,10 @@ export async function getCoverageByType(
     };
   });
 
-  return { rows, error: null };
+  return {
+    rows,
+    error: null,
+    universe: scope.applied,
+    sphereEmpty: scope.sphereEmpty,
+  };
 }

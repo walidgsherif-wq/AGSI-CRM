@@ -27,6 +27,10 @@ export type SegmentPenetrationRow = {
 export type SegmentPenetrationResult = {
   rows: SegmentPenetrationRow[];
   error: string | null;
+  /** Applied universe (may fall back to 'full' when sphere is empty). */
+  universe: 'sphere' | 'full';
+  /** True when caller asked for sphere but sphere_members was empty. */
+  sphereEmpty: boolean;
 };
 
 /**

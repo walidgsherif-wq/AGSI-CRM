@@ -8,8 +8,10 @@ import {
   BAND_THRESHOLD,
   SPOKE_TYPES,
   type SpokeType,
+  type Universe,
   type ValueBand,
 } from '@/types/coverage';
+import { resolveSphereScope } from '@/lib/sphere-scope';
 import { LEVELS, type Level } from '@/types/domain';
 import type {
   SegmentPenetrationResult,
@@ -48,9 +50,11 @@ function supabase() {
  */
 export async function getSegmentPenetration(
   band: ValueBand = 'all',
+  universe: Universe = 'sphere',
 ): Promise<SegmentPenetrationResult> {
   const sb = supabase();
   const threshold = BAND_THRESHOLD[band];
+  const scope = await resolveSphereScope(sb, universe);
   const emptyLevelMap = (): Record<Level, number> => {
     const out = {} as Record<Level, number>;
     for (const l of LEVELS) out[l] = 0;
@@ -95,7 +99,12 @@ export async function getSegmentPenetration(
         hint: error.hint,
         code: error.code,
       });
-      return { rows: emptyRows, error: `companies fetch: ${error.message}` };
+      return {
+        rows: emptyRows,
+        error: `companies fetch: ${error.message}`,
+        universe: scope.applied,
+        sphereEmpty: scope.sphereEmpty,
+      };
     }
     const rows = data ?? [];
     companies.push(...rows);
@@ -132,6 +141,8 @@ export async function getSegmentPenetration(
         return {
           rows: emptyRows,
           error: `project_companies fetch: ${error.message}`,
+          universe: scope.applied,
+          sphereEmpty: scope.sphereEmpty,
         };
       }
       const rows = data ?? [];
@@ -158,6 +169,7 @@ export async function getSegmentPenetration(
 
   for (const c of companies) {
     if (companyIdsInBand && !companyIdsInBand.has(c.id)) continue;
+    if (scope.memberIds && !scope.memberIds.has(c.id)) continue;
     const b = buckets[c.company_type];
     if (!b) continue;
     b.total += 1;
@@ -183,5 +195,10 @@ export async function getSegmentPenetration(
     };
   });
 
-  return { rows, error: null };
+  return {
+    rows,
+    error: null,
+    universe: scope.applied,
+    sphereEmpty: scope.sphereEmpty,
+  };
 }
