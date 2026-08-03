@@ -30,6 +30,10 @@ export type SphereBuilderRow = {
   added_by: string | null;
   added_by_role: string | null;
   added_at: string | null;
+  /** Non-null when this out-of-sphere company has a pending proposal. */
+  pending_proposal_id: string | null;
+  /** Non-null when a prior proposal was rejected — surfaces the anti-nag hint. */
+  rejected_proposal_id: string | null;
 };
 
 export type SphereOwnerOption = { id: string; full_name: string };
@@ -202,6 +206,35 @@ export async function getSphereBuilderRows(
     for (const m of mems ?? []) memByCompany.set(m.company_id, m);
   }
 
+  // Pending / rejected proposals for the same IDs — one query, both
+  // status buckets, split client-side. bd_manager RLS only lets them
+  // see their own proposals; admin/bd_head see all. The UI treats a
+  // manager who doesn't see a peer's pending proposal as "not
+  // proposed" for their view — the propose action will then dedup
+  // server-side via the RPC.
+  type PropRow = {
+    id: string;
+    company_id: string;
+    status: 'pending' | 'rejected' | 'approved';
+  };
+  const pendingByCompany = new Map<string, string>();
+  const rejectedByCompany = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: props } = await sb
+      .from('sphere_proposals')
+      .select('id, company_id, status')
+      .in('company_id', ids)
+      .in('status', ['pending', 'rejected'])
+      .returns<PropRow[]>();
+    for (const p of props ?? []) {
+      if (p.status === 'pending' && !pendingByCompany.has(p.company_id)) {
+        pendingByCompany.set(p.company_id, p.id);
+      } else if (p.status === 'rejected' && !rejectedByCompany.has(p.company_id)) {
+        rejectedByCompany.set(p.company_id, p.id);
+      }
+    }
+  }
+
   // Merge into typed rows.
   let rows: SphereBuilderRow[] = companies.map((c) => {
     const s = statsById.get(c.id) ?? { count: 0, value: 0 };
@@ -221,6 +254,8 @@ export async function getSphereBuilderRows(
       added_by: m?.added_by ?? null,
       added_by_role: m?.added_by_role ?? null,
       added_at: m?.added_at ?? null,
+      pending_proposal_id: pendingByCompany.get(c.id) ?? null,
+      rejected_proposal_id: rejectedByCompany.get(c.id) ?? null,
     };
   });
 
@@ -286,8 +321,9 @@ async function loadCityOptions(
 }
 
 /**
- * Add a batch of companies to the sphere. Governance:
- *   - admin / bd_head / bd_manager may add.
+ * Add a batch of companies directly to the sphere. Governance
+ * (amended 0098): admin / bd_head only. Managers propose via
+ * proposeForSphere() and admin/bd_head decide from the inbox.
  *   - added_by is stamped auth.uid() (RLS pins this).
  *   - added_by_role is stamped from the caller's current profile role.
  *   - Ignores companies already in the sphere (ON CONFLICT DO NOTHING).
@@ -297,8 +333,11 @@ export async function addToSphere(
   note?: string | null,
 ): Promise<{ added: number } | { error: string }> {
   const user = await getCurrentUser();
-  if (!['admin', 'bd_head', 'bd_manager'].includes(user.role)) {
-    return { error: 'Only BD team members can edit the sphere.' };
+  if (!['admin', 'bd_head'].includes(user.role)) {
+    return {
+      error:
+        'Managers propose stakeholders for the sphere; only admin or bd_head add directly.',
+    };
   }
   const ids = Array.from(new Set(companyIds.filter(Boolean))).slice(0, 500);
   if (ids.length === 0) return { added: 0 };
@@ -337,56 +376,33 @@ export async function addToSphere(
  * a bd_manager trying to remove an admin-added row via a hand-crafted
  * PostgREST call is dropped by the delete_manager_own policy).
  */
+/**
+ * Remove sphere entries. Amended governance (0098): admin / bd_head
+ * only. Managers cannot remove any row — including ones they had
+ * originally proposed — since even those are, after approval, admin/
+ * head-owned membership decisions.
+ */
 export async function removeFromSphere(
   companyIds: string[],
 ): Promise<
-  { removed: number; blocked: number } | { error: string }
+  { removed: number } | { error: string }
 > {
   const user = await getCurrentUser();
-  if (!['admin', 'bd_head', 'bd_manager'].includes(user.role)) {
-    return { error: 'Only BD team members can edit the sphere.' };
+  if (!['admin', 'bd_head'].includes(user.role)) {
+    return {
+      error:
+        'Only admin or bd_head can remove from the sphere.',
+    };
   }
   const ids = Array.from(new Set(companyIds.filter(Boolean))).slice(0, 500);
-  if (ids.length === 0) return { removed: 0, blocked: 0 };
+  if (ids.length === 0) return { removed: 0 };
 
-  const sb = supabase();
-
-  // Load the target rows so we can enforce governance with a real
-  // message. For admin/bd_head all pass; for bd_manager we filter
-  // to their own additions.
-  const { data: rows } = await sb
-    .from('sphere_members')
-    .select('company_id, added_by, added_by_role')
-    .in('company_id', ids)
-    .returns<
-      Array<{ company_id: string; added_by: string | null; added_by_role: string }>
-    >();
-  const all = rows ?? [];
-
-  let removable: string[] = [];
-  let blocked = 0;
-  if (user.role === 'admin' || user.role === 'bd_head') {
-    removable = all.map((r) => r.company_id);
-  } else {
-    for (const r of all) {
-      if (r.added_by === user.id && r.added_by_role === 'bd_manager') {
-        removable.push(r.company_id);
-      } else {
-        blocked += 1;
-      }
-    }
-  }
-
-  if (removable.length === 0) {
-    return { removed: 0, blocked };
-  }
-
-  const { error } = await sb
+  const { error } = await supabase()
     .from('sphere_members')
     .delete()
-    .in('company_id', removable);
+    .in('company_id', ids);
   if (error) return { error: error.message };
 
   revalidatePath('/sphere');
-  return { removed: removable.length, blocked };
+  return { removed: ids.length };
 }

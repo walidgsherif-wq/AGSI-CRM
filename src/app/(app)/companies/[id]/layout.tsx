@@ -11,6 +11,7 @@ import { LevelChangeButton } from '@/components/domain/LevelChangeDialog';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { CompanyTabs } from './_components/CompanyTabs';
 import { DiscussionRail } from './_components/DiscussionRail';
+import { ProposeForSphereButton } from './_components/ProposeForSphereButton';
 import {
   getUnreadMentionCountForCompany,
   listUnreadMentionsForCompany,
@@ -80,6 +81,26 @@ export default async function CompanyLayout({
   // rail (matches the pre-#157 tab-level gate); everyone else does.
   const isBdTeam = ['admin', 'bd_head', 'bd_manager'].includes(user.role);
   const canPost = isBdTeam;
+
+  // Manual "Propose for sphere" button — bd_manager only, and only
+  // when the company isn't already covered / pending / rejected.
+  // Small query, keeps the button click one round-trip vs three.
+  let showProposeButton = false;
+  if (user.role === 'bd_manager') {
+    const [{ count: memberCount }, { count: proposalCount }] = await Promise.all([
+      supabase
+        .from('sphere_members')
+        .select('company_id', { count: 'exact', head: true })
+        .eq('company_id', company.id),
+      supabase
+        .from('sphere_proposals')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', company.id)
+        .in('status', ['pending', 'rejected']),
+    ]);
+    showProposeButton =
+      (memberCount ?? 0) === 0 && (proposalCount ?? 0) === 0;
+  }
 
   // Load rail data alongside the header so a single layout render
   // hydrates every tab. Skipped entirely for leadership so no data
@@ -176,15 +197,23 @@ export default async function CompanyLayout({
             {company.source}
           </p>
         </div>
-        <LevelChangeButton
-          companyId={company.id}
-          companyName={company.canonical_name}
-          currentLevel={company.current_level}
-          userRole={user.role}
-          isOwner={company.owner_id === user.id}
-          crmSetupMode={crmSetupMode}
-          variant="button"
-        />
+        <div className="flex flex-wrap items-start gap-3">
+          {showProposeButton && (
+            <ProposeForSphereButton
+              companyId={company.id}
+              companyName={company.canonical_name}
+            />
+          )}
+          <LevelChangeButton
+            companyId={company.id}
+            companyName={company.canonical_name}
+            currentLevel={company.current_level}
+            userRole={user.role}
+            isOwner={company.owner_id === user.id}
+            crmSetupMode={crmSetupMode}
+            variant="button"
+          />
+        </div>
       </div>
 
       {/* Two-column body when the viewer has rail access; single
