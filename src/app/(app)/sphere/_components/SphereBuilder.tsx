@@ -15,6 +15,7 @@ import {
   type SphereBuilderResponse,
   type SphereBuilderRow,
 } from '@/server/actions/sphere';
+import { proposeForSphere } from '@/server/actions/sphere-proposals';
 import {
   PAGE_SIZE,
   SPHERE_IN_FILTERS,
@@ -62,17 +63,15 @@ export function SphereBuilder({
   const rows = initialData.rows;
   const totalPages = Math.max(1, Math.ceil(initialData.total / PAGE_SIZE));
 
-  // Rows this viewer can remove — controls whether the Remove button
-  // is enabled AND whether the per-row checkbox surfaces a lock icon.
-  const canRemoveRow = useMemo(
-    () => (r: SphereBuilderRow) => {
-      if (!r.in_sphere) return false;
-      if (currentUserRole === 'admin' || currentUserRole === 'bd_head') return true;
-      if (currentUserRole !== 'bd_manager') return false;
-      return r.added_by === currentUserId && r.added_by_role === 'bd_manager';
-    },
-    [currentUserId, currentUserRole],
-  );
+  // Amendment (0098): removal is admin/bd_head only.
+  const canRemove =
+    currentUserRole === 'admin' || currentUserRole === 'bd_head';
+  const canAddDirectly = canRemove; // same tier
+  const canPropose = currentUserRole === 'bd_manager';
+
+  // Silence "unused prop" for the current user id — kept in the API
+  // shape because a future per-user proposal history view will want it.
+  void currentUserId;
 
   // URL-driven state. Merge overrides into the current search params
   // and push. Clearing a value = drop that key from the URL.
@@ -127,11 +126,14 @@ export function SphereBuilder({
     () => rows.filter((r) => selected.has(r.company_id)),
     [rows, selected],
   );
-  const selectableAdd = selectedRows.filter((r) => !r.in_sphere);
-  const selectableRemove = selectedRows.filter(canRemoveRow);
-  const lockedInSelection = selectedRows.filter(
-    (r) => r.in_sphere && !canRemoveRow(r),
-  ).length;
+  // "Addable" set = out-of-sphere companies. Admins add directly.
+  // Managers propose — same eligibility, but a pending / rejected
+  // proposal disqualifies (server will dedup anyway; the UI hint
+  // stops a manager wasting a click).
+  const selectableAdd = selectedRows.filter(
+    (r) => !r.in_sphere && !r.pending_proposal_id && !r.rejected_proposal_id,
+  );
+  const selectableRemove = selectedRows.filter((r) => r.in_sphere);
 
   function bulkAdd() {
     if (selectableAdd.length === 0) return;
@@ -151,6 +153,36 @@ export function SphereBuilder({
     });
   }
 
+  function bulkPropose() {
+    if (selectableAdd.length === 0) return;
+    setMsg(null);
+    startTransition(async () => {
+      const results = await Promise.all(
+        selectableAdd.map((r) =>
+          proposeForSphere(r.company_id, 'manual'),
+        ),
+      );
+      let proposed = 0;
+      let deduped = 0;
+      let errored = 0;
+      for (const r of results) {
+        if ('error' in r) errored += 1;
+        else if (r.proposed) proposed += 1;
+        else deduped += 1;
+      }
+      const parts: string[] = [];
+      if (proposed > 0) parts.push(`${proposed} proposed for review.`);
+      if (deduped > 0) parts.push(`${deduped} skipped (already covered or pending).`);
+      if (errored > 0) parts.push(`${errored} failed.`);
+      setMsg({
+        tone: errored > 0 ? 'err' : deduped > 0 ? 'warn' : 'ok',
+        text: parts.join(' ') || 'Nothing to propose.',
+      });
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   function bulkRemove() {
     if (selectableRemove.length === 0) return;
     setMsg(null);
@@ -162,14 +194,7 @@ export function SphereBuilder({
         setMsg({ tone: 'err', text: res.error });
         return;
       }
-      const parts = [`${res.removed} removed.`];
-      if (res.blocked > 0) {
-        parts.push(`${res.blocked} skipped (added by admin or head).`);
-      }
-      setMsg({
-        tone: res.blocked > 0 ? 'warn' : 'ok',
-        text: parts.join(' '),
-      });
+      setMsg({ tone: 'ok', text: `${res.removed} removed.` });
       setSelected(new Set());
       router.refresh();
     });
@@ -280,29 +305,38 @@ export function SphereBuilder({
         <div className="flex flex-wrap items-center gap-2 px-3">
           <span className="text-xs text-agsi-darkGray">
             {selected.size === 0
-              ? 'Select rows to add or remove.'
+              ? canPropose
+                ? 'Select rows to propose for the sphere.'
+                : 'Select rows to add or remove.'
               : `${selected.size} selected`}
           </span>
-          <Button
-            size="sm"
-            disabled={pending || selectableAdd.length === 0}
-            onClick={bulkAdd}
-          >
-            + Add {selectableAdd.length > 0 ? selectableAdd.length : ''} to sphere
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={pending || selectableRemove.length === 0}
-            onClick={bulkRemove}
-          >
-            − Remove {selectableRemove.length > 0 ? selectableRemove.length : ''} from sphere
-          </Button>
-          {lockedInSelection > 0 && (
-            <span className="inline-flex items-center gap-1 text-xxs italic text-agsi-darkGray">
-              <Lock aria-hidden className="h-3 w-3" />
-              {lockedInSelection} selected are admin/head-added — cannot remove
-            </span>
+          {canAddDirectly && (
+            <Button
+              size="sm"
+              disabled={pending || selectableAdd.length === 0}
+              onClick={bulkAdd}
+            >
+              + Add {selectableAdd.length > 0 ? selectableAdd.length : ''} to sphere
+            </Button>
+          )}
+          {canPropose && (
+            <Button
+              size="sm"
+              disabled={pending || selectableAdd.length === 0}
+              onClick={bulkPropose}
+            >
+              Propose {selectableAdd.length > 0 ? selectableAdd.length : ''} for review
+            </Button>
+          )}
+          {canRemove && (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={pending || selectableRemove.length === 0}
+              onClick={bulkRemove}
+            >
+              − Remove {selectableRemove.length > 0 ? selectableRemove.length : ''} from sphere
+            </Button>
           )}
           {msg && (
             <span
@@ -382,7 +416,6 @@ export function SphereBuilder({
             ) : (
               rows.map((r) => {
                 const isSelected = selected.has(r.company_id);
-                const removeLocked = r.in_sphere && !canRemoveRow(r);
                 return (
                   <tr
                     key={r.company_id}
@@ -437,12 +470,22 @@ export function SphereBuilder({
                         <span className="inline-flex items-center gap-1 text-xxs text-agsi-green">
                           <Check aria-hidden className="h-3 w-3" />
                           In
-                          {removeLocked && (
-                            <Lock
-                              aria-hidden
-                              className="ml-1 h-3 w-3 text-agsi-darkGray"
-                            />
-                          )}
+                        </span>
+                      ) : r.pending_proposal_id ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-xxs text-rag-amber"
+                          title="Awaiting admin review"
+                        >
+                          <Lock aria-hidden className="h-3 w-3" />
+                          Pending
+                        </span>
+                      ) : r.rejected_proposal_id ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-xxs italic text-agsi-darkGray"
+                          title="Previously rejected — admin can still add manually"
+                        >
+                          <X aria-hidden className="h-3 w-3" />
+                          Rejected
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xxs text-agsi-darkGray">

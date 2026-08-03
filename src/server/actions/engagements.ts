@@ -11,6 +11,7 @@ import {
   engagementUpdateSchema,
   type EngagementType,
 } from '@/lib/zod/engagement';
+import { maybeProposeFromAutoHook } from '@/server/actions/sphere-proposals';
 
 export type EngagementDetails = {
   id: string;
@@ -81,6 +82,13 @@ export async function createEngagement(formData: FormData) {
     .from('engagements')
     .insert({ ...parsed.data, created_by: user.id });
   if (error) return { error: error.message };
+
+  // Sphere-of-interest curation prompt (0098): when a bd_manager
+  // engages an off-sphere company, auto-create a pending proposal
+  // for admin/bd_head to review. Best-effort — never blocks the
+  // engagement. Dedup + role-gate live inside the helper.
+  await maybeProposeFromAutoHook(parsed.data.company_id, 'engaged_off_sphere');
+
   revalidatePath(`/companies/${parsed.data.company_id}/engagements`);
   return { ok: true };
 }

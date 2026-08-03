@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { companyCreateSchema, companyUpdateSchema } from '@/lib/zod/company';
+import { maybeProposeFromAutoHook } from '@/server/actions/sphere-proposals';
 
 function supabaseFromRequest() {
   return createServerClient(
@@ -140,6 +141,12 @@ export async function claimCompany(companyId: string, locationId: string) {
     p_location_id: locationId,
   });
   if (error) return { error: error.message };
+
+  // Sphere-of-interest curation prompt (0098): when a bd_manager
+  // claims an off-sphere company, auto-create a pending proposal
+  // for admin/bd_head. Best-effort — never blocks the claim. Dedup
+  // + role-gate live inside the helper.
+  await maybeProposeFromAutoHook(companyId, 'claimed_off_sphere');
 
   revalidatePath('/companies');
   revalidatePath(`/companies/${companyId}`);

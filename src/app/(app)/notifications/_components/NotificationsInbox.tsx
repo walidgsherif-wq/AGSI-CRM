@@ -15,6 +15,7 @@ import {
   type NotificationRow,
 } from '@/server/actions/notifications';
 import { ReviewActions } from '@/app/(app)/admin/level-requests/_components/ReviewActions';
+import { SphereProposalActions } from './SphereProposalActions';
 import { notifyUnreadChanged } from '@/lib/notifications-events';
 import type { Level, Role } from '@/types/domain';
 
@@ -32,6 +33,7 @@ const TYPE_LABEL: Record<string, string> = {
   composition_warning: 'Composition warning',
   composition_drift: 'Composition drift',
   mention: 'Mention',
+  sphere_proposal: 'Sphere proposal',
   leadership_report_finalised: 'Leadership report',
 };
 
@@ -63,11 +65,25 @@ export type LevelChangeContext = {
   requester_name: string;
 };
 
+/** Per-notification enrichment for sphere-proposal rows. */
+export type SphereProposalContext = {
+  proposal_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: 'engaged_off_sphere' | 'claimed_off_sphere' | 'manual';
+  company_id: string;
+  company_name: string;
+  company_type_label: string;
+  proposer_name: string;
+  note: string | null;
+  review_note: string | null;
+};
+
 export function NotificationsInbox({
   initial,
   initialFilter,
   initialType,
   levelChangeContext,
+  sphereProposalContext,
   viewerRole,
 }: {
   initial: NotificationRow[];
@@ -75,6 +91,8 @@ export function NotificationsInbox({
   initialType: string;
   /** Keyed by notification.id. Populated server-side for level_change rows. */
   levelChangeContext?: Record<string, LevelChangeContext>;
+  /** Keyed by notification.id. Populated for sphere_proposal rows. */
+  sphereProposalContext?: Record<string, SphereProposalContext>;
   viewerRole: Role;
 }) {
   const router = useRouter();
@@ -172,6 +190,7 @@ export function NotificationsInbox({
               <Row
                 n={n}
                 lc={levelChangeContext?.[n.id]}
+                sp={sphereProposalContext?.[n.id]}
                 viewerRole={viewerRole}
                 onMarkRead={() => {
                   startTransition(async () => {
@@ -201,12 +220,14 @@ export function NotificationsInbox({
 function Row({
   n,
   lc,
+  sp,
   viewerRole,
   onMarkRead,
   onDismiss,
 }: {
   n: NotificationRow;
   lc?: LevelChangeContext;
+  sp?: SphereProposalContext;
   viewerRole: Role;
   onMarkRead: () => void;
   onDismiss: () => void;
@@ -218,6 +239,12 @@ function Row({
   const canReview =
     isLevelChange &&
     lc!.status === 'pending' &&
+    (viewerRole === 'admin' || viewerRole === 'bd_head');
+
+  const isSphereProposal = n.notification_type === 'sphere_proposal' && sp;
+  const canDecideProposal =
+    isSphereProposal &&
+    sp!.status === 'pending' &&
     (viewerRole === 'admin' || viewerRole === 'bd_head');
 
   return (
@@ -240,6 +267,12 @@ function Row({
 
         {isLevelChange ? (
           <LevelChangeBody n={n} lc={lc!} canReview={canReview!} />
+        ) : isSphereProposal ? (
+          <SphereProposalBody
+            n={n}
+            sp={sp!}
+            canReview={canDecideProposal!}
+          />
         ) : (
           <>
             <p className="text-sm font-medium text-agsi-navy">{n.subject}</p>
@@ -279,6 +312,78 @@ function Row({
           <X className="h-3 w-3" aria-hidden /> Dismiss
         </button>
       </div>
+    </div>
+  );
+}
+
+function SphereProposalBody({
+  n,
+  sp,
+  canReview,
+}: {
+  n: NotificationRow;
+  sp: SphereProposalContext;
+  canReview: boolean;
+}) {
+  const reasonLabel =
+    sp.reason === 'engaged_off_sphere'
+      ? 'engaged with the stakeholder'
+      : sp.reason === 'claimed_off_sphere'
+        ? 'claimed the stakeholder'
+        : 'manually proposed';
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p className="text-sm font-medium text-agsi-navy">{sp.company_name}</p>
+        <span className="text-xs text-agsi-darkGray">· {sp.company_type_label}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge
+          variant={
+            sp.status === 'pending'
+              ? 'amber'
+              : sp.status === 'approved'
+                ? 'green'
+                : 'red'
+          }
+        >
+          {sp.status}
+        </Badge>
+        <span className="text-xs text-agsi-darkGray">
+          · {sp.proposer_name} {reasonLabel}
+        </span>
+      </div>
+      {sp.note && (
+        <div className="rounded-lg border border-agsi-lightGray bg-agsi-offWhite px-3 py-2">
+          <p className="text-xxs font-semibold uppercase tracking-wider text-agsi-darkGray">
+            Proposer note
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-xs text-agsi-navy">
+            {sp.note}
+          </p>
+        </div>
+      )}
+      {sp.review_note && sp.status !== 'pending' && (
+        <div className="rounded-lg border border-agsi-lightGray bg-agsi-offWhite px-3 py-2">
+          <p className="text-xxs font-semibold uppercase tracking-wider text-agsi-darkGray">
+            Review note
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-xs text-agsi-navy">
+            {sp.review_note}
+          </p>
+        </div>
+      )}
+      {!canReview && n.body && n.body !== sp.note && (
+        <p className="whitespace-pre-wrap text-xs text-agsi-darkGray">{n.body}</p>
+      )}
+      {canReview && (
+        <div className="rounded-lg border border-agsi-lightGray bg-white p-3">
+          <p className="mb-2 text-xs font-semibold text-agsi-navy">
+            Review this proposal
+          </p>
+          <SphereProposalActions proposalId={sp.proposal_id} />
+        </div>
+      )}
     </div>
   );
 }

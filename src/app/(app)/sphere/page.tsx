@@ -84,9 +84,9 @@ export default async function SpherePage({
           <CardDescription>
             {canEdit
               ? user.role === 'bd_manager'
-                ? 'You can add stakeholders and remove ones you added yourself; admin/head-added rows are locked.'
-                : 'You can add or remove any stakeholder.'
-              : 'Read-only. Ask an admin, BD head, or BD manager to edit the sphere.'}
+                ? 'You can propose stakeholders for the sphere; admin/head review and decide. Removal is admin/head only.'
+                : 'You can add or remove any stakeholder directly. Manager proposals appear as notifications for you to approve.'
+              : 'Read-only. Ask an admin or BD head to edit the sphere.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

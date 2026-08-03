@@ -31,6 +31,7 @@ const TYPE_LABEL: Record<string, string> = {
   composition_warning: 'Composition warning',
   composition_drift: 'Composition drift',
   mention: 'Mention',
+  sphere_proposal: 'Sphere proposal',
   leadership_report_finalised: 'Leadership report',
 };
 
