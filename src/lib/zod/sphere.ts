@@ -29,6 +29,17 @@ export const sphereQuerySchema = z.object({
   // URL strings, min 0, silently dropped when empty.
   min_value: z.coerce.number().min(0).optional().catch(undefined),
   min_count: z.coerce.number().int().min(0).optional().catch(undefined),
+  // Filter on the LARGEST SINGLE project the stakeholder is on
+  // (max_project_value in the view, 0100). Distinct from
+  // min_value which sums every project. Answers "does this
+  // stakeholder touch at least one deal ≥ X?" — the aggregate
+  // can't (an owner of 200 tiny projects can outrank a single-
+  // huge-project owner on the sum but never on the max).
+  min_single_project_value: z
+    .coerce.number()
+    .min(0)
+    .optional()
+    .catch(undefined),
   page: z.coerce.number().int().min(1).default(1),
 });
 
