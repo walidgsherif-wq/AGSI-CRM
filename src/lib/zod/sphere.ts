@@ -24,6 +24,11 @@ export const sphereQuerySchema = z.object({
   city: z.string().trim().min(1).optional(),
   owner: z.string().uuid().optional(),
   q: z.string().trim().min(1).max(200).optional(),
+  // New: server-side minimums so the top-value / top-count views can
+  // be trimmed to a floor without in-memory filtering. Coerced from
+  // URL strings, min 0, silently dropped when empty.
+  min_value: z.coerce.number().min(0).optional().catch(undefined),
+  min_count: z.coerce.number().int().min(0).optional().catch(undefined),
   page: z.coerce.number().int().min(1).default(1),
 });
 

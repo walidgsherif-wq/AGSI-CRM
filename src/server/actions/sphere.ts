@@ -55,237 +55,209 @@ const SORT_COLUMN_MAP: Record<SphereQuery['sort'], string> = {
 };
 
 /**
- * Companies + their stats + sphere membership, one page at a time.
- * Restricted to SPOKE_TYPES + active + non-merged so the builder
- * shows the same universe the coverage / segment panels operate on
- * — the sphere targets those same 7 stakeholder categories.
+ * Rows for the sphere builder. **Driven from `company_stats`** (0052,
+ * widened in 0099) so ORDER BY value / count runs at the DB against
+ * the entire filtered universe — not a name-first pre-fetch cap
+ * sorted in memory. That was the pre-0099 bug: page 1 of "top value"
+ * only reflected the alphabetical head of the ~3.6k universe.
  *
- * Sort runs against company_stats then joins companies for the
- * type/city columns that stats doesn't expose. Two round trips
- * (rows + count) so the paginator can render "X of Y" honestly.
+ * Every filter — type / city / owner / search / min-value / min-count
+ * / in-out-of-sphere — pushes down as a WHERE on the view. Range +
+ * sort + count all cooperate: page N is the true window of the
+ * ordered filtered set, and `total` is the exact match count.
+ *
+ * Small enrichments (owner full_name, membership, proposal state)
+ * come from parallel lookups on the returned page ids — bounded and
+ * cheap.
  */
 export async function getSphereBuilderRows(
   q: SphereQuery,
 ): Promise<SphereBuilderResponse> {
   await getCurrentUser();
   const sb = supabase();
-
-  // We paginate over `companies` (has type/city we filter on) and
-  // then enrich with `company_stats` (has the sort keys). Filtering
-  // on the stats keys themselves is out of scope for the MVP — the
-  // sort surface is enough for the "target list building" workflow.
   const from = (q.page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  // Base companies query: SPOKE_TYPES only, active, non-merged.
-  let companiesQuery = sb
-    .from('companies')
+  // ── 1) Build the view-driven base query with every filter ──────
+  let viewQuery = sb
+    .from('company_stats')
     .select(
-      'id, canonical_name, company_type, city, current_level, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
+      'company_id, canonical_name, company_type, city, level, owner_id, project_count, project_value_involved',
       { count: 'exact' },
     )
     .eq('is_active', true)
     .is('merged_into_company_id', null)
     .in('company_type', SPOKE_TYPES as unknown as string[]);
 
-  if (q.type) companiesQuery = companiesQuery.eq('company_type', q.type);
-  if (q.city) companiesQuery = companiesQuery.eq('city', q.city);
-  if (q.owner) companiesQuery = companiesQuery.eq('owner_id', q.owner);
-  if (q.q) companiesQuery = companiesQuery.ilike('canonical_name', `%${q.q}%`);
+  if (q.type) viewQuery = viewQuery.eq('company_type', q.type);
+  if (q.city) viewQuery = viewQuery.eq('city', q.city);
+  if (q.owner) viewQuery = viewQuery.eq('owner_id', q.owner);
+  if (q.q) viewQuery = viewQuery.ilike('canonical_name', `%${q.q}%`);
+  if (q.min_value !== undefined) {
+    viewQuery = viewQuery.gte('project_value_involved', q.min_value);
+  }
+  if (q.min_count !== undefined) {
+    viewQuery = viewQuery.gte('project_count', q.min_count);
+  }
 
-  // If the caller narrows by in/out of sphere, we resolve that up-
-  // front against sphere_members and constrain the id list. Small
-  // enough (~250 members) to fit in one filter without paging.
-  let sphereIds: Set<string> | null = null;
+  // Membership scope — one lookup, `.in()` for "in sphere", `.not
+  // .in()` for "out". `sphere_members` peaks around a few hundred
+  // rows so the URL length is bounded.
   if (q.in !== 'all') {
     const { data: mem } = await sb
       .from('sphere_members')
       .select('company_id')
       .returns<Array<{ company_id: string }>>();
-    sphereIds = new Set((mem ?? []).map((r) => r.company_id));
+    const sphereIds = (mem ?? []).map((r) => r.company_id);
     if (q.in === 'in') {
-      if (sphereIds.size === 0) {
-        // No members yet — short-circuit rather than send a
-        // gigantic empty IN clause.
-        return {
-          rows: [],
-          total: 0,
-          page: q.page,
-          pageSize: PAGE_SIZE,
-          sphereCount: 0,
-          owners: await loadOwnerOptions(sb),
-          cities: await loadCityOptions(sb),
-        };
+      if (sphereIds.length === 0) {
+        return emptyResponse(sb, q.page);
       }
-      companiesQuery = companiesQuery.in('id', Array.from(sphereIds));
-    } else {
-      // 'out' — exclude any current members.
-      if (sphereIds.size > 0) {
-        companiesQuery = companiesQuery.not(
-          'id',
-          'in',
-          `(${Array.from(sphereIds).join(',')})`,
-        );
-      }
+      viewQuery = viewQuery.in('company_id', sphereIds);
+    } else if (sphereIds.length > 0) {
+      viewQuery = viewQuery.not(
+        'company_id',
+        'in',
+        `(${sphereIds.join(',')})`,
+      );
     }
   }
 
-  // Sort. For 'name' we can push down to the companies query
-  // directly. For value/count we sort in-memory over the page because
-  // company_stats doesn't accept an ORDER at the client SDK level in
-  // the same expression tree — the trade-off is small: the page size
-  // caps at 50, and total-order rankings live on the pre-fetch cap
-  // rather than the SDK.
-  if (q.sort === 'name') {
-    companiesQuery = companiesQuery.order('canonical_name', {
-      ascending: q.dir === 'asc',
-    });
-  } else {
-    // For value / count we need the full filtered set to order
-    // globally, then window in-memory. Fetch a wider slice than
-    // the page and rank; upstream `total` still reflects the true
-    // count so the paginator stays honest. We cap at 5000 to bound
-    // memory — well above any realistic BD-team target universe.
-    companiesQuery = companiesQuery
-      .order('canonical_name', { ascending: true })
-      .range(0, Math.min(from + PAGE_SIZE * 50, 4999));
+  // ── 2) Order + range at the DB ─────────────────────────────────
+  const primarySort = SORT_COLUMN_MAP[q.sort];
+  viewQuery = viewQuery.order(primarySort, {
+    ascending: q.dir === 'asc',
+    nullsFirst: false,
+  });
+  // Deterministic tiebreaker so ties don't shuffle across page loads.
+  if (q.sort !== 'name') {
+    viewQuery = viewQuery.order('canonical_name', { ascending: true });
   }
+  viewQuery = viewQuery.range(from, to);
 
-  if (q.sort === 'name') {
-    companiesQuery = companiesQuery.range(from, to);
-  }
-
-  type CompanyRow = {
-    id: string;
+  type ViewRow = {
+    company_id: string;
     canonical_name: string;
     company_type: string;
     city: string | null;
-    current_level: string;
+    level: string;
     owner_id: string | null;
-    owner: { full_name: string } | { full_name: string }[] | null;
-  };
-  const { data: cRows, count } = await companiesQuery.returns<CompanyRow[]>();
-  const companies = cRows ?? [];
-
-  // Fetch stats for the fetched IDs — one query.
-  const ids = companies.map((c) => c.id);
-  type StatsRow = {
-    company_id: string;
     project_count: number | string;
     project_value_involved: number | string;
   };
-  let statsById = new Map<string, { count: number; value: number }>();
-  if (ids.length > 0) {
-    const { data: stats } = await sb
-      .from('company_stats')
-      .select('company_id, project_count, project_value_involved')
-      .in('company_id', ids)
-      .returns<StatsRow[]>();
-    for (const s of stats ?? []) {
-      statsById.set(s.company_id, {
-        count: Number(s.project_count ?? 0),
-        value: Number(s.project_value_involved ?? 0),
-      });
-    }
-  }
+  const { data: vRows, count } = await viewQuery.returns<ViewRow[]>();
+  const pageRows = vRows ?? [];
+  const ids = pageRows.map((r) => r.company_id);
 
-  // Membership rows for the same IDs — one query.
-  type MemRow = {
-    company_id: string;
-    added_by: string | null;
-    added_by_role: string;
-    added_at: string;
-  };
+  // ── 3) Small enrichments for the page ─────────────────────────
+  // Owner names — one query for the BD-team profile roster (small,
+  // ~10 rows; simpler than embedded joins on the view which
+  // PostgREST can't infer without FKs).
+  const [owners, cities, memPage, proposalPage, sphereCountRes] =
+    await Promise.all([
+      loadOwnerOptions(sb),
+      loadCityOptions(sb),
+      ids.length === 0
+        ? Promise.resolve({ data: [] as MemRow[] })
+        : sb
+            .from('sphere_members')
+            .select('company_id, added_by, added_by_role, added_at')
+            .in('company_id', ids)
+            .returns<MemRow[]>()
+            .then((r) => ({ data: r.data ?? [] })),
+      ids.length === 0
+        ? Promise.resolve({ data: [] as PropRow[] })
+        : sb
+            .from('sphere_proposals')
+            .select('id, company_id, status')
+            .in('company_id', ids)
+            .in('status', ['pending', 'rejected'])
+            .returns<PropRow[]>()
+            .then((r) => ({ data: r.data ?? [] })),
+      sb
+        .from('sphere_members')
+        .select('company_id', { count: 'exact', head: true }),
+    ]);
+
+  const ownerNameById = new Map(owners.map((o) => [o.id, o.full_name]));
+
   const memByCompany = new Map<string, MemRow>();
-  if (ids.length > 0) {
-    const { data: mems } = await sb
-      .from('sphere_members')
-      .select('company_id, added_by, added_by_role, added_at')
-      .in('company_id', ids)
-      .returns<MemRow[]>();
-    for (const m of mems ?? []) memByCompany.set(m.company_id, m);
-  }
+  for (const m of memPage.data) memByCompany.set(m.company_id, m);
 
-  // Pending / rejected proposals for the same IDs — one query, both
-  // status buckets, split client-side. bd_manager RLS only lets them
-  // see their own proposals; admin/bd_head see all. The UI treats a
-  // manager who doesn't see a peer's pending proposal as "not
-  // proposed" for their view — the propose action will then dedup
-  // server-side via the RPC.
-  type PropRow = {
-    id: string;
-    company_id: string;
-    status: 'pending' | 'rejected' | 'approved';
-  };
   const pendingByCompany = new Map<string, string>();
   const rejectedByCompany = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: props } = await sb
-      .from('sphere_proposals')
-      .select('id, company_id, status')
-      .in('company_id', ids)
-      .in('status', ['pending', 'rejected'])
-      .returns<PropRow[]>();
-    for (const p of props ?? []) {
-      if (p.status === 'pending' && !pendingByCompany.has(p.company_id)) {
-        pendingByCompany.set(p.company_id, p.id);
-      } else if (p.status === 'rejected' && !rejectedByCompany.has(p.company_id)) {
-        rejectedByCompany.set(p.company_id, p.id);
-      }
+  for (const p of proposalPage.data) {
+    if (p.status === 'pending' && !pendingByCompany.has(p.company_id)) {
+      pendingByCompany.set(p.company_id, p.id);
+    } else if (
+      p.status === 'rejected' &&
+      !rejectedByCompany.has(p.company_id)
+    ) {
+      rejectedByCompany.set(p.company_id, p.id);
     }
   }
 
-  // Merge into typed rows.
-  let rows: SphereBuilderRow[] = companies.map((c) => {
-    const s = statsById.get(c.id) ?? { count: 0, value: 0 };
-    const m = memByCompany.get(c.id) ?? null;
-    const owner = Array.isArray(c.owner) ? c.owner[0] : c.owner;
+  // ── 4) Assemble typed rows — order preserved from the view ────
+  const rows: SphereBuilderRow[] = pageRows.map((r) => {
+    const m = memByCompany.get(r.company_id) ?? null;
     return {
-      company_id: c.id,
-      canonical_name: c.canonical_name,
-      company_type: c.company_type,
-      city: c.city,
-      level: c.current_level,
-      owner_id: c.owner_id,
-      owner_name: owner?.full_name ?? null,
-      project_count: s.count,
-      project_value_involved: s.value,
+      company_id: r.company_id,
+      canonical_name: r.canonical_name,
+      company_type: r.company_type,
+      city: r.city,
+      level: r.level,
+      owner_id: r.owner_id,
+      owner_name: r.owner_id ? (ownerNameById.get(r.owner_id) ?? null) : null,
+      project_count: Number(r.project_count ?? 0),
+      project_value_involved: Number(r.project_value_involved ?? 0),
       in_sphere: !!m,
       added_by: m?.added_by ?? null,
       added_by_role: m?.added_by_role ?? null,
       added_at: m?.added_at ?? null,
-      pending_proposal_id: pendingByCompany.get(c.id) ?? null,
-      rejected_proposal_id: rejectedByCompany.get(c.id) ?? null,
+      pending_proposal_id: pendingByCompany.get(r.company_id) ?? null,
+      rejected_proposal_id: rejectedByCompany.get(r.company_id) ?? null,
     };
   });
-
-  // In-memory sort for value / count over the fetched slice, then window.
-  if (q.sort !== 'name') {
-    const col: keyof SphereBuilderRow =
-      q.sort === 'value_involved' ? 'project_value_involved' : 'project_count';
-    rows.sort((a, b) => {
-      const av = Number(a[col] ?? 0);
-      const bv = Number(b[col] ?? 0);
-      if (av === bv) return a.canonical_name.localeCompare(b.canonical_name);
-      return q.dir === 'asc' ? av - bv : bv - av;
-    });
-    rows = rows.slice(from, to + 1);
-  }
-
-  const [{ count: sphereCount }, owners, cities] = await Promise.all([
-    sb
-      .from('sphere_members')
-      .select('company_id', { count: 'exact', head: true }),
-    loadOwnerOptions(sb),
-    loadCityOptions(sb),
-  ]);
 
   return {
     rows,
     total: count ?? 0,
     page: q.page,
     pageSize: PAGE_SIZE,
-    sphereCount: sphereCount ?? 0,
+    sphereCount: sphereCountRes.count ?? 0,
+    owners,
+    cities,
+  };
+}
+
+type MemRow = {
+  company_id: string;
+  added_by: string | null;
+  added_by_role: string;
+  added_at: string;
+};
+
+type PropRow = {
+  id: string;
+  company_id: string;
+  status: 'pending' | 'rejected' | 'approved';
+};
+
+async function emptyResponse(
+  sb: ReturnType<typeof supabase>,
+  page: number,
+): Promise<SphereBuilderResponse> {
+  const [owners, cities, sphereCountRes] = await Promise.all([
+    loadOwnerOptions(sb),
+    loadCityOptions(sb),
+    sb.from('sphere_members').select('company_id', { count: 'exact', head: true }),
+  ]);
+  return {
+    rows: [],
+    total: 0,
+    page,
+    pageSize: PAGE_SIZE,
+    sphereCount: sphereCountRes.count ?? 0,
     owners,
     cities,
   };

@@ -202,7 +202,7 @@ export function SphereBuilder({
 
   return (
     <div className="space-y-3">
-      {/* Filters */}
+      {/* Filters — two rows: identity/scope first, then thresholds. */}
       <div className="grid gap-2 border-b border-agsi-lightGray/60 p-3 sm:grid-cols-6">
         <div className="sm:col-span-2">
           <label className="block text-xxs font-medium uppercase tracking-wider text-agsi-darkGray">
@@ -297,6 +297,63 @@ export function SphereBuilder({
             <option value="in">In sphere</option>
             <option value="out">Not in sphere</option>
           </Select>
+        </div>
+
+        {/* Row 2 — threshold filters. Free-text so the caller can
+            type "100000000" or paste an AED figure without a slider.
+            Submitting the form pushes the URL; clearing the value
+            drops the filter. */}
+        <div>
+          <label className="block text-xxs font-medium uppercase tracking-wider text-agsi-darkGray">
+            Min value involved (AED)
+          </label>
+          <form
+            action=""
+            onSubmit={(e) => {
+              e.preventDefault();
+              const v = new FormData(e.currentTarget).get('min_value');
+              const s = typeof v === 'string' ? v.trim() : '';
+              pushQuery({ min_value: s && Number(s) > 0 ? s : null });
+            }}
+          >
+            <Input
+              name="min_value"
+              inputMode="numeric"
+              placeholder="e.g. 100000000"
+              defaultValue={
+                initialQuery.min_value !== undefined
+                  ? String(initialQuery.min_value)
+                  : ''
+              }
+              className="mt-1"
+            />
+          </form>
+        </div>
+        <div>
+          <label className="block text-xxs font-medium uppercase tracking-wider text-agsi-darkGray">
+            Min # projects
+          </label>
+          <form
+            action=""
+            onSubmit={(e) => {
+              e.preventDefault();
+              const v = new FormData(e.currentTarget).get('min_count');
+              const s = typeof v === 'string' ? v.trim() : '';
+              pushQuery({ min_count: s && Number(s) > 0 ? s : null });
+            }}
+          >
+            <Input
+              name="min_count"
+              inputMode="numeric"
+              placeholder="e.g. 3"
+              defaultValue={
+                initialQuery.min_count !== undefined
+                  ? String(initialQuery.min_count)
+                  : ''
+              }
+              className="mt-1"
+            />
+          </form>
         </div>
       </div>
 
