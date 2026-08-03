@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   KanbanSquare,
   Building2,
+  Target,
   FolderKanban,
   CheckSquare,
   CalendarDays,
@@ -55,6 +56,12 @@ const NAV: NavItem[] = [
     href: '/companies',
     label: 'Companies',
     icon: Building2,
+    roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
+  },
+  {
+    href: '/sphere',
+    label: 'Sphere',
+    icon: Target,
     roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
   },
   {
