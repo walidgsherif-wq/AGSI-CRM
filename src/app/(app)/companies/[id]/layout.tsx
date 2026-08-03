@@ -10,7 +10,13 @@ import { LevelBadge } from '@/components/domain/LevelBadge';
 import { LevelChangeButton } from '@/components/domain/LevelChangeDialog';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { CompanyTabs } from './_components/CompanyTabs';
-import { getUnreadMentionCountForCompany } from '@/server/actions/company-mentions';
+import { DiscussionRail } from './_components/DiscussionRail';
+import {
+  getUnreadMentionCountForCompany,
+  listUnreadMentionsForCompany,
+} from '@/server/actions/company-mentions';
+import type { CommentRow, MentionParticipant } from './discussion/_components/CommentList';
+import type { ComposerParticipant } from './discussion/_components/CommentComposer';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +31,25 @@ type CompanyHeaderRow = {
   source: string;
   owner_id: string | null;
 };
+
+type RawCommentRow = {
+  id: string;
+  company_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+  author: { full_name: string } | null;
+};
+
+type RawMentionRow = {
+  comment_id: string;
+  mentioned_profile_id: string;
+  profile: { full_name: string; is_active: boolean } | null;
+};
+
+type RawProfileRow = { id: string; full_name: string; role: string };
 
 export default async function CompanyLayout({
   children,
@@ -51,11 +76,84 @@ export default async function CompanyLayout({
 
   const crmSetupMode = await getCrmSetupMode();
 
-  // Initial mention count for the Discussion tab badge. Leadership
-  // can't be mentioned (RPC guard) and doesn't see the tab, but the
-  // count is cheap enough to skip role-gating here — RLS returns 0
-  // for viewers with no matching notifications.
-  const unreadMentionCount = await getUnreadMentionCountForCompany(company.id);
+  // The Discussion is a BD-team channel. Leadership never sees the
+  // rail (matches the pre-#157 tab-level gate); everyone else does.
+  const isBdTeam = ['admin', 'bd_head', 'bd_manager'].includes(user.role);
+  const canPost = isBdTeam;
+
+  // Load rail data alongside the header so a single layout render
+  // hydrates every tab. Skipped entirely for leadership so no data
+  // leaks server-side and the query cost is zero for that role.
+  let railComments: CommentRow[] = [];
+  let railParticipants: ComposerParticipant[] = [];
+  let unreadMentions: Array<{ notificationId: string; commentId: string }> = [];
+  let unreadMentionCount = 0;
+
+  if (isBdTeam) {
+    const { data: rawComments } = await supabase
+      .from('company_comments')
+      .select(
+        'id, company_id, author_id, body, created_at, edited_at, deleted_at, author:profiles!company_comments_author_id_fkey(full_name)',
+      )
+      .eq('company_id', company.id)
+      .order('created_at', { ascending: true })
+      .limit(500)
+      .returns<RawCommentRow[]>();
+
+    const comments = rawComments ?? [];
+    const commentIds = comments.map((c) => c.id);
+
+    let mentionRows: RawMentionRow[] = [];
+    if (commentIds.length > 0) {
+      const { data } = await supabase
+        .from('company_comment_mentions')
+        .select(
+          'comment_id, mentioned_profile_id, profile:profiles!company_comment_mentions_mentioned_profile_id_fkey(full_name, is_active)',
+        )
+        .in('comment_id', commentIds)
+        .returns<RawMentionRow[]>();
+      mentionRows = data ?? [];
+    }
+
+    const mentionsByComment = new Map<string, MentionParticipant[]>();
+    for (const m of mentionRows) {
+      const arr = mentionsByComment.get(m.comment_id) ?? [];
+      arr.push({
+        id: m.mentioned_profile_id,
+        full_name: m.profile?.full_name ?? 'Unknown',
+        is_active: m.profile?.is_active ?? false,
+      });
+      mentionsByComment.set(m.comment_id, arr);
+    }
+
+    railComments = comments.map((c) => ({
+      id: c.id,
+      author_id: c.author_id,
+      author_name: c.author?.full_name ?? null,
+      body: c.body,
+      created_at: c.created_at,
+      edited_at: c.edited_at,
+      deleted_at: c.deleted_at,
+      mentions: mentionsByComment.get(c.id) ?? [],
+    }));
+
+    const { data: teamProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('is_active', true)
+      .in('role', ['admin', 'bd_head', 'bd_manager'])
+      .order('full_name', { ascending: true })
+      .returns<RawProfileRow[]>();
+
+    railParticipants = (teamProfiles ?? []).map((p) => ({
+      id: p.id,
+      full_name: p.full_name,
+      role: p.role,
+    }));
+
+    unreadMentions = await listUnreadMentionsForCompany(company.id);
+    unreadMentionCount = await getUnreadMentionCountForCompany(company.id);
+  }
 
   return (
     <div className="space-y-6">
@@ -86,12 +184,27 @@ export default async function CompanyLayout({
         />
       </div>
 
-      <CompanyTabs
-        companyId={company.id}
-        initialUnreadMentionCount={unreadMentionCount}
-      />
+      {/* Two-column body when the viewer has rail access; single
+          column for leadership so the tabs get the whole width. */}
+      <div className={isBdTeam ? 'flex items-start gap-4' : ''}>
+        <div className={isBdTeam ? 'flex-1 min-w-0 space-y-6' : 'space-y-6'}>
+          <CompanyTabs companyId={company.id} />
+          {children}
+        </div>
 
-      {children}
+        {isBdTeam && (
+          <DiscussionRail
+            companyId={company.id}
+            currentUserId={user.id}
+            canPost={canPost}
+            isAdmin={user.role === 'admin'}
+            initialComments={railComments}
+            initialParticipants={railParticipants}
+            initialUnreadMentions={unreadMentions}
+            initialUnreadCount={unreadMentionCount}
+          />
+        )}
+      </div>
     </div>
   );
 }
