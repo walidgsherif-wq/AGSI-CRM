@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { ArrowDown, ArrowUp, Check, Lock, X } from 'lucide-react';
@@ -12,6 +12,8 @@ import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import {
   addToSphere,
   removeFromSphere,
+  addAllMatchingToSphere,
+  removeAllMatchingFromSphere,
   type SphereBuilderResponse,
   type SphereBuilderRow,
 } from '@/server/actions/sphere';
@@ -55,10 +57,26 @@ export function SphereBuilder({
   // navigation. A Set keyed by company_id is O(1) for the toggle-all
   // + bulk-action paths.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Selection scope:
+  //   'page' — the Set above IS the selection (rows visible now).
+  //   'all'  — the entire filtered set across all pages. The Set is
+  //            kept in sync visually (rows shown as selected) but
+  //            the actual server call uses the filter, not the ids.
+  // Switching filters or paging clears `all` back to `page` because
+  // the "all matching" scope was locked to the filter at that moment.
+  const [scope, setScope] = useState<'page' | 'all'>('page');
   const [msg, setMsg] = useState<{
     tone: 'ok' | 'warn' | 'err';
     text: string;
   } | null>(null);
+
+  // Reset the 'all' scope whenever the filter or page changes — the
+  // scope was pinned to the previous query.
+  const filterFingerprint = searchParams.toString();
+  useEffect(() => {
+    setScope('page');
+    setSelected(new Set());
+  }, [filterFingerprint]);
 
   const rows = initialData.rows;
   const totalPages = Math.max(1, Math.ceil(initialData.total / PAGE_SIZE));
@@ -195,6 +213,54 @@ export function SphereBuilder({
         return;
       }
       setMsg({ tone: 'ok', text: `${res.removed} removed.` });
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  // ── Full-set actions (across-all-pages scope) ────────────────────
+  // These operate on the filter, not the client-supplied id list —
+  // the server enumerates. Admin/bd_head only; managers stay on the
+  // single-company propose path (bulk-propose would bypass curation).
+  function fullSetAdd() {
+    const total = initialData.total;
+    if (!confirm(
+      `Add all ${NUM.format(total)} matching companies to the sphere?\n\nCompanies already in the sphere are skipped.`,
+    )) return;
+    setMsg(null);
+    startTransition(async () => {
+      const res = await addAllMatchingToSphere(initialQuery);
+      if ('error' in res) {
+        setMsg({ tone: 'err', text: res.error });
+        return;
+      }
+      const skipped = res.total - res.added;
+      const parts = [`${res.added} added to sphere.`];
+      if (skipped > 0) parts.push(`${skipped} already in — skipped.`);
+      setMsg({ tone: 'ok', text: parts.join(' ') });
+      setScope('page');
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function fullSetRemove() {
+    const total = initialData.total;
+    if (!confirm(
+      `Remove all ${NUM.format(total)} matching companies from the sphere?\n\nOnly current members are affected.`,
+    )) return;
+    setMsg(null);
+    startTransition(async () => {
+      const res = await removeAllMatchingFromSphere(initialQuery);
+      if ('error' in res) {
+        setMsg({ tone: 'err', text: res.error });
+        return;
+      }
+      setMsg({
+        tone: 'ok',
+        text: `${res.removed} removed from sphere.`,
+      });
+      setScope('page');
       setSelected(new Set());
       router.refresh();
     });
@@ -361,13 +427,48 @@ export function SphereBuilder({
       {canEdit && (
         <div className="flex flex-wrap items-center gap-2 px-3">
           <span className="text-xs text-agsi-darkGray">
-            {selected.size === 0
-              ? canPropose
-                ? 'Select rows to propose for the sphere.'
-                : 'Select rows to add or remove.'
-              : `${selected.size} selected`}
+            {scope === 'all'
+              ? `All ${NUM.format(initialData.total)} matching selected`
+              : selected.size === 0
+                ? canPropose
+                  ? 'Select rows to propose for the sphere.'
+                  : 'Select rows to add or remove.'
+                : `${selected.size} on this page selected`}
           </span>
-          {canAddDirectly && (
+
+          {/* Full-set scope actions when the user picked "Select all
+              N matching this filter". Admin/bd_head only — the
+              affordance never surfaces for managers. */}
+          {scope === 'all' && canAddDirectly && (
+            <Button size="sm" disabled={pending} onClick={fullSetAdd}>
+              + Add all {NUM.format(initialData.total)} to sphere
+            </Button>
+          )}
+          {scope === 'all' && canRemove && (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={fullSetRemove}
+            >
+              − Remove all {NUM.format(initialData.total)} from sphere
+            </Button>
+          )}
+          {scope === 'all' && (
+            <button
+              type="button"
+              onClick={() => {
+                setScope('page');
+                setSelected(new Set());
+              }}
+              className="text-xxs text-agsi-darkGray hover:text-agsi-navy hover:underline"
+            >
+              Clear selection
+            </button>
+          )}
+
+          {/* Page-scope actions — original behaviour. */}
+          {scope === 'page' && canAddDirectly && (
             <Button
               size="sm"
               disabled={pending || selectableAdd.length === 0}
@@ -376,7 +477,7 @@ export function SphereBuilder({
               + Add {selectableAdd.length > 0 ? selectableAdd.length : ''} to sphere
             </Button>
           )}
-          {canPropose && (
+          {scope === 'page' && canPropose && (
             <Button
               size="sm"
               disabled={pending || selectableAdd.length === 0}
@@ -385,7 +486,7 @@ export function SphereBuilder({
               Propose {selectableAdd.length > 0 ? selectableAdd.length : ''} for review
             </Button>
           )}
-          {canRemove && (
+          {scope === 'page' && canRemove && (
             <Button
               size="sm"
               variant="secondary"
@@ -411,6 +512,30 @@ export function SphereBuilder({
         </div>
       )}
 
+      {/* "Select all N matching this filter" affordance. Surfaces
+          only when the entire current page is selected AND there
+          are more matches beyond this page. Full-set actions are
+          admin/bd_head only — the banner never renders for
+          managers. */}
+      {(canAddDirectly || canRemove) &&
+        scope === 'page' &&
+        rows.length > 0 &&
+        rows.every((r) => selected.has(r.company_id)) &&
+        initialData.total > rows.length && (
+          <div className="mx-3 flex flex-wrap items-center justify-between gap-2 rounded border border-agsi-lightGray/70 bg-agsi-offWhite/40 px-3 py-2 text-xs">
+            <span className="text-agsi-darkGray">
+              All {rows.length} on this page are selected.
+            </span>
+            <button
+              type="button"
+              onClick={() => setScope('all')}
+              className="font-medium text-agsi-accent hover:underline"
+            >
+              Select all {NUM.format(initialData.total)} matching this filter →
+            </button>
+          </div>
+        )}
+
       {/* Table */}
       <div className="overflow-x-auto border-t border-agsi-lightGray/60">
         <table className="w-full min-w-[900px] text-sm">
@@ -419,13 +544,25 @@ export function SphereBuilder({
               {canEdit && (
                 <th className="w-8 px-3 py-2">
                   <input
-                    aria-label="Select all rows on this page"
+                    aria-label={
+                      scope === 'all'
+                        ? `All ${initialData.total} matching selected — click to clear`
+                        : 'Select all rows on this page'
+                    }
                     type="checkbox"
                     checked={
-                      rows.length > 0 &&
-                      rows.every((r) => selected.has(r.company_id))
+                      scope === 'all' ||
+                      (rows.length > 0 &&
+                        rows.every((r) => selected.has(r.company_id)))
                     }
-                    onChange={(e) => selectAllOnPage(e.target.checked)}
+                    onChange={(e) => {
+                      if (scope === 'all') {
+                        setScope('page');
+                        setSelected(new Set());
+                        return;
+                      }
+                      selectAllOnPage(e.target.checked);
+                    }}
                   />
                 </th>
               )}
@@ -487,8 +624,20 @@ export function SphereBuilder({
                         <input
                           aria-label={`Select ${r.canonical_name}`}
                           type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => toggleRow(r.company_id, e.target.checked)}
+                          // In 'all' scope every row is (implicitly)
+                          // included — show checked. Clicking a row
+                          // in that scope drops back to page-scope
+                          // with just that row toggled, so the user
+                          // can quickly narrow after picking "all".
+                          checked={scope === 'all' || isSelected}
+                          onChange={(e) => {
+                            if (scope === 'all') {
+                              setScope('page');
+                              setSelected(new Set([r.company_id]));
+                              return;
+                            }
+                            toggleRow(r.company_id, e.target.checked);
+                          }}
                         />
                       </td>
                     )}
