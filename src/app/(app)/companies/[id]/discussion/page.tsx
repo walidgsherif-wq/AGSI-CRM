@@ -15,6 +15,8 @@ import {
   type CommentRow,
   type MentionParticipant,
 } from './_components/CommentList';
+import { MentionClearer } from './_components/MentionClearer';
+import { listUnreadMentionsForCompany } from '@/server/actions/company-mentions';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,6 +134,10 @@ export default async function CompanyDiscussionTab({
   const targetCommentId = searchParams.comment ?? null;
   const canPost = ['admin', 'bd_head', 'bd_manager'].includes(user.role);
 
+  // Live 'mention' notifications for this viewer scoped to this
+  // company. Feeds the on-scroll clearer — one observer per row.
+  const unreadMentions = await listUnreadMentionsForCompany(params.id);
+
   return (
     <div className="space-y-4">
       {canPost && (
@@ -161,6 +167,8 @@ export default async function CompanyDiscussionTab({
           )}
         </CardContent>
       </Card>
+
+      {unreadMentions.length > 0 && <MentionClearer mentions={unreadMentions} />}
     </div>
   );
 }
