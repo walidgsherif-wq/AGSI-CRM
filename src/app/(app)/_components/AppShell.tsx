@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { Sidebar } from '@/components/domain/Sidebar';
+import { NotificationsRealtime } from '@/components/domain/NotificationsRealtime';
 import type { Role } from '@/types/domain';
 import type { FeatureKey } from '@/lib/auth/features';
 
 type Props = {
-  user: { role: Role; fullName: string; email: string };
+  user: { id: string; role: Role; fullName: string; email: string };
   features: FeatureKey[];
   /** Rendered above <main>; null when CRM setup mode is off. */
   banner?: React.ReactNode;
@@ -51,6 +52,12 @@ export function AppShell({ user, features, banner, children }: Props) {
 
   return (
     <div className="flex min-h-screen bg-agsi-offWhite">
+      {/* Zero-render helper: one realtime channel + window-focus
+          safety net, fans notifications events onto the shared
+          client bus so every listener (bell, action queue, discussion
+          rail badge) refreshes in near-real time. */}
+      <NotificationsRealtime currentUserId={user.id} />
+
       <Sidebar
         role={user.role}
         features={features}

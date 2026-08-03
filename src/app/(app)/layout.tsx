@@ -9,7 +9,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell
-      user={{ role: user.role, fullName: user.fullName, email: user.email }}
+      user={{
+        id: user.id,
+        role: user.role,
+        fullName: user.fullName,
+        email: user.email,
+      }}
       features={[...features]}
       banner={<SetupModeBanner />}
     >
