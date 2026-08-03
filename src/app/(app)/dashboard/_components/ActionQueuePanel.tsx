@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AtSign,
@@ -20,6 +20,8 @@ import {
   type ActionQueue,
   type ActionType,
 } from '@/lib/action-queue';
+import { getActionQueue } from '@/server/actions/action-queue';
+import { subscribeUnreadChanged } from '@/lib/notifications-events';
 
 const INITIAL_VISIBLE = 6;
 
@@ -46,12 +48,29 @@ const TYPE_LABEL: Record<ActionType, string> = {
 
 export function ActionQueuePanel({
   greetingName,
-  queue,
+  queue: initialQueue,
 }: {
   greetingName: string;
   queue: ActionQueue;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Seeded from the server render so first paint has data; live-
+  // updated when the shared notifications bus fires (realtime
+  // fanout from NotificationsRealtime + the existing in-tab
+  // triggers from markRead / dismiss / etc).
+  const [queue, setQueue] = useState<ActionQueue>(initialQueue);
+
+  useEffect(() => {
+    return subscribeUnreadChanged(() => {
+      void getActionQueue()
+        .then((next) => setQueue(next))
+        .catch(() => {
+          // Auth blip / RLS transient — the next event or a
+          // full-page navigation will reconcile.
+        });
+    });
+  }, []);
+
   const now = new Date();
   const items = queue.items;
   const visible = expanded ? items : items.slice(0, INITIAL_VISIBLE);
