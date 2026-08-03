@@ -27,6 +27,8 @@ import {
   getCoverageDiagnostics,
   type CoverageDiagnostics,
 } from '@/server/actions/coverage-diagnostics';
+import { getActionQueue } from '@/server/actions/action-queue';
+import { ActionQueuePanel } from './_components/ActionQueuePanel';
 import { MemberSelector, type BdMember } from './_components/MemberSelector';
 import { MyEventsCard, type MyEventRow } from './_components/MyEventsCard';
 import {
@@ -181,6 +183,11 @@ export default async function DashboardPage({
       : viewedUserId === user.id
         ? 'Your'
         : `${viewedProfile?.full_name ?? 'Member'}’s`;
+
+  // Daily action queue — the new hero. Per-user prioritised list of
+  // mentions, overdue tasks, cold owned stakeholders, and (admin
+  // only) pending approvals. Read-only aggregation.
+  const actionQueue = await getActionQueue();
 
   // Initial radar data for the default 'all' band. Re-fetches client-
   // side when the user picks a different value band.
@@ -454,6 +461,14 @@ export default async function DashboardPage({
       )}
 
       {coverageDebug && <CoverageDebugBanner data={coverageDebug} />}
+
+      <ActionQueuePanel greetingName={user.fullName} queue={actionQueue} />
+
+      <div className="pt-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-agsi-darkGray">
+          Team scoreboard
+        </h2>
+      </div>
 
       {user.role !== 'bd_manager' && initialMarketValue && (
         <MarketValueEngagementPanel data={initialMarketValue} />
