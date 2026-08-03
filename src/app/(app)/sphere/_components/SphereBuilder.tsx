@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
+import { BAND_THRESHOLD } from '@/types/coverage';
 import {
   addToSphere,
   removeFromSphere,
@@ -365,13 +366,16 @@ export function SphereBuilder({
           </Select>
         </div>
 
-        {/* Row 2 — threshold filters. Free-text so the caller can
-            type "100000000" or paste an AED figure without a slider.
-            Submitting the form pushes the URL; clearing the value
-            drops the filter. */}
+        {/* Row 2 — threshold filters.
+            - "Total value involved ≥" = SUM across all their current
+              projects (aggregate; existing min_value).
+            - "On a project worth ≥"    = MAX single-project value
+              (0100; catches stakeholders with at least one big deal
+              even if their portfolio total is small).
+            Labelled explicitly so the two never blur together. */}
         <div>
           <label className="block text-xxs font-medium uppercase tracking-wider text-agsi-darkGray">
-            Min value involved (AED)
+            Total value involved ≥ (AED)
           </label>
           <form
             action=""
@@ -420,6 +424,35 @@ export function SphereBuilder({
               className="mt-1"
             />
           </form>
+        </div>
+        <div>
+          <label className="block text-xxs font-medium uppercase tracking-wider text-agsi-darkGray">
+            On a project worth ≥
+          </label>
+          <Select
+            value={
+              initialQuery.min_single_project_value !== undefined
+                ? String(initialQuery.min_single_project_value)
+                : ''
+            }
+            onChange={(e) =>
+              pushQuery({
+                min_single_project_value: e.target.value || null,
+              })
+            }
+            className="mt-1"
+          >
+            <option value="">Any single project</option>
+            <option value={String(BAND_THRESHOLD.gt_100m ?? 100_000_000)}>
+              ≥ 100M AED
+            </option>
+            <option value={String(BAND_THRESHOLD.gt_500m ?? 500_000_000)}>
+              ≥ 500M AED
+            </option>
+            <option value={String(BAND_THRESHOLD.gt_1b ?? 1_000_000_000)}>
+              ≥ 1B AED
+            </option>
+          </Select>
         </div>
       </div>
 

@@ -99,6 +99,13 @@ export async function getSphereBuilderRows(
   if (q.min_count !== undefined) {
     viewQuery = viewQuery.gte('project_count', q.min_count);
   }
+  if (q.min_single_project_value !== undefined) {
+    // "On a project worth ≥ X" — max_project_value comes from 0100.
+    viewQuery = viewQuery.gte(
+      'max_project_value',
+      q.min_single_project_value,
+    );
+  }
 
   // Membership scope — one lookup, `.in()` for "in sphere", `.not
   // .in()` for "out". `sphere_members` peaks around a few hundred
@@ -275,6 +282,9 @@ async function applySphereFilters(
   if (q.min_count !== undefined) {
     query = query.gte('project_count', q.min_count);
   }
+  if (q.min_single_project_value !== undefined) {
+    query = query.gte('max_project_value', q.min_single_project_value);
+  }
 
   if (q.in !== 'all') {
     let sphereIds = opts?.sphereIds;
@@ -354,6 +364,9 @@ async function resolveMatchingCompanyIds(q: SphereQuery): Promise<string[]> {
     }
     if (q.min_count !== undefined) {
       query = query.gte('project_count', q.min_count);
+    }
+    if (q.min_single_project_value !== undefined) {
+      query = query.gte('max_project_value', q.min_single_project_value);
     }
     if (q.in === 'in' && sphereIds) {
       query = query.in('company_id', sphereIds);
