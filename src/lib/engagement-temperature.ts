@@ -53,6 +53,11 @@ export type EngagementTemperature = {
   /** Max cell value across the grid — the UI normalises the
    *  sequential ramp against it. Zero when the grid is empty. */
   cellMax: number;
+  /** Applied sphere universe (may have fallen back from 'sphere'
+   *  to 'full' when sphere_members is empty). */
+  universe: 'sphere' | 'full';
+  /** True when the caller asked for sphere but sphere_members is empty. */
+  sphereEmpty: boolean;
 };
 
 export function emptyEngagementGrid(): EngagementGrid {

@@ -9,7 +9,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { getSegmentPenetration } from '@/server/actions/segment-penetration';
-import type { ValueBand } from '@/types/coverage';
+import type { Universe, ValueBand } from '@/types/coverage';
+import {
+  SphereFallbackNotice,
+  UniverseToggle,
+  universeSuffix,
+} from '@/components/domain/UniverseToggle';
 import {
   LEVEL_COLOR,
   LEVEL_LABEL,
@@ -39,41 +44,50 @@ export function SegmentPenetrationPanel({
   initialBand?: ValueBand;
 }) {
   const [band, setBand] = useState<ValueBand>(initialBand);
+  const [universe, setUniverse] = useState<Universe>(
+    initial.universe === 'full' && !initial.sphereEmpty ? 'full' : 'sphere',
+  );
+  const [appliedUniverse, setAppliedUniverse] = useState<Universe>(
+    initial.universe,
+  );
+  const [sphereEmpty, setSphereEmpty] = useState(initial.sphereEmpty);
   const [data, setData] = useState<SegmentPenetrationRow[]>(initial.rows);
   const [error, setError] = useState<string | null>(initial.error);
   const [pending, startTransition] = useTransition();
 
-  // Fetch when the band changes. Broken out so both the button
-  // handler and the event subscription can share the same code path.
-  function fetchForBand(next: ValueBand) {
+  function refetch(nextBand: ValueBand, nextUniverse: Universe) {
     startTransition(async () => {
-      const res = await getSegmentPenetration(next);
+      const res = await getSegmentPenetration(nextBand, nextUniverse);
       setData(res.rows);
       setError(res.error);
+      setAppliedUniverse(res.universe);
+      setSphereEmpty(res.sphereEmpty);
     });
   }
 
   function selectBand(next: ValueBand) {
     if (next === band) return;
     setBand(next);
-    fetchForBand(next);
-    // Tell the sibling coverage radar to move to the same band.
+    refetch(next, universe);
     notifyBandChanged(next);
   }
 
-  // Sync with the coverage radar via the shared band-change event.
+  function selectUniverse(next: Universe) {
+    if (next === universe) return;
+    setUniverse(next);
+    refetch(band, next);
+  }
+
   useEffect(() => {
     return subscribeBandChanged((next) => {
       setBand((cur) => {
         if (cur === next) return cur;
-        fetchForBand(next);
+        refetch(next, universe);
         return next;
       });
     });
-    // fetchForBand closes over startTransition which is stable across
-    // renders; safe to omit the linter dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [universe]);
 
   const claimedTotal = data.reduce(
     (s, r) => s + (r.total - r.unclaimed),
@@ -93,7 +107,9 @@ export function SegmentPenetrationPanel({
               light-to-dark = how deep the relationship has progressed.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <UniverseToggle value={universe} onChange={selectUniverse} disabled={pending} />
+            <span className="text-xxs text-agsi-midGray">·</span>
             {BANDS.map((b) => (
               <button
                 key={b.key}
@@ -119,12 +135,16 @@ export function SegmentPenetrationPanel({
             <strong>Segment penetration failed to load:</strong> {error}
           </div>
         )}
+        {sphereEmpty && <SphereFallbackNotice />}
         <div className="mb-3 flex flex-wrap items-baseline gap-2 text-xs text-agsi-darkGray">
           <span>
             Overall claimed:{' '}
             <strong className="text-agsi-navy">
               {claimedTotal} of {overallTotal}
             </strong>
+            <span className="ml-1 text-agsi-midGray">
+              {universeSuffix(appliedUniverse)}
+            </span>
           </span>
           {pending && <span className="text-agsi-midGray">updating…</span>}
         </div>

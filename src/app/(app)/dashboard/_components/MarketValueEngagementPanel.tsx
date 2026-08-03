@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +15,13 @@ import {
   type MarketValueColdRow,
   type MarketValueEngagement,
 } from '@/lib/market-value-engagement';
+import { getMarketValueEngagement } from '@/server/actions/market-value-engagement';
+import type { Universe } from '@/types/coverage';
+import {
+  SphereFallbackNotice,
+  UniverseToggle,
+  universeSuffix,
+} from '@/components/domain/UniverseToggle';
 
 const BAND_ORDER: MarketValueBand[] = ['hot', 'warm', 'cooling', 'older'];
 
@@ -21,10 +31,31 @@ const BAND_ORDER: MarketValueBand[] = ['hot', 'warm', 'cooling', 'older'];
  * above the temperature board on the dashboard.
  */
 export function MarketValueEngagementPanel({
-  data,
+  data: initial,
 }: {
   data: MarketValueEngagement;
 }) {
+  const [data, setData] = useState<MarketValueEngagement>(initial);
+  const [universe, setUniverse] = useState<Universe>(
+    initial.universe === 'full' && !initial.sphereEmpty ? 'full' : 'sphere',
+  );
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function onUniverseChange(next: Universe) {
+    if (next === universe) return;
+    setUniverse(next);
+    setError(null);
+    startTransition(async () => {
+      const r = await getMarketValueEngagement(next);
+      if ('error' in r) {
+        setError(r.error);
+        return;
+      }
+      setData(r);
+    });
+  }
+
   const { headline, cold_split, whitespace, pareto, top_unengaged } = data;
 
   const reachPct =
@@ -44,14 +75,21 @@ export function MarketValueEngagementPanel({
             <CardTitle>Market value engagement</CardTitle>
             <CardDescription>
               &ldquo;Engaged with players on {formatPct(reachPct)} of live
-              market value&rdquo; — dedup&rsquo;d at the project level so a
+              market value&rdquo; {universeSuffix(data.universe)} — dedup&rsquo;d at the project level so a
               deal shared by a developer and a consultant counts once. Value
               known for {formatPct(valueKnownPct)} of live projects.
             </CardDescription>
           </div>
+          <UniverseToggle value={universe} onChange={onUniverseChange} disabled={pending} />
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {data.sphereEmpty && <SphereFallbackNotice />}
+        {error && (
+          <div className="rounded border border-rag-red/40 bg-rag-red/5 px-3 py-2 text-xs text-rag-red">
+            Refresh failed: {error}
+          </div>
+        )}
         <HeadlineTiles
           reachPct={reachPct}
           headline={headline}

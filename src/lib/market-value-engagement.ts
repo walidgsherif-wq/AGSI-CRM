@@ -72,6 +72,11 @@ export type MarketValueEngagement = {
   whitespace: MarketValueWhitespaceRow[];
   pareto: MarketValueParetoRow[];
   top_unengaged: MarketValueTopUnengagedRow[];
+  /** Applied sphere universe (may have fallen back from 'sphere'
+   *  to 'full' when sphere_members is empty). */
+  universe: 'sphere' | 'full';
+  /** True when caller asked for sphere but sphere_members is empty. */
+  sphereEmpty: boolean;
 };
 
 /** Compact AED formatter — 12.3M / 456M / 1.2B. Keeps tiles legible. */

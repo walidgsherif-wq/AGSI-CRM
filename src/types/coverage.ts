@@ -6,6 +6,22 @@ import type { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 
 export type ValueBand = 'all' | 'gt_100m' | 'gt_500m' | 'gt_1b';
 
+/**
+ * Sphere-of-interest scope. 'sphere' restricts every ecosystem
+ * metric to companies in sphere_members (0097) so both numerator
+ * and denominator reflect the curated target list. 'full' preserves
+ * the pre-Build-B behaviour (whole active universe).
+ *
+ * Composes with ValueBand — the two axes are independent (e.g.
+ * "sphere + >500M projects" is a valid slice).
+ */
+export type Universe = 'sphere' | 'full';
+
+export const UNIVERSE_LABEL: Record<Universe, string> = {
+  sphere: 'Sphere',
+  full: 'Full universe',
+};
+
 export type MemberContribution = {
   member_id: string;
   full_name: string;
@@ -38,6 +54,12 @@ export type CoverageRow = {
 export type CoverageResult = {
   rows: CoverageRow[];
   error: string | null;
+  /** Actual universe applied — may differ from requested when the
+   *  sphere is empty and the action falls back. */
+  universe: Universe;
+  /** True when caller asked for 'sphere' but sphere_members is empty
+   *  and we fell back to 'full'. Panels show a fallback notice. */
+  sphereEmpty: boolean;
 };
 
 // Spokes shown on every coverage view — exclude 'other' as a catch-all.

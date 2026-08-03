@@ -12,6 +12,12 @@ import {
   type EngagementRowType,
   type EngagementTemperature,
 } from '@/lib/engagement-temperature';
+import type { Universe } from '@/types/coverage';
+import {
+  SphereFallbackNotice,
+  UniverseToggle,
+  universeSuffix,
+} from '@/components/domain/UniverseToggle';
 
 const BAND_HEADER: Record<Band, string> = {
   hot: 'Hot',
@@ -34,21 +40,34 @@ export function EngagementTemperaturePanel({
 }) {
   const [snapshot, setSnapshot] = useState<EngagementTemperature>(initial);
   const [measure, setMeasure] = useState<EngagementMeasure>(initial.measure);
+  const [universe, setUniverse] = useState<Universe>(
+    initial.universe === 'full' && !initial.sphereEmpty ? 'full' : 'sphere',
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function onMeasureChange(next: EngagementMeasure) {
-    if (next === measure) return;
-    setMeasure(next);
+  function refetch(nextMeasure: EngagementMeasure, nextUniverse: Universe) {
     setError(null);
     startTransition(async () => {
-      const r = await getEngagementTemperature(next);
+      const r = await getEngagementTemperature(nextMeasure, nextUniverse);
       if ('error' in r) {
         setError(r.error);
         return;
       }
       setSnapshot(r);
     });
+  }
+
+  function onMeasureChange(next: EngagementMeasure) {
+    if (next === measure) return;
+    setMeasure(next);
+    refetch(next, universe);
+  }
+
+  function onUniverseChange(next: Universe) {
+    if (next === universe) return;
+    setUniverse(next);
+    refetch(measure, next);
   }
 
   const tailLabel = snapshot.measure === 'companies' ? 'Cold / none' : 'Older';
@@ -74,21 +93,28 @@ export function EngagementTemperaturePanel({
               bands from last event.
             </CardDescription>
           </div>
-          <label className="flex items-center gap-2 text-xs text-agsi-darkGray">
-            Measure:
-            <select
-              value={measure}
-              disabled={pending}
-              onChange={(e) => onMeasureChange(e.target.value as EngagementMeasure)}
-              className="rounded border border-agsi-midGray bg-white px-2 py-1 text-xs text-agsi-navy"
-            >
-              <option value="companies">Companies</option>
-              <option value="events">Engagements</option>
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <UniverseToggle value={universe} onChange={onUniverseChange} disabled={pending} />
+            <label className="flex items-center gap-2 text-xs text-agsi-darkGray">
+              Measure:
+              <select
+                value={measure}
+                disabled={pending}
+                onChange={(e) => onMeasureChange(e.target.value as EngagementMeasure)}
+                className="rounded border border-agsi-midGray bg-white px-2 py-1 text-xs text-agsi-navy"
+              >
+                <option value="companies">Companies</option>
+                <option value="events">Engagements</option>
+              </select>
+            </label>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
+        {snapshot.sphereEmpty && <SphereFallbackNotice />}
+        <p className="mb-2 text-xxs text-agsi-midGray">
+          Universe: {universeSuffix(snapshot.universe)}
+        </p>
         <BreadthStrip breadth={snapshot.breadth} />
 
         <div className="mt-4 overflow-x-auto">
