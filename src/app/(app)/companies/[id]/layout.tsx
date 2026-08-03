@@ -10,6 +10,7 @@ import { LevelBadge } from '@/components/domain/LevelBadge';
 import { LevelChangeButton } from '@/components/domain/LevelChangeDialog';
 import { COMPANY_TYPE_LABEL } from '@/lib/zod/company';
 import { CompanyTabs } from './_components/CompanyTabs';
+import { getUnreadMentionCountForCompany } from '@/server/actions/company-mentions';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,12 @@ export default async function CompanyLayout({
 
   const crmSetupMode = await getCrmSetupMode();
 
+  // Initial mention count for the Discussion tab badge. Leadership
+  // can't be mentioned (RPC guard) and doesn't see the tab, but the
+  // count is cheap enough to skip role-gating here — RLS returns 0
+  // for viewers with no matching notifications.
+  const unreadMentionCount = await getUnreadMentionCountForCompany(company.id);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -79,7 +86,10 @@ export default async function CompanyLayout({
         />
       </div>
 
-      <CompanyTabs companyId={company.id} />
+      <CompanyTabs
+        companyId={company.id}
+        initialUnreadMentionCount={unreadMentionCount}
+      />
 
       {children}
     </div>
