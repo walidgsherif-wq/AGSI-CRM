@@ -107,27 +107,17 @@ export async function getSphereBuilderRows(
     );
   }
 
-  // Membership scope — one lookup, `.in()` for "in sphere", `.not
-  // .in()` for "out". `sphere_members` peaks around a few hundred
-  // rows so the URL length is bounded.
-  if (q.in !== 'all') {
-    const { data: mem } = await sb
-      .from('sphere_members')
-      .select('company_id')
-      .returns<Array<{ company_id: string }>>();
-    const sphereIds = (mem ?? []).map((r) => r.company_id);
-    if (q.in === 'in') {
-      if (sphereIds.length === 0) {
-        return emptyResponse(sb, q.page);
-      }
-      viewQuery = viewQuery.in('company_id', sphereIds);
-    } else if (sphereIds.length > 0) {
-      viewQuery = viewQuery.not(
-        'company_id',
-        'in',
-        `(${sphereIds.join(',')})`,
-      );
-    }
+  // Membership scope — DB-side via the in_sphere boolean added in
+  // 0102. Replaces the pre-0102 approach that loaded sphere_member
+  // ids into JS and passed them to PostgREST via .in(); that URL
+  // silently truncates past a few hundred UUIDs, so a sphere with
+  // 660 members showed "No companies match" for "In sphere" while
+  // the SPHERE SIZE badge still read 660 (the 660 bug). Pure boolean
+  // eq scales indefinitely.
+  if (q.in === 'in') {
+    viewQuery = viewQuery.eq('in_sphere', true);
+  } else if (q.in === 'out') {
+    viewQuery = viewQuery.eq('in_sphere', false);
   }
 
   // ── 2) Order + range at the DB ─────────────────────────────────
@@ -256,9 +246,9 @@ type PropRow = {
  * row queries all agree on the filter semantics — "N matching" and
  * "add all matching" are guaranteed to see the same universe.
  *
- * The membership scope (`q.in`) is applied here too; if the caller
- * already has the sphere-member id set they can pass it in via
- * `sphereIds` to avoid a second lookup.
+ * Membership is a boolean predicate on the view (in_sphere from
+ * 0102) — no URL id list, so it scales past a few hundred members
+ * without the silent-truncation bug the pre-0102 code hit.
  */
 async function applySphereFilters(
   sb: ReturnType<typeof supabase>,
@@ -286,27 +276,16 @@ async function applySphereFilters(
     query = query.gte('max_project_value', q.min_single_project_value);
   }
 
-  if (q.in !== 'all') {
-    let sphereIds = opts?.sphereIds;
-    if (sphereIds === undefined) {
-      const { data } = await sb
-        .from('sphere_members')
-        .select('company_id')
-        .returns<Array<{ company_id: string }>>();
-      sphereIds = (data ?? []).map((r) => r.company_id);
-    }
-    if (q.in === 'in') {
-      if (sphereIds.length === 0) {
-        // Force an impossible predicate so the query returns 0 —
-        // simpler than returning a special sentinel.
-        query = query.eq('company_id', '00000000-0000-0000-0000-000000000000');
-      } else {
-        query = query.in('company_id', sphereIds);
-      }
-    } else if (sphereIds.length > 0) {
-      query = query.not('company_id', 'in', `(${sphereIds.join(',')})`);
-    }
+  // Membership scope — DB-side (in_sphere from 0102). No URL id list.
+  if (q.in === 'in') {
+    query = query.eq('in_sphere', true);
+  } else if (q.in === 'out') {
+    query = query.eq('in_sphere', false);
   }
+  // The `opts` param is retained for backward compat but no longer
+  // used — the previous impl accepted a preloaded id set to avoid
+  // a second lookup; the DB filter makes that unnecessary.
+  void opts;
 
   return query;
 }
@@ -333,17 +312,6 @@ async function resolveMatchingCompanyIds(q: SphereQuery): Promise<string[]> {
   const PAGE = 1000;
   const HARD_CAP = 20_000;
   const ids: string[] = [];
-  // Fetch memberships once for the in/out scope so each page uses
-  // the same set.
-  let sphereIds: string[] | undefined;
-  if (q.in !== 'all') {
-    const { data } = await sb
-      .from('sphere_members')
-      .select('company_id')
-      .returns<Array<{ company_id: string }>>();
-    sphereIds = (data ?? []).map((r) => r.company_id);
-    if (q.in === 'in' && sphereIds.length === 0) return [];
-  }
 
   for (let offset = 0; offset < HARD_CAP; offset += PAGE) {
     let query = sb
@@ -368,10 +336,11 @@ async function resolveMatchingCompanyIds(q: SphereQuery): Promise<string[]> {
     if (q.min_single_project_value !== undefined) {
       query = query.gte('max_project_value', q.min_single_project_value);
     }
-    if (q.in === 'in' && sphereIds) {
-      query = query.in('company_id', sphereIds);
-    } else if (q.in === 'out' && sphereIds && sphereIds.length > 0) {
-      query = query.not('company_id', 'in', `(${sphereIds.join(',')})`);
+    // Membership scope — DB-side via in_sphere (0102). No URL id list.
+    if (q.in === 'in') {
+      query = query.eq('in_sphere', true);
+    } else if (q.in === 'out') {
+      query = query.eq('in_sphere', false);
     }
 
     const { data } = await query.returns<Array<{ company_id: string }>>();
@@ -482,24 +451,36 @@ export async function removeAllMatchingFromSphere(
   return { removed, total: ids.length };
 }
 
-async function emptyResponse(
-  sb: ReturnType<typeof supabase>,
-  page: number,
-): Promise<SphereBuilderResponse> {
-  const [owners, cities, sphereCountRes] = await Promise.all([
-    loadOwnerOptions(sb),
-    loadCityOptions(sb),
-    sb.from('sphere_members').select('company_id', { count: 'exact', head: true }),
-  ]);
-  return {
-    rows: [],
-    total: 0,
-    page,
-    pageSize: PAGE_SIZE,
-    sphereCount: sphereCountRes.count ?? 0,
-    owners,
-    cities,
-  };
+/**
+ * Clear the entire sphere — remove every sphere_members row.
+ * admin/bd_head only. Sister to the full-set add/remove actions but
+ * unconditional (no filter). Companies / proposals / anything else
+ * untouched — only membership rows go. After a clear, dashboard
+ * metrics fall back to the full universe (Build B's empty-sphere
+ * guard) and the builder shows every company as "Out".
+ *
+ * The confirm dialog with the exact count lives in the UI — this
+ * action trusts the caller has confirmed and just wipes the set.
+ */
+export async function clearSphere(): Promise<
+  { removed: number } | { error: string }
+> {
+  const user = await getCurrentUser();
+  if (!['admin', 'bd_head'].includes(user.role)) {
+    return { error: 'Only admin or bd_head can clear the sphere.' };
+  }
+  const sb = supabase();
+  // A bare DELETE with no WHERE would be rejected by Supabase's
+  // unqualified-delete guard (see 0090). `.not('company_id', 'is',
+  // null)` is always true for this table (PK is NOT NULL) so it
+  // targets every row while satisfying the guard.
+  const { error, count } = await sb
+    .from('sphere_members')
+    .delete({ count: 'exact' })
+    .not('company_id', 'is', null);
+  if (error) return { error: error.message };
+  revalidatePath('/sphere');
+  return { removed: count ?? 0 };
 }
 
 async function loadOwnerOptions(
