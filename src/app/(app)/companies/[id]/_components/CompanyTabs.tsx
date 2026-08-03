@@ -8,6 +8,7 @@ const TABS = [
   { label: 'Engagements', segment: 'engagements' },
   { label: 'Tasks', segment: 'tasks' },
   { label: 'Notes', segment: 'notes' },
+  { label: 'Discussion', segment: 'discussion' },
   { label: 'Documents', segment: 'documents' },
   { label: 'Level history', segment: 'level-history' },
   { label: 'Ownership', segment: 'ownership-timeline' },
