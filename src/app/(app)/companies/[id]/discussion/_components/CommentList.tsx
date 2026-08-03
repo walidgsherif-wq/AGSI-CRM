@@ -83,6 +83,11 @@ export function CommentList({
                 companyId={companyId}
               />
             )}
+            {/* Task-created marker deliberately omitted — the
+                comment→task link exists on the task side (tasks.
+                comment_id), but rendering it inline here would
+                require a per-comment tasks lookup for every render.
+                Nice-to-have from the brief; skipped for MVP. */}
           </li>
         );
       })}

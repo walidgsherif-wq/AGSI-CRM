@@ -96,7 +96,10 @@ export default async function CompanyLayout({
         'id, company_id, author_id, body, created_at, edited_at, deleted_at, author:profiles!company_comments_author_id_fkey(full_name)',
       )
       .eq('company_id', company.id)
-      .order('created_at', { ascending: true })
+      // Newest at top — the composer sits above this list so posting
+      // and reading both happen without scrolling. The ?comment=<id>
+      // deep-link scroll uses getElementById and is order-agnostic.
+      .order('created_at', { ascending: false })
       .limit(500)
       .returns<RawCommentRow[]>();
 

@@ -15,6 +15,7 @@ import {
 } from '@/lib/zod/task';
 import {
   TaskForm,
+  type CommentContext,
   type EngagementContext,
   type TaskFormInitial,
 } from './_components/TaskForm';
@@ -63,7 +64,11 @@ export default async function CompanyTasksTab({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { edit?: string; from_engagement?: string };
+  searchParams: {
+    edit?: string;
+    from_engagement?: string;
+    from_comment?: string;
+  };
 }) {
   const user = await getCurrentUser();
   if (user.role === 'leadership') {
@@ -107,8 +112,13 @@ export default async function CompanyTasksTab({
   ]);
 
   // Follow-up entry path: TaskForm opens pre-filled with engagement
-  // context + a "Follow up: {company}" default title.
+  // context + a "Follow up: {company}" default title. Same pattern
+  // for from_comment (added in this build) — either seeds the same
+  // title default; the two contexts are mutually exclusive in the
+  // URL but the form gracefully renders both blocks if handed both.
   let engagementContext: EngagementContext | null = null;
+  let commentContext: CommentContext | null = null;
+  let commentDescriptionDefault: string | null = null;
   let followUpTitleDefault: string | null = null;
   if (searchParams.from_engagement) {
     const { data: eng } = await supabase
@@ -138,6 +148,40 @@ export default async function CompanyTasksTab({
       };
       const companyName = companyRes.data?.canonical_name ?? 'this stakeholder';
       followUpTitleDefault = `Follow up: ${companyName}`;
+    }
+  }
+
+  if (searchParams.from_comment) {
+    const { data: cmt } = await supabase
+      .from('company_comments')
+      .select(
+        'id, body, created_at, deleted_at, author:profiles!company_comments_author_id_fkey(full_name)',
+      )
+      .eq('id', searchParams.from_comment)
+      .eq('company_id', params.id)
+      .maybeSingle<{
+        id: string;
+        body: string;
+        created_at: string;
+        deleted_at: string | null;
+        author:
+          | { full_name: string }
+          | { full_name: string }[]
+          | null;
+      }>();
+    if (cmt && !cmt.deleted_at) {
+      const author = pickOne(cmt.author);
+      commentContext = {
+        id: cmt.id,
+        body: cmt.body,
+        created_at: cmt.created_at,
+        author_name: author?.full_name ?? null,
+        href: `/companies/${params.id}?comment=${cmt.id}`,
+      };
+      const companyName = companyRes.data?.canonical_name ?? 'this stakeholder';
+      followUpTitleDefault = followUpTitleDefault ?? `Follow up: ${companyName}`;
+      const preview = (cmt.body ?? '').trim().slice(0, 500);
+      commentDescriptionDefault = preview ? `From comment: "${preview}"` : null;
     }
   }
 
@@ -188,8 +232,10 @@ export default async function CompanyTasksTab({
           defaultOwnerId={user.id}
           canAssignToOthers={canAssignToOthers}
           engagementContext={engagementContext ?? undefined}
+          commentContext={commentContext ?? undefined}
           titleDefault={followUpTitleDefault ?? undefined}
-          defaultOpen={engagementContext !== null}
+          descriptionDefault={commentDescriptionDefault ?? undefined}
+          defaultOpen={engagementContext !== null || commentContext !== null}
         />
       )}
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,7 +37,11 @@ export function CommentActions({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  if (!canEdit && !canDelete) return null;
+  // "Create task" is always shown on live comments — anyone who can
+  // see the discussion can spawn a follow-up. Edit/Delete are still
+  // gated by canEdit/canDelete.
+  const anyAction = canEdit || canDelete || true;
+  if (!anyAction) return null;
 
   function saveEdit() {
     setError(null);
@@ -102,6 +107,15 @@ export function CommentActions({
 
   return (
     <div className="flex shrink-0 items-center gap-1">
+      <Link
+        href={
+          `/companies/${companyId}/tasks?from_comment=${commentId}` as never
+        }
+        title="Create a follow-up task from this comment"
+        className="rounded px-2 py-1 text-xxs text-agsi-darkGray hover:bg-agsi-lightGray/40 hover:text-agsi-navy"
+      >
+        Create task
+      </Link>
       {canEdit && (
         <button
           type="button"

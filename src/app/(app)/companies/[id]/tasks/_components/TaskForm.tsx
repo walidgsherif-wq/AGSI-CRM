@@ -43,6 +43,20 @@ export type EngagementContext = {
   href: string;
 };
 
+/**
+ * Comment context — mirrors EngagementContext so the same TaskForm
+ * renders a "From comment" panel + hidden comment_id input when a
+ * user creates a task from the discussion thread.
+ */
+export type CommentContext = {
+  id: string;
+  body: string;
+  created_at: string;
+  author_name: string | null;
+  /** Deep-link back to the source comment in the discussion rail. */
+  href: string;
+};
+
 export function TaskForm({
   mode,
   companyId,
@@ -52,7 +66,9 @@ export function TaskForm({
   onClose,
   canAssignToOthers = false,
   engagementContext,
+  commentContext,
   titleDefault,
+  descriptionDefault,
   defaultOpen,
 }: {
   mode: 'create' | 'edit';
@@ -71,9 +87,16 @@ export function TaskForm({
    *  engagement_id input so the saved task carries the link, and
    *  opens the form on mount. */
   engagementContext?: EngagementContext;
+  /** When set (task-from-comment entry path): renders the same
+   *  collapsible chrome as engagementContext but for a discussion
+   *  comment; emits a hidden comment_id. */
+  commentContext?: CommentContext;
   /** Used when initial.title is empty — typically
    *  "Follow up: {companyName}" for the follow-up path. */
   titleDefault?: string;
+  /** Pre-fill the description field (empty by default). Used by the
+   *  comment-follow-up path to seed a `From comment: "…"` quote. */
+  descriptionDefault?: string;
   /** Open the form on mount (used when arriving via follow-up URL). */
   defaultOpen?: boolean;
 }) {
@@ -81,13 +104,17 @@ export function TaskForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(
-    mode === 'edit' || defaultOpen === true || !!engagementContext,
+    mode === 'edit' ||
+      defaultOpen === true ||
+      !!engagementContext ||
+      !!commentContext,
   );
   const [reminders, setReminders] = useState<Set<ReminderKind>>(
     new Set(initial?.reminder_kinds ?? []),
   );
   const [customAt, setCustomAt] = useState(initial?.reminder_custom_at ?? '');
   const [engagementExpanded, setEngagementExpanded] = useState(false);
+  const [commentExpanded, setCommentExpanded] = useState(false);
 
   function close() {
     if (mode === 'edit' && onClose) onClose();
@@ -142,6 +169,37 @@ export function TaskForm({
           value={engagementContext.id}
         />
       )}
+      {commentContext && (
+        <input type="hidden" name="comment_id" value={commentContext.id} />
+      )}
+
+      {commentContext && (
+        <div className="rounded-lg border border-agsi-accent/40 bg-agsi-accent/5 px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold text-agsi-navy">
+              From comment · {new Date(commentContext.created_at).toLocaleString()}
+              {commentContext.author_name && (
+                <span className="font-normal text-agsi-darkGray">
+                  {' '}
+                  · by {commentContext.author_name}
+                </span>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setCommentExpanded((v) => !v)}
+              className="text-xs font-medium text-agsi-accent hover:underline"
+            >
+              {commentExpanded ? 'Hide comment' : 'Show comment'}
+            </button>
+          </div>
+          {commentExpanded && (
+            <p className="mt-2 whitespace-pre-wrap text-agsi-navy">
+              {commentContext.body}
+            </p>
+          )}
+        </div>
+      )}
 
       {engagementContext && (
         <div className="rounded-lg border border-agsi-accent/40 bg-agsi-accent/5 px-3 py-2 text-xs">
@@ -187,7 +245,7 @@ export function TaskForm({
         <Textarea
           name="description"
           rows={2}
-          defaultValue={initial?.description ?? ''}
+          defaultValue={initial?.description ?? descriptionDefault ?? ''}
           className="mt-1"
         />
       </div>
