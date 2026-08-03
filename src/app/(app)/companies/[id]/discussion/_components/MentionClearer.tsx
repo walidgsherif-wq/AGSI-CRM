@@ -24,8 +24,17 @@ import { notifyUnreadChanged } from '@/lib/notifications-events';
  */
 export function MentionClearer({
   mentions,
+  rootRef,
 }: {
   mentions: Array<{ notificationId: string; commentId: string }>;
+  /**
+   * Optional scroll container. When the discussion lives inside a
+   * nested-scroll element (the right rail), pass its ref so
+   * IntersectionObserver anchors to it — otherwise scrolling the
+   * rail internally doesn't fire. Omit on legacy full-page usage;
+   * defaults to the viewport.
+   */
+  rootRef?: React.RefObject<HTMLElement | null>;
 }) {
   // Ref, not state — mutating this set must not cause re-renders.
   const clearedRef = useRef<Set<string>>(new Set());
@@ -79,7 +88,7 @@ export function MentionClearer({
           }
         }
       },
-      { threshold: [0, 0.6, 1] },
+      { root: rootRef?.current ?? null, threshold: [0, 0.6, 1] },
     );
 
     // Attach to each mentioned comment's rendered <li id="comment-…">.
@@ -100,7 +109,7 @@ export function MentionClearer({
       timers.clear();
       observer.disconnect();
     };
-  }, [mentions]);
+  }, [mentions, rootRef]);
 
   return null;
 }
