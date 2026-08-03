@@ -32,6 +32,7 @@ function rawFromForm(formData: FormData) {
     company_id: get('company_id'),
     project_id: get('project_id'),
     engagement_id: get('engagement_id'),
+    comment_id: get('comment_id'),
     title: get('title'),
     description: get('description'),
     owner_id: get('owner_id'),
@@ -80,6 +81,54 @@ async function syncReminders(
  * the task row, that's a separate migration adding the column +
  * surfacing it in the task UI.
  */
+/**
+ * Create a follow-up task from a discussion comment. Mirrors
+ * createFollowUpTask (from engagement) exactly — synthesises a
+ * FormData and delegates to createTask so every safeguard runs.
+ *
+ * Pre-fills:
+ *   company_id     — from the comment's company
+ *   title          — "Follow up: {company}"
+ *   description    — quoted preview of the source comment (first 500
+ *                    chars) so the task carries context even if the
+ *                    comment is later soft-deleted / the link clears.
+ *   comment_id     — links the task back to the source comment.
+ *   owner_id       — the current user (editable in the form later).
+ */
+export async function createFollowUpTaskFromComment(commentId: string) {
+  const user = await getCurrentUser();
+  if (user.role === 'leadership') return { error: 'Leadership cannot create tasks.' };
+  const { data: c } = await supabase()
+    .from('company_comments')
+    .select(
+      'company_id, body, company:companies!company_comments_company_id_fkey(canonical_name)',
+    )
+    .eq('id', commentId)
+    .maybeSingle<{
+      company_id: string;
+      body: string;
+      company: { canonical_name: string } | { canonical_name: string }[] | null;
+    }>();
+  if (!c) return { error: 'Comment not found.' };
+
+  const companyName = Array.isArray(c.company)
+    ? c.company[0]?.canonical_name
+    : c.company?.canonical_name;
+  const title = `Follow up: ${companyName ?? 'stakeholder'}`.slice(0, 280);
+  const preview = (c.body ?? '').trim().slice(0, 500);
+  const description = preview ? `From comment: "${preview}"` : null;
+
+  const fd = new FormData();
+  fd.append('company_id', c.company_id);
+  fd.append('comment_id', commentId);
+  fd.append('title', title);
+  if (description) fd.append('description', description);
+  fd.append('owner_id', user.id);
+  fd.append('priority', 'med');
+  fd.append('status', 'open');
+  return createTask(fd);
+}
+
 export async function createFollowUpTask(engagementId: string) {
   const user = await getCurrentUser();
   if (user.role === 'leadership') return { error: 'Leadership cannot create tasks.' };
