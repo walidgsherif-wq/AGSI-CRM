@@ -106,10 +106,14 @@ function LiveCommentRow({
   canDelete: boolean;
   companyId: string;
 }) {
+  // Vertical stack: metadata + actions on one line, body on its own
+  // row below spanning the full column width. Previously these were
+  // in a horizontal flex — the actions column stole width and the
+  // body wrapped inside a narrow sub-column, especially in the rail.
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-agsi-darkGray">
+    <div className="space-y-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-agsi-darkGray">
           <span className="font-medium text-agsi-navy">
             {row.author_name ?? 'Deleted user'}
           </span>
@@ -121,17 +125,17 @@ function LiveCommentRow({
             <span className="italic text-agsi-midGray">(edited)</span>
           )}
         </div>
-        <div className="mt-1 whitespace-pre-wrap break-words text-sm text-agsi-navy">
-          {renderBodyWithMentions(row.body, row.mentions)}
-        </div>
+        <CommentActions
+          commentId={row.id}
+          companyId={companyId}
+          body={row.body}
+          canEdit={canEdit}
+          canDelete={canDelete}
+        />
       </div>
-      <CommentActions
-        commentId={row.id}
-        companyId={companyId}
-        body={row.body}
-        canEdit={canEdit}
-        canDelete={canDelete}
-      />
+      <div className="whitespace-pre-wrap break-words text-sm text-agsi-navy">
+        {renderBodyWithMentions(row.body, row.mentions)}
+      </div>
     </div>
   );
 }
