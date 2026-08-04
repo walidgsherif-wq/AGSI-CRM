@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   Snowflake,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   HIGH_VALUE_THRESHOLD_AED,
@@ -22,6 +21,7 @@ import {
 } from '@/lib/action-queue';
 import { getActionQueue } from '@/server/actions/action-queue';
 import { subscribeUnreadChanged } from '@/lib/notifications-events';
+import { CollapsiblePanel } from '@/components/domain/CollapsiblePanel';
 
 const INITIAL_VISIBLE = 6;
 
@@ -49,9 +49,11 @@ const TYPE_LABEL: Record<ActionType, string> = {
 export function ActionQueuePanel({
   greetingName,
   queue: initialQueue,
+  currentUserId,
 }: {
   greetingName: string;
   queue: ActionQueue;
+  currentUserId: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   // Seeded from the server render so first paint has data; live-
@@ -77,31 +79,39 @@ export function ActionQueuePanel({
   const hiddenCount = Math.max(0, items.length - visible.length);
   const firstName = greetingName.split(' ')[0] || greetingName;
 
+  // Pulse text — always visible on the collapsed header. Urgent
+  // when any item is queued (each entry is by definition something
+  // needing attention).
+  const pulse =
+    items.length === 0 ? (
+      <span className="italic text-agsi-darkGray">You&apos;re clear today</span>
+    ) : (
+      <span className="font-medium text-agsi-navy">
+        {items.length} {items.length === 1 ? 'thing needs' : 'things need'} you today
+      </span>
+    );
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold text-agsi-navy">
-              {greeting()} {firstName}
-            </h2>
-            <p className="mt-0.5 text-sm text-agsi-darkGray">
-              {items.length === 0
-                ? "You're clear for today — no actions in your queue."
-                : `${items.length} ${items.length === 1 ? 'thing needs' : 'things need'} you today`}
-            </p>
-          </div>
-          {items.length > 0 && <QueueLegend items={items} />}
+    <CollapsiblePanel
+      panelId="action-queue"
+      userId={currentUserId}
+      title={`${greeting()} ${firstName}`}
+      pulse={pulse}
+      urgent={items.length > 0}
+    >
+      {items.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-agsi-lightGray/40 px-4 py-2">
+          <QueueLegend items={items} />
         </div>
-      </CardHeader>
+      )}
 
       {items.length === 0 ? (
-        <CardContent className="flex items-center gap-3 border-t border-agsi-lightGray/60 py-6 text-sm text-agsi-darkGray">
+        <div className="flex items-center gap-3 py-6 pl-4 text-sm text-agsi-darkGray">
           <CircleCheck className="h-5 w-5 text-agsi-green" aria-hidden />
           <span>Nothing waiting on you — good time to prospect.</span>
-        </CardContent>
+        </div>
       ) : (
-        <CardContent className="p-0">
+        <div className="p-0">
           <ul className="divide-y divide-agsi-lightGray/70">
             {visible.map((item) => (
               <ActionRow key={item.key} item={item} now={now} />
@@ -127,9 +137,9 @@ export function ActionQueuePanel({
               Collapse
             </button>
           )}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </CollapsiblePanel>
   );
 }
 

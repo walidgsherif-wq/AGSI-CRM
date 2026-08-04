@@ -10,9 +10,12 @@ import {
   CircleCheck,
   Loader2,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { setTaskStatus } from '@/server/actions/tasks';
 import type { MyTaskRow, MyTasksData } from '@/server/actions/my-tasks';
+import {
+  CollapsiblePanel,
+  CountPulse,
+} from '@/components/domain/CollapsiblePanel';
 
 type Group = 'overdue' | 'today' | 'week' | 'later';
 
@@ -62,7 +65,13 @@ function relativeDue(due: string | null, today: string): string {
  * surfaces urgent exceptions across every source, this is the full
  * task-only working list.
  */
-export function MyTasksPanel({ initial }: { initial: MyTasksData }) {
+export function MyTasksPanel({
+  initial,
+  currentUserId,
+}: {
+  initial: MyTasksData;
+  currentUserId: string;
+}) {
   const router = useRouter();
   const [data, setData] = useState<MyTasksData>(initial);
   const [pending, startTransition] = useTransition();
@@ -129,40 +138,50 @@ export function MyTasksPanel({ initial }: { initial: MyTasksData }) {
     });
   }
 
+  const overdueCount = groups.overdue.length;
+  const openCount = data.rows.length;
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <CardTitle>My tasks</CardTitle>
-            <CardDescription>
-              Your open work — self-set and lead-assigned. Advance or
-              complete inline; the action queue above surfaces urgent
-              exceptions across every source.
-            </CardDescription>
-          </div>
-          <div className="min-w-[10rem]">
-            <p className="text-right text-xxs uppercase tracking-wider text-agsi-darkGray">
-              {data.doneLast7d} of {momentumDenom} done this week
-            </p>
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-agsi-lightGray/50">
-              <div
-                className="h-full bg-agsi-navy transition-all"
-                style={{ width: `${momentumPct}%` }}
-                aria-hidden
-              />
-            </div>
+    <CollapsiblePanel
+      panelId="my-tasks"
+      userId={currentUserId}
+      title="My tasks"
+      pulse={
+        <CountPulse
+          overdue={overdueCount}
+          open={openCount}
+          calmText="Clear — nothing open"
+        />
+      }
+      urgent={overdueCount > 0}
+    >
+      {/* Momentum bar + one-line context live inside the body so
+          the collapsed pulse stays tight. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-agsi-lightGray/40 px-4 py-2">
+        <p className="text-xs text-agsi-darkGray">
+          Self-set and lead-assigned. Advance or complete inline.
+        </p>
+        <div className="min-w-[10rem]">
+          <p className="text-right text-xxs uppercase tracking-wider text-agsi-darkGray">
+            {data.doneLast7d} of {momentumDenom} done this week
+          </p>
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-agsi-lightGray/50">
+            <div
+              className="h-full bg-agsi-navy transition-all"
+              style={{ width: `${momentumPct}%` }}
+              aria-hidden
+            />
           </div>
         </div>
-      </CardHeader>
+      </div>
 
       {data.rows.length === 0 ? (
-        <CardContent className="flex items-center gap-3 border-t border-agsi-lightGray/60 py-6 text-sm text-agsi-darkGray">
+        <div className="flex items-center gap-3 py-6 pl-4 text-sm text-agsi-darkGray">
           <CircleCheck className="h-5 w-5 text-agsi-green" aria-hidden />
           <span>You&apos;re clear — nothing open.</span>
-        </CardContent>
+        </div>
       ) : (
-        <CardContent className="space-y-4 p-0 pt-1">
+        <div className="space-y-4 p-0 pt-1">
           {(['overdue', 'today', 'week', 'later'] as Group[]).map((g) => {
             const rows = groups[g];
             if (rows.length === 0) return null;
@@ -194,9 +213,9 @@ export function MyTasksPanel({ initial }: { initial: MyTasksData }) {
               </div>
             );
           })}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </CollapsiblePanel>
   );
 }
 
