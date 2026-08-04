@@ -136,7 +136,8 @@ export async function claimCompany(companyId: string, locationId: string) {
     return { error: 'Select an emirate to claim this stakeholder.' };
   }
 
-  const { error } = await supabaseFromRequest().rpc('claim_company', {
+  const sb = supabaseFromRequest();
+  const { error } = await sb.rpc('claim_company', {
     p_company_id: companyId,
     p_location_id: locationId,
   });
@@ -147,6 +148,27 @@ export async function claimCompany(companyId: string, locationId: string) {
   // for admin/bd_head. Best-effort — never blocks the claim. Dedup
   // + role-gate live inside the helper.
   await maybeProposeFromAutoHook(companyId, 'claimed_off_sphere');
+
+  // Claim notification (0103 + 0104): fan out one 'claim' row per
+  // active admin / bd_head, excluding the claimer. Best-effort —
+  // wrapped in try/catch so a notification failure never rolls back
+  // the claim itself (the claim already committed). Only fires when
+  // the claim_company RPC succeeded; it internally sets owner_id
+  // null → this user, so this branch is exactly the "new claim"
+  // path the brief calls for (re-assignments go through
+  // transfer_company_ownership; unclaim through unclaim_company).
+  try {
+    await sb.rpc('send_claim_notifications', {
+      p_company_id: companyId,
+      p_actor_id: user.id,
+    });
+  } catch (err) {
+    console.error('[claim] send_claim_notifications failed', {
+      companyId,
+      actorId: user.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   revalidatePath('/companies');
   revalidatePath(`/companies/${companyId}`);
