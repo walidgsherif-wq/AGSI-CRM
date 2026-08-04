@@ -5,7 +5,6 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import {
   TASK_PRIORITY_LABEL,
   TASK_STATUS_LABEL,
@@ -250,121 +249,132 @@ export default async function CompanyTasksTab({
               No tasks yet. Click &quot;New task&quot; above.
             </p>
           ) : (
-            <Table>
-              <THead>
-                <TR head>
-                  <TH className="px-4">Task</TH>
-                  <TH className="px-4">Owner</TH>
-                  <TH className="px-4">Due</TH>
-                  <TH className="px-4">Priority</TH>
-                  <TH className="px-4">Reminders</TH>
-                  <TH className="px-4">Status</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {tasks.map((t) => {
-                  const overdue =
-                    t.due_date &&
-                    t.status !== 'done' &&
-                    t.status !== 'cancelled' &&
-                    t.due_date < new Date().toISOString().slice(0, 10);
-                  const canEdit =
-                    user.role === 'admin' ||
-                    user.role === 'bd_head' ||
-                    (user.role === 'bd_manager' && t.owner_id === user.id);
-                  const canDelete = canEdit;
-                  const pendingReminders = (t.reminders ?? []).filter((r) => !r.sent_at).length;
-                  const sentReminders = (t.reminders ?? []).filter((r) => r.sent_at).length;
-                  return (
-                    <TR
-                      key={t.id}
-                      className={
-                        t.status === 'done' || t.status === 'cancelled' ? 'opacity-60' : ''
-                      }
+            <ul className="divide-y divide-agsi-lightGray/70">
+              {tasks.map((t) => {
+                const overdue =
+                  t.due_date &&
+                  t.status !== 'done' &&
+                  t.status !== 'cancelled' &&
+                  t.due_date < new Date().toISOString().slice(0, 10);
+                const canEdit =
+                  user.role === 'admin' ||
+                  user.role === 'bd_head' ||
+                  (user.role === 'bd_manager' && t.owner_id === user.id);
+                const canDelete = canEdit;
+                const pendingReminders = (t.reminders ?? []).filter((r) => !r.sent_at).length;
+                const sentReminders = (t.reminders ?? []).filter((r) => r.sent_at).length;
+                const eng = pickOne(t.engagement);
+                const engSummary =
+                  eng && eng.summary.length > 80
+                    ? eng.summary.slice(0, 80) + '…'
+                    : eng?.summary;
+                const dim =
+                  t.status === 'done' || t.status === 'cancelled'
+                    ? 'opacity-60'
+                    : '';
+                return (
+                  <li key={t.id} className={`px-4 py-3 ${dim}`}>
+                    {/* Line 1 — title uses the full width. line-clamp-2
+                        keeps very long titles scannable; native `title`
+                        gives full text on hover. Description +
+                        engagement chip live below the title as
+                        context, before the metadata row. */}
+                    <p
+                      className="line-clamp-2 text-sm font-medium text-agsi-navy"
+                      title={t.title}
                     >
-                      <TD className="px-4">
-                        <div className="font-medium text-agsi-navy">{t.title}</div>
-                        {t.description && (
-                          <div className="mt-0.5 text-xs text-agsi-darkGray">{t.description}</div>
-                        )}
-                        {(() => {
-                          const eng = pickOne(t.engagement);
-                          if (!eng) return null;
-                          const truncated =
-                            eng.summary.length > 80
-                              ? eng.summary.slice(0, 80) + '…'
-                              : eng.summary;
-                          return (
-                            <Link
-                              href={`/companies/${params.id}/engagements`}
-                              className="mt-1 inline-block text-xxs text-agsi-accent hover:underline"
-                            >
-                              From engagement: “{truncated}” · {eng.engagement_date}
-                            </Link>
-                          );
-                        })()}
-                        {t.source !== 'manual' && (
-                          <Badge variant="amber" className="mt-1">
-                            {t.source}
-                          </Badge>
-                        )}
-                      </TD>
-                      <TD className="px-4 text-agsi-darkGray">
-                        <div>{t.owner?.full_name ?? '—'}</div>
-                        {t.assigned_by?.full_name && (
-                          <div className="text-xs2 italic text-agsi-midGray">
-                            assigned by {t.assigned_by.full_name}
-                          </div>
-                        )}
-                      </TD>
-                      <TD className="px-4">
-                        <span className={overdue ? 'text-rag-red' : 'text-agsi-darkGray'}>
-                          {t.due_date ?? '—'}
-                          {overdue && ' · overdue'}
+                      {t.title}
+                    </p>
+                    {t.description && (
+                      <p
+                        className="mt-0.5 line-clamp-2 text-xs text-agsi-darkGray"
+                        title={t.description}
+                      >
+                        {t.description}
+                      </p>
+                    )}
+                    {eng && (
+                      <Link
+                        href={`/companies/${params.id}/engagements`}
+                        className="mt-1 inline-block text-xxs text-agsi-accent hover:underline"
+                      >
+                        From engagement: &ldquo;{engSummary}&rdquo; · {eng.engagement_date}
+                      </Link>
+                    )}
+
+                    {/* Line 2 — compact metadata row. flex-wrap so it
+                        collapses gracefully on narrow viewports rather
+                        than sitting as fixed columns with dead
+                        whitespace. */}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xxs text-agsi-darkGray">
+                      <span
+                        className="inline-flex items-center gap-1"
+                        title={
+                          t.assigned_by?.full_name
+                            ? `Assigned by ${t.assigned_by.full_name}`
+                            : undefined
+                        }
+                      >
+                        <span className="text-agsi-midGray">Owner:</span>
+                        <span className="text-agsi-navy">
+                          {t.owner?.full_name ?? '—'}
                         </span>
-                      </TD>
-                      <TD className="px-4">
-                        <Badge variant={PRIORITY_VARIANT[t.priority]}>
-                          {TASK_PRIORITY_LABEL[t.priority]}
-                        </Badge>
-                      </TD>
-                      <TD className="px-4 text-xs text-agsi-darkGray tabular">
-                        {pendingReminders + sentReminders === 0 ? (
-                          '—'
-                        ) : (
-                          <>
-                            <span title="Pending reminders">🔔 {pendingReminders}</span>
-                            {sentReminders > 0 && (
-                              <span className="ml-2 text-agsi-darkGray/60" title="Sent">
-                                ✓ {sentReminders}
-                              </span>
-                            )}
-                          </>
+                        {t.assigned_by?.full_name && (
+                          <span className="italic text-agsi-midGray">
+                            · assigned by {t.assigned_by.full_name}
+                          </span>
                         )}
-                      </TD>
-                      <TD className="px-4">
-                        <div className="flex items-center gap-3">
-                          <TaskRowActions
-                            id={t.id}
-                            status={t.status}
-                            contextPath={`/companies/${params.id}/tasks`}
-                            canDelete={canDelete}
-                          />
-                          {canEdit && (
-                            <Link
-                              href={`/companies/${params.id}/tasks?edit=${t.id}` as never}
-                              className="text-xs text-agsi-accent hover:underline"
-                            >
-                              Edit
-                            </Link>
+                      </span>
+                      <span
+                        className={
+                          overdue ? 'font-medium text-rag-red' : 'text-agsi-darkGray'
+                        }
+                      >
+                        {t.due_date ? `Due ${t.due_date}` : 'No due date'}
+                        {overdue && ' · overdue'}
+                      </span>
+                      <Badge variant={PRIORITY_VARIANT[t.priority]}>
+                        {TASK_PRIORITY_LABEL[t.priority]}
+                      </Badge>
+                      {pendingReminders + sentReminders > 0 && (
+                        <span
+                          className="inline-flex items-center gap-1 tabular-nums"
+                          title={`Reminders — ${pendingReminders} pending${
+                            sentReminders > 0 ? `, ${sentReminders} sent` : ''
+                          }`}
+                        >
+                          🔔 {pendingReminders}
+                          {sentReminders > 0 && (
+                            <span className="text-agsi-darkGray/60">
+                              · ✓ {sentReminders}
+                            </span>
                           )}
-                        </div>
-                      </TD>
-                    </TR>
-                  );
-                })}
-              </TBody>
-            </Table>
+                        </span>
+                      )}
+                      {t.source !== 'manual' && (
+                        <Badge variant="amber">{t.source}</Badge>
+                      )}
+                      <div className="ml-auto flex items-center gap-3">
+                        <TaskRowActions
+                          id={t.id}
+                          status={t.status}
+                          contextPath={`/companies/${params.id}/tasks`}
+                          canDelete={canDelete}
+                        />
+                        {canEdit && (
+                          <Link
+                            href={`/companies/${params.id}/tasks?edit=${t.id}` as never}
+                            className="text-xs text-agsi-accent hover:underline"
+                          >
+                            Edit
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </CardContent>
       </Card>
