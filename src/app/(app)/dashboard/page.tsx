@@ -478,12 +478,18 @@ export default async function DashboardPage({
 
       {coverageDebug && <CoverageDebugBanner data={coverageDebug} />}
 
-      <ActionQueuePanel greetingName={user.fullName} queue={actionQueue} />
+      <ActionQueuePanel
+        greetingName={user.fullName}
+        queue={actionQueue}
+        currentUserId={user.id}
+      />
 
-      {myTasks && <MyTasksPanel initial={myTasks} />}
+      {myTasks && (
+        <MyTasksPanel initial={myTasks} currentUserId={user.id} />
+      )}
 
       {assignedByMe && assignedByMe.length > 0 && (
-        <AssignedByMePanel rows={assignedByMe} />
+        <AssignedByMePanel rows={assignedByMe} currentUserId={user.id} />
       )}
 
       <div className="pt-2">
