@@ -5,7 +5,11 @@ import { serverComponentCookies } from '@/lib/supabase/cookie-adapter';
 import { requireFeature } from '@/lib/auth/features';
 import { Button } from '@/components/ui/button';
 import { type TaskPriority, type TaskStatus } from '@/lib/zod/task';
-import { TaskForm } from '../companies/[id]/tasks/_components/TaskForm';
+import {
+  TaskForm,
+  type TaskFormInitial,
+} from '../companies/[id]/tasks/_components/TaskForm';
+import type { ReminderKind } from '@/lib/zod/task';
 import { TaskKanban } from './_components/TaskKanban';
 
 export const dynamic = 'force-dynamic';
@@ -26,13 +30,17 @@ type TaskRow = {
   assigned_by: { full_name: string } | null;
   company: { id: string; canonical_name: string } | null;
   project: { id: string; name: string } | null;
-  reminders: { reminder_kind: string }[];
+  reminders: {
+    reminder_kind: ReminderKind;
+    reminder_at: string;
+    sent_at: string | null;
+  }[];
 };
 
 export default async function GlobalTasksPage({
   searchParams,
 }: {
-  searchParams: { scope?: string };
+  searchParams: { scope?: string; edit?: string };
 }) {
   const user = await requireFeature('tasks');
 
@@ -47,7 +55,7 @@ export default async function GlobalTasksPage({
   let query = supabase
     .from('tasks')
     .select(
-      'id, title, description, due_date, priority, status, owner_id, assigned_by_id, source, company_id, project_id, owner:profiles!tasks_owner_id_fkey(full_name), assigned_by:profiles!tasks_assigned_by_id_fkey(full_name), company:companies(id, canonical_name), project:projects(id, name), reminders:task_reminders(reminder_kind)',
+      'id, title, description, due_date, priority, status, owner_id, assigned_by_id, source, company_id, project_id, owner:profiles!tasks_owner_id_fkey(full_name), assigned_by:profiles!tasks_assigned_by_id_fkey(full_name), company:companies(id, canonical_name), project:projects(id, name), reminders:task_reminders(reminder_kind, reminder_at, sent_at)',
     )
     .order('status', { ascending: true })
     .order('due_date', { ascending: true, nullsFirst: false })
@@ -69,6 +77,39 @@ export default async function GlobalTasksPage({
   const profiles = (profilesRaw ?? []) as Array<{ id: string; full_name: string }>;
   const canAssignToOthers = user.role === 'admin' || user.role === 'bd_head';
   const canCreate = user.role !== 'leadership';
+
+  // ?edit=<id> — ad-hoc-safe edit path. Kanban/oversight cards route
+  // company-linked tasks to /companies/[id]/tasks?edit=… (their own
+  // edit surface), and tasks without a company here so ad-hoc rows
+  // finally have an editor. Only tasks visible in the current
+  // fetched list are editable — the RLS-scoped `tasks` query above
+  // already limits `mine`/`team` to what the caller can see.
+  let editInitial: TaskFormInitial | null = null;
+  let editCompanyId: string | null = null;
+  if (searchParams.edit) {
+    const t = tasks.find((x) => x.id === searchParams.edit);
+    if (t) {
+      editCompanyId = t.company_id;
+      const customRem = (t.reminders ?? []).find(
+        (r) => r.reminder_kind === 'custom',
+      );
+      editInitial = {
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        owner_id: t.owner_id,
+        due_date: t.due_date,
+        priority: t.priority,
+        status: t.status,
+        reminder_kinds: (t.reminders ?? []).map(
+          (r) => r.reminder_kind,
+        ),
+        reminder_custom_at: customRem
+          ? new Date(customRem.reminder_at).toISOString().slice(0, 16)
+          : null,
+      };
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -106,14 +147,25 @@ export default async function GlobalTasksPage({
         )}
       </div>
 
-      {canCreate && (
+      {editInitial ? (
         <TaskForm
-          mode="create"
-          companyId={null}
+          mode="edit"
+          companyId={editCompanyId}
           profiles={profiles}
           defaultOwnerId={user.id}
+          initial={editInitial}
           canAssignToOthers={canAssignToOthers}
         />
+      ) : (
+        canCreate && (
+          <TaskForm
+            mode="create"
+            companyId={null}
+            profiles={profiles}
+            defaultOwnerId={user.id}
+            canAssignToOthers={canAssignToOthers}
+          />
+        )
       )}
 
       <TaskKanban
