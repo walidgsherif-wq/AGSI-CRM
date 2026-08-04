@@ -196,14 +196,23 @@ function TaskCard({
   onDragEnd: () => void;
   isBeingDragged: boolean;
 }) {
+  const router = useRouter();
   const isOverdue =
     card.status !== 'done' && card.due_date !== null && card.due_date < today;
-  // Company-linked cards link out to the company's Tasks tab (where
-  // the existing edit flow lives). Ad-hoc cards stay non-clickable
-  // for now — editing them isn't surfaced yet (separate item).
+  // Every card has an edit target. Company-linked cards keep the
+  // stakeholder-scoped edit surface; ad-hoc cards route to
+  // /tasks?edit=<id> — closes the gap where ad-hoc rows were
+  // non-editable (the pre-fix comment called it out as unfinished).
   const editHref = card.company_id
-    ? `/companies/${card.company_id}/tasks?edit=${card.id}`
-    : null;
+    ? (`/companies/${card.company_id}/tasks?edit=${card.id}` as const)
+    : (`/tasks?edit=${card.id}` as const);
+
+  function openEdit() {
+    // HTML5 drag suppresses the click event on drop, so this fires
+    // only on real clicks — no manual drag-vs-click threshold
+    // needed. Keyboard support via role/tabIndex + onKeyDown below.
+    router.push(editHref as never);
+  }
 
   return (
     <div
@@ -213,23 +222,27 @@ function TaskCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
+      onClick={openEdit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openEdit();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Edit ${card.title}`}
       className={cn(
-        'cursor-grab rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm active:cursor-grabbing',
+        // Whole-card hover + click. cursor-grab stays the primary
+        // affordance (the kanban's dominant interaction is drag);
+        // hover:border-agsi-navy/40 + shadow-md communicate the
+        // card-level interactive surface without swapping cursors.
+        'cursor-grab rounded-lg border border-agsi-lightGray bg-white p-3 shadow-sm transition-shadow transition-colors hover:border-agsi-navy/40 hover:shadow-md active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-agsi-accent',
         isBeingDragged && 'opacity-50',
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        {editHref ? (
-          <Link
-            href={editHref as never}
-            draggable={false}
-            className="text-sm font-medium text-agsi-navy hover:underline"
-          >
-            {card.title}
-          </Link>
-        ) : (
-          <p className="text-sm font-medium text-agsi-navy">{card.title}</p>
-        )}
+        <p className="text-sm font-medium text-agsi-navy">{card.title}</p>
         {/* Delegation marker: when assigned_by is set, show the
             assigner avatar to the LEFT of the owner avatar with a
             small arrow — reads as "<assigner> delegated to <owner>". */}
@@ -259,6 +272,7 @@ function TaskCard({
           <Link
             href={`/companies/${card.company_id}`}
             draggable={false}
+            onClick={(e) => e.stopPropagation()}
             className="text-xs text-agsi-accent hover:underline"
           >
             {card.company_name ?? 'Company'}

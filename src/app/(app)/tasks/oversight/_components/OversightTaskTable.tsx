@@ -31,9 +31,11 @@ const columns: ColumnDef<OversightTaskRow, unknown>[] = [
     header: 'Task',
     cell: ({ row }) => {
       const t = row.original;
-      const editHref = t.company_id
+      // Every row is editable — ad-hoc tasks route to /tasks?edit=<id>
+      // so the company-linked fallback isn't the only edit surface.
+      const editHref: Route = t.company_id
         ? (`/companies/${t.company_id}/tasks?edit=${t.id}` as Route)
-        : null;
+        : (`/tasks?edit=${t.id}` as Route);
       return (
         <span
           className={cn(
@@ -41,13 +43,9 @@ const columns: ColumnDef<OversightTaskRow, unknown>[] = [
             (t.status === 'done' || t.status === 'cancelled') && 'opacity-60',
           )}
         >
-          {editHref ? (
-            <Link href={editHref} className="font-medium text-agsi-navy hover:underline">
-              {t.title}
-            </Link>
-          ) : (
-            <span className="font-medium text-agsi-navy">{t.title}</span>
-          )}
+          <Link href={editHref} className="font-medium text-agsi-navy hover:underline">
+            {t.title}
+          </Link>
         </span>
       );
     },
