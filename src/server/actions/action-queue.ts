@@ -134,6 +134,58 @@ export async function getActionQueue(): Promise<ActionQueue> {
     });
   }
 
+  // ── Claim FYIs — admin / bd_head only ───────────────────────
+  // Matches the send_claim_notifications fan-out (0104): claims are
+  // only ever addressed to active admin/bd_head profiles, so a
+  // bd_manager query here would always be empty. Bailing early skips
+  // the round-trip. Informational, not a decision — sorts below
+  // approvals via TYPE_WEIGHT.claim.
+  if (user.role === 'admin' || user.role === 'bd_head') {
+    type ClaimRow = {
+      id: string;
+      subject: string;
+      body: string;
+      link_url: string | null;
+      related_company_id: string | null;
+      created_at: string;
+      related_company: CompanyRow | null;
+    };
+    const { data: claims } = await sb
+      .from('notifications')
+      .select(
+        'id, subject, body, link_url, related_company_id, created_at, ' +
+          'related_company:companies!notifications_related_company_id_fkey(id, canonical_name, company_type, current_level)',
+      )
+      .eq('notification_type', 'claim')
+      .eq('is_read', false)
+      .is('dismissed_at', null)
+      .order('created_at', { ascending: false })
+      .returns<ClaimRow[]>();
+
+    for (const c of claims ?? []) {
+      if (!c.related_company) continue; // company merged / removed since
+      const ageDays = daysBetween(c.created_at, now);
+      const company = companyStub(c.related_company);
+      items.push({
+        key: `claim:${c.id}`,
+        type: 'claim',
+        // Newer bumps higher inside the claim tier, same shape as
+        // mentions. Bounded to [0, 99] so a stale claim never leaks
+        // above pending_approval (weight gap = 50).
+        priority: TYPE_WEIGHT.claim + ageBonus(99 - ageDays),
+        // Subject already reads "{actor} claimed {company}" —
+        // matches the RPC in 0104. No re-formatting here so a
+        // future subject tweak flows through automatically.
+        reason: c.subject,
+        link_url: c.link_url ?? `/companies/${company.id}`,
+        context: contextLine(company),
+        occurred_at: c.created_at,
+        company,
+        notification_id: c.id,
+      });
+    }
+  }
+
   // ── Overdue tasks ────────────────────────────────────────────
   type TaskRow = {
     id: string;

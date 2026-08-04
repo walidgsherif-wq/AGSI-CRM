@@ -6,7 +6,8 @@ export type ActionType =
   | 'mention'
   | 'overdue_task'
   | 'cold_high_value'
-  | 'pending_approval';
+  | 'pending_approval'
+  | 'claim';
 
 /**
  * Type-level weights that drive the ranking. Kept as a single readable
@@ -16,14 +17,18 @@ export type ActionType =
  *     time-sensitive (someone is waiting on the viewer specifically).
  *   cold_high_value ranks below them but above approvals — it's
  *     proactive work with real dollar-value at risk.
- *   pending_approval trails — it's queue work, less urgent than a
- *     stakeholder going silent while carrying real value.
+ *   pending_approval trails actionable items — queue work, less urgent
+ *     than a stakeholder going silent while carrying real value.
+ *   claim trails everything — purely informational (a member took
+ *     ownership of a stakeholder). It's an FYI leaders acknowledge,
+ *     not a decision or a stalled thread.
  *
  * Priority score = TYPE_WEIGHT[type] + per-item tiebreak in [0, 99]:
  *   overdue_task     — days overdue (older = bigger)
  *   mention          — 99 - days old (newer = bigger)
  *   cold_high_value  — log-scaled value bucket (0..99)
  *   pending_approval — days old (older = bigger)
+ *   claim            — 99 - days old (newer = bigger)
  *
  * Bounded tiebreak keeps the bucketing legible — a type-A item can
  * never leapfrog a type-B item just because it accumulated age.
@@ -33,6 +38,7 @@ export const TYPE_WEIGHT: Record<ActionType, number> = {
   mention: 400,
   cold_high_value: 200,
   pending_approval: 100,
+  claim: 50,
 };
 
 /**
@@ -71,6 +77,9 @@ export type ActionItem = {
   value_aed?: number | null;
   /** Full company shim so the UI can render level / type badges without a re-fetch. */
   company: CompanyStub;
+  /** Present on `claim` rows — the underlying notification id, so the
+   *  OK/acknowledge button can dismiss it. Undefined for other types. */
+  notification_id?: string;
 };
 
 export type ActionQueue = {
