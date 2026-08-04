@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/get-user';
 import {
   Card,
@@ -19,14 +19,14 @@ export const dynamic = 'force-dynamic';
 /**
  * Sphere of Interest — the curated target-stakeholder list.
  *
- * Read: everyone authenticated.
- * Write: admin/bd_head/bd_manager (governance enforced in the action +
- *   RLS + surfaced in the UI). Leadership sees the builder read-only —
- *   useful for reviewing target coverage without editing.
+ * Access: admin + bd_head only. bd_manager still sees the sphere-
+ * scoped dashboard metrics (Build B) and keeps "Propose for sphere"
+ * on the stakeholder card — but the builder itself is a lead-only
+ * curation tool. Leadership doesn't need it either.
  *
- * Route lives at /sphere (not under /admin/*) because the admin layout
- * is admin-only via requireRole, and this feature explicitly needs
- * bd_head + bd_manager write access.
+ * Route lives at /sphere (not under /admin/*) because the admin
+ * layout is `requireRole(['admin'])` — bd_head needs write access
+ * too, so the gate lives here.
  */
 export default async function SpherePage({
   searchParams,
@@ -34,6 +34,13 @@ export default async function SpherePage({
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const user = await getCurrentUser();
+
+  // Server-side role gate — the sidebar hides the link for
+  // bd_manager + leadership, but a direct URL hit must also bounce.
+  // This is the primary block; nav visibility is UX polish.
+  if (user.role !== 'admin' && user.role !== 'bd_head') {
+    redirect('/dashboard');
+  }
 
   const parsed = sphereQuerySchema.safeParse(
     Object.fromEntries(
@@ -48,7 +55,10 @@ export default async function SpherePage({
 
   const data = await getSphereBuilderRows(q);
 
-  const canEdit = ['admin', 'bd_head', 'bd_manager'].includes(user.role);
+  // Only admin/bd_head reach this line (the redirect above bounced
+  // everyone else) — the SphereBuilder still takes canEdit so the
+  // component stays reusable if this ever needs a read-only preview.
+  const canEdit = true;
 
   const typeOptions = (SPOKE_TYPES as readonly string[]).map((k) => ({
     value: k,
@@ -88,11 +98,8 @@ export default async function SpherePage({
         <CardHeader className="pb-2">
           <CardTitle>Builder</CardTitle>
           <CardDescription>
-            {canEdit
-              ? user.role === 'bd_manager'
-                ? 'You can propose stakeholders for the sphere; admin/head review and decide. Removal is admin/head only.'
-                : 'You can add or remove any stakeholder directly. Manager proposals appear as notifications for you to approve.'
-              : 'Read-only. Ask an admin or BD head to edit the sphere.'}
+            You can add or remove any stakeholder directly. Manager
+            proposals appear as notifications for you to approve.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
