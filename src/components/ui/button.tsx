@@ -3,7 +3,13 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+  // Explicit cursor-pointer + disabled:cursor-not-allowed (swapped
+  // in from the previous disabled:pointer-events-none, which
+  // suppressed the disabled cursor entirely). The native `disabled`
+  // attribute still blocks the click — this is purely the visual
+  // affordance so a hovered disabled button reads as "can't click"
+  // rather than "no cursor change."
+  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
   {
     variants: {
       variant: {

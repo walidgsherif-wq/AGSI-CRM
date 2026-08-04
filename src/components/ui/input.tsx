@@ -9,8 +9,12 @@ export const inputVariants = cva(
     'w-full rounded-lg border bg-white px-3 py-2 text-sm text-agsi-navy',
     'placeholder:text-agsi-midGray transition-colors',
     'focus:outline-none focus:ring-1',
+    // Disabled = truly not-interactive → not-allowed cursor + muted.
     'disabled:cursor-not-allowed disabled:bg-agsi-lightGray/40 disabled:text-agsi-darkGray',
-    'read-only:cursor-not-allowed read-only:bg-agsi-lightGray/40 read-only:text-agsi-darkGray',
+    // Read-only ≠ disabled — the value can still be selected + copied,
+    // so the text cursor stays. Keep the muted background as the
+    // visual "you can't type here" hint.
+    'read-only:bg-agsi-lightGray/40 read-only:text-agsi-darkGray',
   ].join(' '),
   {
     variants: {
