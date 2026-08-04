@@ -12,7 +12,17 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <select
         ref={ref}
-        className={cn(inputVariants({ tone }), 'pr-8', className)}
+        className={cn(
+          inputVariants({ tone }),
+          // A <select> is always a click target when enabled — force
+          // the pointer cursor explicitly so browser default cursors
+          // (arrow / text) don't leak through from parent CSS or
+          // Tailwind preflight version drift. disabled:cursor-not-
+          // allowed from inputVariants still wins when the select
+          // is actually disabled.
+          'cursor-pointer pr-8 hover:border-agsi-navy',
+          className,
+        )}
         {...props}
       >
         {children}
