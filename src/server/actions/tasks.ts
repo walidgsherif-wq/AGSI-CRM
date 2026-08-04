@@ -234,6 +234,26 @@ export async function updateTask(formData: FormData) {
     });
   }
 
+  // Completion-loop notification (0105 + 0106): if the status just
+  // flipped to 'done', let the assigner know. The RPC itself no-ops
+  // when the task isn't lead-assigned or when the actor IS the
+  // assigner, so the callsite doesn't need to reason about those
+  // conditions. Wrapped in try/catch — a failed notify never blocks
+  // the status update the user actually asked for.
+  if (update.status === 'done') {
+    try {
+      await supabase().rpc('send_task_completed_notification', {
+        p_task_id: id,
+        p_actor_id: user.id,
+      });
+    } catch (err) {
+      console.error('[tasks] send_task_completed_notification failed', {
+        id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   // Only re-sync reminders if the form explicitly carried reminder_kinds
   // (the global status-only inline updater doesn't carry them).
   if (reminder_kinds !== undefined) {
@@ -259,6 +279,25 @@ export async function setTaskStatus(id: string, status: TaskStatus) {
   else patch.completed_at = null;
   const { error } = await supabase().from('tasks').update(patch).eq('id', id);
   if (error) return { error: error.message };
+
+  // Same completion-loop notify as updateTask — this is the inline
+  // complete-checkbox path used by MyTasksPanel + task lists. RPC
+  // no-ops on non-lead-assigned tasks; try/catch keeps the status
+  // change unblocked if the notify fails.
+  if (status === 'done') {
+    try {
+      await supabase().rpc('send_task_completed_notification', {
+        p_task_id: id,
+        p_actor_id: user.id,
+      });
+    } catch (err) {
+      console.error('[tasks] send_task_completed_notification failed', {
+        id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   revalidatePath('/tasks');
   return { ok: true };
 }
