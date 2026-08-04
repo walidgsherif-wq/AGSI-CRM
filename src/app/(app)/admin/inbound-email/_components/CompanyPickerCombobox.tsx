@@ -25,18 +25,25 @@ export function CompanyPickerCombobox({
   onChange,
   disabled,
   placeholder = 'Type to search…',
+  initialSelected = null,
 }: {
   value: string;
   onChange: (id: string | null) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Pre-hydrated hit for the chip when `value` is set on first render
+   *  (e.g. from URL params) — avoids a client round-trip just to show
+   *  the label. Consumers who don't need this can leave it null. */
+  initialSelected?: CompanySearchHit | null;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CompanySearchHit[]>([]);
   const [highlight, setHighlight] = useState(0);
-  const [selected, setSelected] = useState<CompanySearchHit | null>(null);
+  const [selected, setSelected] = useState<CompanySearchHit | null>(
+    initialSelected,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useRef(
