@@ -59,10 +59,15 @@ const NAV: NavItem[] = [
     roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
   },
   {
+    // Builder is admin + bd_head only. bd_manager keeps "Propose for
+    // sphere" on the stakeholder card and full sphere-scoped
+    // dashboard metrics (Build B), but the curation surface itself
+    // is a lead-only tool. Leadership is view-only elsewhere and
+    // doesn't need the builder either.
     href: '/sphere',
     label: 'Sphere',
     icon: Target,
-    roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
+    roles: ['admin', 'bd_head'],
   },
   {
     href: '/projects',
