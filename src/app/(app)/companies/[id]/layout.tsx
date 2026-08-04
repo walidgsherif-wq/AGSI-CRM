@@ -31,6 +31,12 @@ type CompanyHeaderRow = {
   has_active_projects: boolean;
   source: string;
   owner_id: string | null;
+  /** Owner profile shape from the PostgREST embed. Nullable when
+   *  owner_id is null OR when the linked profile has been removed. */
+  owner:
+    | { full_name: string }
+    | { full_name: string }[]
+    | null;
 };
 
 type RawCommentRow = {
@@ -68,7 +74,7 @@ export default async function CompanyLayout({
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, canonical_name, company_type, city, current_level, is_key_stakeholder, has_active_projects, source, owner_id',
+      'id, canonical_name, company_type, city, current_level, is_key_stakeholder, has_active_projects, source, owner_id, owner:profiles!companies_owner_id_fkey(full_name)',
     )
     .eq('id', params.id)
     .single<CompanyHeaderRow>();
@@ -194,7 +200,20 @@ export default async function CompanyLayout({
           </div>
           <p className="mt-1 text-sm text-agsi-darkGray">
             {COMPANY_TYPE_LABEL[company.company_type]} · {company.city ?? 'No city'} · Source:{' '}
-            {company.source}
+            {company.source} ·{' '}
+            {(() => {
+              // Owner is the FK-embedded profile; supabase-js may
+              // return the row shape as `{…}` or `[{…}]` depending
+              // on the relationship inference — collapse both.
+              const owner = Array.isArray(company.owner)
+                ? company.owner[0]
+                : company.owner;
+              return company.owner_id && owner?.full_name ? (
+                <>Owner: {owner.full_name}</>
+              ) : (
+                <span className="italic">Unclaimed</span>
+              );
+            })()}
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-3">
