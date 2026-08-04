@@ -29,6 +29,9 @@ import {
 } from '@/server/actions/coverage-diagnostics';
 import { getActionQueue } from '@/server/actions/action-queue';
 import { ActionQueuePanel } from './_components/ActionQueuePanel';
+import { getAssignedByMe, getMyTasks } from '@/server/actions/my-tasks';
+import { MyTasksPanel } from './_components/MyTasksPanel';
+import { AssignedByMePanel } from './_components/AssignedByMePanel';
 import { MemberSelector, type BdMember } from './_components/MemberSelector';
 import { MyEventsCard, type MyEventRow } from './_components/MyEventsCard';
 import {
@@ -188,6 +191,19 @@ export default async function DashboardPage({
   // mentions, overdue tasks, cold owned stakeholders, and (admin
   // only) pending approvals. Read-only aggregation.
   const actionQueue = await getActionQueue();
+
+  // My Tasks — the caller's own open + in-progress work (self-set
+  // and lead-assigned). Every BD-team member sees this; leadership
+  // has no owned tasks so we skip the fetch. Strict scope: RLS
+  // (0106) already restricts SELECT to owner-or-assigner, and the
+  // action filters owner_id = self on top.
+  const isBdTeam = ['admin', 'bd_head', 'bd_manager'].includes(user.role);
+  const myTasks = isBdTeam ? await getMyTasks() : null;
+
+  // Lead-side "Tasks I've assigned" — admin/bd_head only. Never
+  // fetched for bd_manager (also enforced inside the action).
+  const canSeeAssignedByMe = user.role === 'admin' || user.role === 'bd_head';
+  const assignedByMe = canSeeAssignedByMe ? await getAssignedByMe() : null;
 
   // Initial radar data for the default 'all' band. Re-fetches client-
   // side when the user picks a different value band.
@@ -463,6 +479,12 @@ export default async function DashboardPage({
       {coverageDebug && <CoverageDebugBanner data={coverageDebug} />}
 
       <ActionQueuePanel greetingName={user.fullName} queue={actionQueue} />
+
+      {myTasks && <MyTasksPanel initial={myTasks} />}
+
+      {assignedByMe && assignedByMe.length > 0 && (
+        <AssignedByMePanel rows={assignedByMe} />
+      )}
 
       <div className="pt-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-agsi-darkGray">

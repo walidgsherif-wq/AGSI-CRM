@@ -33,6 +33,8 @@ const TYPE_LABEL: Record<string, string> = {
   mention: 'Mention',
   sphere_proposal: 'Sphere proposal',
   claim: 'Claim',
+  task_completed: 'Task completed',
+  task_assigned: 'Task assigned',
   leadership_report_finalised: 'Leadership report',
 };
 
