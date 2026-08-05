@@ -1,0 +1,140 @@
+# Daily pg_dump backup of prod. Runs on GitHub-hosted runners,
+# stores the dump as a downloadable Actions artifact retained for 90
+# days. Independent of ci.yml — different trigger, different secret,
+# different failure mode.
+#
+# Why this file exists:
+#   Prod state is one hostile SQL session away from data loss (see
+#   the 2026-06-26 wipe of ~95 level_history rows). The append-only
+#   guard on level_history / audit_events (0107) blocks the specific
+#   vector but doesn't cover the whole DB. A daily pg_dump gives us
+#   a full-fidelity restore point that lives outside the DB.
+#
+# Restore recipe (kept here so it doesn't drift from the dump format):
+#   1. Download the artifact from the Actions run page.
+#   2. Restore to a target with the matching-or-newer client:
+#        pg_restore --clean --if-exists --no-owner --no-privileges \
+#                   -d "$TARGET_DB_URL" agsi-crm-backup-YYYY-MM-DD.dump
+#      --no-owner / --no-privileges strip ownership + grants at
+#      restore time (Supabase manages roles itself). Add
+#      --schema=public if you only want the app schema.
+#
+# Secret required (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL_BACKUP  Full connection string, pointing at the
+#                           Session pooler host (IPv4-reachable from
+#                           GitHub Actions runners). Copy from
+#                           Project Settings → Database → Connection
+#                           string → "Session pooler" tab. Shape:
+#                             postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+#                           Do NOT use db.<ref>.supabase.co here —
+#                           that resolves IPv6-only and every runner
+#                           will time out on it (the exact failure
+#                           mode that broke apply-migrations, see
+#                           ci.yml header comment).
+
+name: DB backup
+
+on:
+  schedule:
+    # 02:00 UTC = 06:00 Dubai. Quiet-hour window.
+    - cron: '0 2 * * *'
+  workflow_dispatch: {}
+
+# One in-flight run at a time. If the previous day's job is somehow
+# still running when the cron fires, wait rather than double-dump.
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump prod → artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    env:
+      # Read-only in this workflow; never printed, never persisted.
+      PGCONN: ${{ secrets.SUPABASE_DB_URL_BACKUP }}
+      # Tiny-file threshold. Anything below this is a failed dump.
+      MIN_DUMP_BYTES: '102400'  # 100 KiB
+
+    steps:
+      - name: Guard — secret must be present
+        run: |
+          if [ -z "${PGCONN:-}" ]; then
+            echo "::error::SUPABASE_DB_URL_BACKUP is not set."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL 17 client (PGDG apt)
+        # Client version must be >= server major, or pg_dump refuses
+        # with "aborting because of server version mismatch". Ubuntu's
+        # default postgresql-client is older than 17, so we pull the
+        # exact major from the PGDG repo. Signed via the modern
+        # signed-by path (apt-key is deprecated).
+        run: |
+          set -euo pipefail
+          sudo install -d -m 0755 /usr/share/keyrings
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          pg_dump --version
+
+      - name: Compute dump filename
+        id: name
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y-%m-%d)"
+          FILE="agsi-crm-backup-${STAMP}.dump"
+          echo "stamp=${STAMP}" >> "$GITHUB_OUTPUT"
+          echo "file=${FILE}"   >> "$GITHUB_OUTPUT"
+
+      - name: pg_dump → custom format
+        # -Fc is the compressed custom format — smaller than plain SQL
+        # and restorable selectively via pg_restore. Full-fidelity by
+        # default (owners + privileges retained). Restore filters can
+        # be applied at pg_restore time (see header comment).
+        # ON_ERROR_STOP for extra safety inside pg_dump.
+        run: |
+          set -euo pipefail
+          FILE="${{ steps.name.outputs.file }}"
+          echo "Dumping to ${FILE} ..."
+          pg_dump \
+            --format=custom \
+            --compress=9 \
+            --no-password \
+            --verbose \
+            --file="${FILE}" \
+            "$PGCONN" 2> pg_dump.log
+          echo "Dump complete. Size:"
+          ls -la "${FILE}"
+
+      - name: Fail if dump is suspiciously small
+        # A silent-failure dump (auth ok, no data pulled) will be
+        # kilobytes of header/footer. 100 KiB catches that without
+        # false-positive risk — real prod dumps are 10s of MB minimum.
+        run: |
+          set -euo pipefail
+          FILE="${{ steps.name.outputs.file }}"
+          SIZE=$(stat -c '%s' "${FILE}")
+          echo "Dump size: ${SIZE} bytes (threshold: ${MIN_DUMP_BYTES} bytes)"
+          if [ "${SIZE}" -lt "${MIN_DUMP_BYTES}" ]; then
+            echo "::error::Dump file is under threshold (${SIZE} < ${MIN_DUMP_BYTES}). Treating as failed dump."
+            echo "--- pg_dump.log tail ---"
+            tail -n 40 pg_dump.log || true
+            exit 1
+          fi
+
+      - name: Upload dump as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agsi-crm-backup-${{ steps.name.outputs.stamp }}
+          path: ${{ steps.name.outputs.file }}
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0  # dump is already compressed (-Fc + -Z9)
