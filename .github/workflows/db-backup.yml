@@ -35,9 +35,13 @@
 name: DB backup
 
 on:
-  schedule:
-    # 02:00 UTC = 06:00 Dubai. Quiet-hour window.
-    - cron: '0 2 * * *'
+  # Daily cron disabled — was firing every night and emailing failures
+  # while the DB password / connection was being sorted. Manual-only
+  # for now via workflow_dispatch. To re-enable the daily schedule:
+  # uncomment the `schedule:` block below.
+  # schedule:
+  #   # 02:00 UTC = 06:00 Dubai. Quiet-hour window.
+  #   - cron: '0 2 * * *'
   workflow_dispatch: {}
 
 # One in-flight run at a time. If the previous day's job is somehow
