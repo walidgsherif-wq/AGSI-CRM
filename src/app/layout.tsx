@@ -11,7 +11,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'AGSI CRM',
   description: 'AGSI Business Development CRM',
-  icons: { icon: '/favicon.ico' },
+  // No `icons` here — Next.js auto-generates the favicon <link> from
+  // src/app/icon.png (file-convention). Overriding this metadata field
+  // shadows the file convention and points at a file that isn't shipped.
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

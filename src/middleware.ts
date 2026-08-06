@@ -25,6 +25,8 @@ export async function middleware(req: NextRequest) {
   const isStatic =
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/icon') ||        // Next file-convention: src/app/icon.png
+    pathname.startsWith('/apple-icon') ||  // (future-proof — none shipped yet)
     pathname.startsWith('/agsi-logo') ||
     pathname === '/robots.txt';
 
@@ -45,5 +47,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|agsi-logo).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|icon.png|apple-icon|agsi-logo).*)'],
 };
