@@ -15,7 +15,6 @@ import { InboundEmailAddressCard } from './_components/InboundEmailAddressCard';
 import { UniverseSizesCard } from './_components/UniverseSizesCard';
 import { CompositionCard } from './_components/CompositionCard';
 import { EcosystemTuningCard } from './_components/EcosystemTuningCard';
-import { BeiWeightingsCard } from './_components/BeiWeightingsCard';
 import { RebarCard } from './_components/RebarCard';
 import { EcosystemPointScaleCard } from './_components/EcosystemPointScaleCard';
 import { CrmSetupModeCard } from './_components/CrmSetupModeCard';
@@ -105,10 +104,6 @@ export default async function AdminSettingsPage() {
     ),
     dedup_window_days: Number(get<{ days?: number }>(settingsMap, 'ecosystem_dedup_window_days')?.days ?? 7),
   };
-  const bei = (get<{ A?: number; B?: number; C?: number; D?: number }>(
-    settingsMap,
-    'bei_weightings',
-  ) ?? {});
   const rebar = {
     window_pct: Number(get<{ pct?: number }>(settingsMap, 'rebar_consumption_window_pct')?.pct ?? 45),
     share_of_value: Number(get<{ share?: number }>(settingsMap, 'rebar_share_of_project_value')?.share ?? 0.05),
@@ -142,12 +137,6 @@ export default async function AdminSettingsPage() {
         initialConsultants={Number(universe.consultants ?? 0)}
         initialMainContractors={Number(universe.main_contractors ?? 0)}
         initialEnablingContractors={Number(universe.enabling_contractors ?? 0)}
-      />
-      <BeiWeightingsCard
-        initialA={Number(bei.A ?? 45)}
-        initialB={Number(bei.B ?? 20)}
-        initialC={Number(bei.C ?? 20)}
-        initialD={Number(bei.D ?? 15)}
       />
       <CompositionCard
         initialHeadlinePct={Number(compWarn.headline_pct ?? 80)}

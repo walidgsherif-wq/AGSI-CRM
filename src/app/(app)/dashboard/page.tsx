@@ -300,10 +300,14 @@ export default async function DashboardPage({
   // BEI is per-user. Team rollup has no BEI semantics, so we only
   // fetch when a specific member is being viewed AND they're in a
   // role that the bei_for_caller view exposes.
+  //
+  // Phase-0 BEI retirement: bd_managers never see the card, so skip
+  // the round-trip when the viewer is one. Admin, bd_head and
+  // leadership continue to see BEI during the transition.
   let bei: BEIRow | null = null;
   const beiEligibleRoles: Array<'bd_manager' | 'bd_head'> = ['bd_manager', 'bd_head'];
   const viewedRole = viewedProfile?.role;
-  if (viewedUserId !== null && viewedRole && beiEligibleRoles.includes(viewedRole as 'bd_manager' | 'bd_head')) {
+  if (user.role !== 'bd_manager' && viewedUserId !== null && viewedRole && beiEligibleRoles.includes(viewedRole as 'bd_manager' | 'bd_head')) {
     const beiRes = await supabase
       .from('bei_for_caller')
       .select(
@@ -516,7 +520,7 @@ export default async function DashboardPage({
         <TeamEventsCard summary={teamEventsSummary} />
       )}
 
-      {bei && (
+      {user.role !== 'bd_manager' && bei && (
         <Card>
           <CardHeader>
             <CardTitle>
