@@ -51,19 +51,6 @@ export async function updateAppSetting(
 // Specialised wrappers — call updateAppSetting with the right key + a
 // validated value shape. Each returns { ok: true } | { error: string }.
 
-export async function updateBeiWeightings(weightings: {
-  A: number;
-  B: number;
-  C: number;
-  D: number;
-}): Promise<ActionResult> {
-  const sum = weightings.A + weightings.B + weightings.C + weightings.D;
-  if (sum !== 100) {
-    return { error: `BEI weightings must sum to 100 (got ${sum}).` };
-  }
-  return updateAppSetting('bei_weightings', weightings);
-}
-
 export async function updateKpiUniverseSizes(sizes: {
   developers: number;
   consultants: number;

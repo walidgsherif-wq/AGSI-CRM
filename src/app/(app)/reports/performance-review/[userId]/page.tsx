@@ -184,13 +184,19 @@ export default async function PerformanceReviewPage({
       .eq('user_id', params.userId)
       .eq('fiscal_year', fy)
       .returns<ActualRow[]>(),
-    supabase
-      .from('bei_for_caller')
-      .select('fiscal_quarter, driver_a_pct, driver_b_pct, driver_c_pct, driver_d_pct, bei, bei_tier')
-      .eq('user_id', params.userId)
-      .eq('fiscal_year', fy)
-      .order('fiscal_quarter')
-      .returns<BEIRow[]>(),
+    // Phase-0 BEI retirement: bd_managers never see the BEI table on
+    // their own performance-review page, so skip the fetch. The slot
+    // still returns a `{data: []}` so the Promise.all shape and the
+    // beiByQ Map stay unchanged.
+    viewer.role === 'bd_manager'
+      ? Promise.resolve({ data: [] as BEIRow[] })
+      : supabase
+          .from('bei_for_caller')
+          .select('fiscal_quarter, driver_a_pct, driver_b_pct, driver_c_pct, driver_d_pct, bei, bei_tier')
+          .eq('user_id', params.userId)
+          .eq('fiscal_year', fy)
+          .order('fiscal_quarter')
+          .returns<BEIRow[]>(),
     supabase
       .from('level_history')
       .select(
@@ -292,6 +298,7 @@ export default async function PerformanceReviewPage({
         </p>
       </div>
 
+      {viewer.role !== 'bd_manager' && (
       <Card>
         <CardHeader>
           <CardTitle>BEI by quarter</CardTitle>
@@ -358,6 +365,7 @@ export default async function PerformanceReviewPage({
           </Table>
         </CardContent>
       </Card>
+      )}
 
       {(['A', 'B', 'C', 'D'] as Driver[]).map((d) => (
         <Card key={d}>
