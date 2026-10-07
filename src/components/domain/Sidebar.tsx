@@ -13,6 +13,7 @@ import {
   LineChart,
   Map as MapIcon,
   FileText,
+  BarChart3,
   Shield,
   Settings,
   LogOut,
@@ -108,6 +109,20 @@ const NAV: NavItem[] = [
     icon: FileText,
     roles: ['admin', 'leadership', 'bd_head'],
     feature: 'reports',
+  },
+  {
+    // Phase 1a — the Driver A–D scorecard moved from the dashboard to
+    // its own sub-route under /reports. Gated by its own feature key
+    // (`reports_scorecard`, defaults to admin+leadership+bd_head+
+    // bd_manager) rather than the stricter `reports` key, so that
+    // bd_managers can keep seeing their own driver progress without
+    // getting access to the leadership-reports archive that `/reports`
+    // guards.
+    href: '/reports/scorecard',
+    label: 'Scorecard',
+    icon: BarChart3,
+    roles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
+    feature: 'reports_scorecard',
   },
   {
     href: '/settings/notifications',

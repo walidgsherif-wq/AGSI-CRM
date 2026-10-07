@@ -10,6 +10,7 @@ export type FeatureKey =
   | 'insights_maps'
   | 'insights_ecosystem'
   | 'reports'
+  | 'reports_scorecard'
   | 'pipeline'
   | 'tasks';
 
@@ -51,6 +52,13 @@ export const FEATURES: FeatureDef[] = [
     label: 'Leadership reports',
     description: 'Finalised/archived leadership reports + PDF download.',
     defaultRoles: ['admin', 'leadership', 'bd_head'],
+  },
+  {
+    key: 'reports_scorecard',
+    label: 'Driver scorecard',
+    description:
+      'The /reports/scorecard sub-route — per-member Driver A–D vs target cards (relocated from the dashboard in Phase 1a). Separate from `reports` because that gate currently excludes bd_manager to protect snapshotted BEI in leadership reports; the scorecard needs to stay reachable to bd_managers so they can see their own driver progress. The DB `features` registry mirror (seeded in migration 0047) does not yet carry this key — code defaults apply, per-user overrides via the admin UI would need the row seeded.',
+    defaultRoles: ['admin', 'leadership', 'bd_head', 'bd_manager'],
   },
   {
     key: 'pipeline',
