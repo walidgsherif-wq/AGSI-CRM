@@ -78,6 +78,25 @@ export default async function ReportsHubPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Driver scorecard</CardTitle>
+          <CardDescription>
+            Per-member Driver A–D progress vs target across all four
+            quarters of the fiscal year. Relocated from the dashboard
+            in Phase 1a.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href={'/reports/scorecard' as never}
+            className="inline-flex items-center text-sm font-medium text-agsi-accent hover:underline"
+          >
+            Open scorecard →
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Quarterly scorecard</CardTitle>
           <CardDescription>Cross-team summary. Lands in M15.</CardDescription>
         </CardHeader>

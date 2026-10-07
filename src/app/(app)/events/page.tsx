@@ -27,6 +27,12 @@ import { EventLogForm } from '@/components/domain/EventLogForm';
 import { PlanEventDialog } from '@/components/domain/PlanEventDialog';
 import { EventProofLink } from '@/components/domain/EventProofLink';
 import { EventRowActions } from './_components/EventRowActions';
+import { MyEventsCard, type MyEventRow } from './_components/MyEventsCard';
+import {
+  TeamEventsCard,
+  type TeamEventSummary,
+} from './_components/TeamEventsCard';
+import type { EventType as EventTypeAlias } from '@/lib/zod/event';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +125,82 @@ export default async function EventsPage({
   const verified = attended.filter((r) => !!r.proof_path);
   const planned = rows.filter((r) => r.status === 'planned');
 
+  // Phase 1a relocation: the dashboard's "My events" + "Team events"
+  // cards moved here. Their fetches moved with them, exactly as they
+  // were. MyEventsCard shows the viewer's own 20 most-recent rows (no
+  // role gate); TeamEventsCard shows an FY-to-date rollup for admin
+  // and leadership only.
+  const fyStartDate = quarters[0]?.startDate.toISOString().slice(0, 10);
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const myEventsRes = await supabase
+    .from('event_attendance')
+    .select(
+      'id, event_name, event_date, event_type, website, value_note, feedback, status, proof_path, confirmed_at',
+    )
+    .eq('member_id', user.id)
+    .order('event_date', { ascending: false })
+    .limit(20)
+    .returns<MyEventRow[]>();
+  const myEvents = myEventsRes.data ?? [];
+
+  const showTeamEvents = user.role === 'admin' || user.role === 'leadership';
+  let teamEventsSummary: TeamEventSummary | null = null;
+  if (showTeamEvents) {
+    type TeamRow = {
+      id: string;
+      member_id: string;
+      event_name: string;
+      event_date: string;
+      event_type: EventTypeAlias;
+      status: 'planned' | 'attended';
+      proof_path: string | null;
+      member: { full_name: string } | { full_name: string }[] | null;
+    };
+    const { data } = await supabase
+      .from('event_attendance')
+      .select(
+        'id, member_id, event_name, event_date, event_type, status, proof_path, member:profiles!event_attendance_member_id_fkey(full_name)',
+      )
+      .gte('event_date', fyStartDate ?? '0001-01-01')
+      .order('event_date', { ascending: false })
+      .returns<TeamRow[]>();
+    const teamRows = data ?? [];
+    const teamAttended = teamRows.filter((r) => r.status === 'attended');
+    const teamPlanned = teamRows.filter(
+      (r) => r.status === 'planned' && r.event_date >= todayDate,
+    );
+    const uniqueMembers = new Set(teamAttended.map((r) => r.member_id));
+    const verifiedTotal = teamAttended.filter((r) => !!r.proof_path).length;
+    const memberNameOf = (r: TeamRow) =>
+      Array.isArray(r.member)
+        ? (r.member[0]?.full_name ?? null)
+        : (r.member?.full_name ?? null);
+    teamEventsSummary = {
+      attendedTotal: teamAttended.length,
+      verifiedTotal,
+      uniqueMembers: uniqueMembers.size,
+      periodLabel: `FY${fy}`,
+      recentAttended: teamAttended.slice(0, 5).map((r) => ({
+        id: r.id,
+        event_name: r.event_name,
+        event_date: r.event_date,
+        event_type: r.event_type,
+        member_name: memberNameOf(r),
+        verified: !!r.proof_path,
+      })),
+      upcoming: [...teamPlanned]
+        .sort((a, b) => a.event_date.localeCompare(b.event_date))
+        .slice(0, 5)
+        .map((r) => ({
+          id: r.id,
+          event_name: r.event_name,
+          event_date: r.event_date,
+          event_type: r.event_type,
+          member_name: memberNameOf(r),
+        })),
+    };
+  }
+
   const periodLabel =
     period === 'quarter'
       ? `FY${fy} Q${fq}`
@@ -152,6 +234,12 @@ export default async function EventsPage({
           />
         </div>
       </div>
+
+      <MyEventsCard rows={myEvents} memberId={user.id} />
+
+      {showTeamEvents && teamEventsSummary && (
+        <TeamEventsCard summary={teamEventsSummary} />
+      )}
 
       <Card>
         <CardHeader>

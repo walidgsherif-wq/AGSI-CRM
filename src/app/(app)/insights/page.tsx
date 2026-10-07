@@ -11,6 +11,7 @@ import { DataFreshnessBadge } from '@/components/domain/DataFreshnessBadge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SnapshotPicker } from './_components/SnapshotPicker';
 import { TrendCharts, type TrendPoint, type PricePoint } from './_components/TrendCharts';
+import { InsightsSubNav } from './_components/InsightsSubNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -236,6 +237,8 @@ export default async function InsightsPage({
           compare={compare}
         />
       </div>
+
+      <InsightsSubNav active="market" />
 
       <FreshnessRow primary={primaryRef} compare={compareRef} />
 
